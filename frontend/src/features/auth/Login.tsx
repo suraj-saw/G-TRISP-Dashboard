@@ -8,8 +8,9 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import API from "../../api/axios";
 
+// Changed: username to email
 interface LoginForm {
-  username: string;
+  email: string;
   password: string;
 }
 
@@ -38,7 +39,8 @@ function sleep(ms: number) {
 function Login() {
   const navigate = useNavigate();
 
-  const [form, setForm] = useState<LoginForm>({ username: "", password: "" });
+  // Changed: initialized with email
+  const [form, setForm] = useState<LoginForm>({ email: "", password: "" });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -51,22 +53,15 @@ function Login() {
       console.groupCollapsed("[Login] Initial session check");
 
       try {
-        // console.log("Checking /auth/me without refresh-token retry...");
-
         await API.get<User>("/auth/me", {
           skipAuthRefresh: true,
         });
 
-        // console.log("Existing access session is valid.");
-
         if (!cancelled && !isSubmittingLogin.current) {
-          // console.log("Redirecting existing logged-in user to /dashboard.");
           navigate("/dashboard", { replace: true });
         }
       } catch (err: any) {
-        // console.log("No active access session. Staying on login page.");
-        // console.log("Status:", err?.response?.status);
-        // console.log("Detail:", err?.response?.data?.detail);
+        // Ignored
       } finally {
         console.groupEnd();
       }
@@ -88,27 +83,17 @@ function Login() {
       const delay = delays[attempt];
 
       if (delay > 0) {
-        // console.log(
-        //   `Waiting ${delay}ms before verification attempt ${attempt + 1}...`
-        // );
         await sleep(delay);
       }
 
       try {
-        // console.log(`Attempt ${attempt + 1}: GET /auth/me`);
-
-        const response = await API.get<User>("/auth/me", {
+        await API.get<User>("/auth/me", {
           skipAuthRefresh: true,
         });
-
-        // console.log("Session verified successfully:", response.data);
         console.groupEnd();
-
         return true;
       } catch (err: any) {
         console.warn(`Attempt ${attempt + 1} failed.`);
-        console.warn("Status:", err?.response?.status);
-        console.warn("Detail:", err?.response?.data?.detail);
       }
     }
 
@@ -133,13 +118,9 @@ function Login() {
     console.groupCollapsed("[Login] Submit");
 
     try {
-    //   console.log("Submitting login request for username:", form.username);
-
       const loginResponse = await API.post("/auth/login", form, {
         skipAuthRefresh: true,
       });
-
-    //   console.log("Login response received:", loginResponse.data);
 
       const sessionReady = await verifySessionAfterLogin();
 
@@ -150,7 +131,6 @@ function Login() {
         return;
       }
 
-    //   console.log("Navigating to /dashboard.");
       navigate("/dashboard", { replace: true });
     } catch (err: unknown) {
       const detail = (
@@ -159,15 +139,8 @@ function Login() {
         }
       )?.response?.data?.detail;
 
-      console.error("Login failed.");
-      console.error(
-        "Status:",
-        (err as { response?: { status?: number } })?.response?.status
-      );
-      console.error("Detail:", detail);
-
       setError(
-        detail ? extractErrorMessage(detail) : "Invalid username or password."
+        detail ? extractErrorMessage(detail) : "Invalid email or password."
       );
     } finally {
       console.groupEnd();
@@ -200,18 +173,18 @@ function Login() {
         <form onSubmit={loginUser} className="space-y-4">
           <div>
             <label
-              htmlFor="username"
+              htmlFor="email"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              Username
+              Email
             </label>
 
             <input
-              id="username"
-              type="text"
-              name="username"
-              placeholder="your_handle"
-              value={form.username}
+              id="email"
+              type="email"
+              name="email"
+              placeholder="you@example.com"
+              value={form.email}
               onChange={handleChange}
               required
               disabled={loading}

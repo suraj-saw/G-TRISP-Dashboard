@@ -39,9 +39,10 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Invalid token type")
 
-        username = payload.get("sub")
+        # Changed to expect user ID in 'sub'
+        user_id_str = payload.get("sub")
 
-        if not username:
+        if not user_id_str:
             raise HTTPException(status_code=401, detail="Invalid token")
 
     except JWTError:
@@ -53,7 +54,8 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
             detail="Session invalidated. Please log in again."
         )
 
-    user = db.query(User).filter(User.username == username).first()
+    # Changed to query by ID instead of username
+    user = db.query(User).filter(User.id == int(user_id_str)).first()
 
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
@@ -85,14 +87,15 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.username == user.username).first()
+    # Still querying by email for the login request (as we changed previously)
+    db_user = db.query(User).filter(User.email == user.email).first()
 
-    # Fixed: Change user.hashed_password to user.password
     if not db_user or not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    # Changed to use ID as the token subject (sub)
     access_token, refresh_token = create_token_pair({
-        "sub": db_user.username,
+        "sub": str(db_user.id),
         "id": db_user.id,
     })
 
@@ -102,7 +105,7 @@ def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
         httponly=True,
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE, # Fixed: removed quotes
+        samesite=COOKIE_SAMESITE,
         path="/",
     )
 
@@ -112,7 +115,7 @@ def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
         httponly=True,
         max_age=REFRESH_TOKEN_EXPIRE_HOURS * 3600,
         secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE, # Fixed: removed quotes
+        samesite=COOKIE_SAMESITE,
         path="/",
     )
 
@@ -141,10 +144,10 @@ def refresh(request: Request, response: Response):
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
 
-        username = payload.get("sub")
+        user_id_str = payload.get("sub")
         user_id = payload.get("id")
 
-        if not username or not user_id:
+        if not user_id_str or not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
 
     except JWTError:
@@ -153,7 +156,7 @@ def refresh(request: Request, response: Response):
     blacklist_refresh_token(token, revoke_session=False)
 
     access_token, refresh_token = create_token_pair({
-        "sub": username,
+        "sub": user_id_str,
         "id": user_id,
     })
 
