@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import API from "../api/axios";
-
+import API from "../../api/axios";
 
 interface User {
   id: number;
