@@ -1,6 +1,7 @@
 // frontend/src/components/layout/TopBar.tsx
 
-import { ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown, LogOut } from "lucide-react";
 
 import NotificationBell from "./NotificationBell";
 import type { User } from "../../types/user";
@@ -9,9 +10,35 @@ interface Props {
   appName: string;
   user: User;
   notificationCount?: number;
+  onLogout: () => void;
 }
 
-function TopBar({ appName, user, notificationCount = 0 }: Props) {
+function TopBar({ appName, user, notificationCount = 0, onLogout }: Props) {
+  const [open, setOpen] = useState(false);
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  /*
+    Close profile dropdown
+    when user clicks outside
+  */
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, []);
+
   return (
     <header
       className="
@@ -29,9 +56,12 @@ function TopBar({ appName, user, notificationCount = 0 }: Props) {
       border-slate-200
 
       shadow-sm
+
+      relative
+      z-40
       "
     >
-      {/* LEFT SECTION - BRAND */}
+      {/* LEFT SIDE - BRAND */}
 
       <div
         className="
@@ -40,7 +70,7 @@ function TopBar({ appName, user, notificationCount = 0 }: Props) {
         gap-3
         "
       >
-        {/* <div
+        <div
           className="
           h-11
           w-11
@@ -59,7 +89,7 @@ function TopBar({ appName, user, notificationCount = 0 }: Props) {
           "
         >
           {appName.charAt(0)}
-        </div> */}
+        </div>
 
         <div>
           <h1
@@ -72,25 +102,25 @@ function TopBar({ appName, user, notificationCount = 0 }: Props) {
             via-green-600
             to-amber-500
 
-            bg-clip-text
             text-transparent
+            bg-clip-text
             "
           >
             {appName}
           </h1>
 
-          {/* <p
+          <p
             className="
             text-xs
             text-slate-500
             "
           >
             Road Safety Analytics
-          </p> */}
+          </p>
         </div>
       </div>
 
-      {/* RIGHT SECTION */}
+      {/* RIGHT SIDE */}
 
       <div
         className="
@@ -101,82 +131,238 @@ function TopBar({ appName, user, notificationCount = 0 }: Props) {
       >
         <NotificationBell count={notificationCount} />
 
-        {/* PROFILE */}
+        {/* PROFILE WRAPPER */}
 
-        <div
-          className="
-          flex
-          items-center
-          gap-3
+        <div ref={dropdownRef} className="relative">
+          {/* PROFILE BUTTON */}
 
-          px-3
-          py-2
-
-          rounded-full
-
-          cursor-pointer
-
-          hover:bg-slate-50
-
-          transition
-          "
-        >
-          {/* LOCAL AVATAR */}
-
-          <div
+          <button
+            onClick={() => setOpen((prev) => !prev)}
             className="
-            h-10
-            w-10
+            flex
+            items-center
+            gap-3
+
+            px-3
+            py-2
 
             rounded-full
 
-            bg-[radial-gradient(circle_at_top_left,#22c55e,#2563eb)]
+            hover:bg-slate-50
 
-            flex
-            items-center
-            justify-center
-
-            text-white
-            font-bold
+            transition
             "
           >
-            {user.username.charAt(0).toUpperCase()}
-          </div>
+            {/* AVATAR */}
 
-          {/* USER INFO */}
-
-          <div
-            className="
-            hidden
-            md:block
-            "
-          >
-            <p
+            <div
               className="
-              font-semibold
-              text-slate-800
+              h-10
+              w-10
+
+              rounded-full
+
+              bg-[radial-gradient(circle_at_top_left,#22c55e,#2563eb)]
+
+              flex
+              items-center
+              justify-center
+
+              text-white
+              font-bold
               "
             >
-              {user.username}
-            </p>
+              {user.username.charAt(0).toUpperCase()}
+            </div>
 
-            {/* <p
+            {/* USER INFO */}
+
+            <div
               className="
-              text-xs
-              capitalize
+              hidden
+              md:block
+
+              text-left
+              "
+            >
+              <p
+                className="
+                font-semibold
+                text-slate-800
+                "
+              >
+                {user.username}
+              </p>
+
+              <p
+                className="
+                text-xs
+                capitalize
+                text-slate-500
+                "
+              >
+                {user.role}
+              </p>
+            </div>
+
+            <ChevronDown
+              size={18}
+              className={`
               text-slate-500
+              transition-transform
+
+              ${open ? "rotate-180" : ""}
+              `}
+            />
+          </button>
+
+          {/* PROFILE DROPDOWN */}
+
+          {open && (
+            <div
+              className="
+              absolute
+
+              right-0
+              top-16
+
+              w-72
+
+              bg-white
+
+              rounded-xl
+
+              border
+              border-slate-200
+
+              shadow-xl
+
+              overflow-hidden
+
+              z-50
               "
             >
-              {user.role}
-            </p> */}
-          </div>
+              {/* USER HEADER */}
 
-          <ChevronDown
-            size={18}
-            className="
-            text-slate-500
-            "
-          />
+              <div
+                className="
+                p-5
+
+                bg-gradient-to-r
+                from-blue-50
+                to-green-50
+
+                border-b
+                "
+              >
+                <div
+                  className="
+                  flex
+                  items-center
+                  gap-3
+                  "
+                >
+                  <div
+                    className="
+                    h-12
+                    w-12
+
+                    rounded-full
+
+                    bg-[radial-gradient(circle_at_top_left,#22c55e,#2563eb)]
+
+                    flex
+                    items-center
+                    justify-center
+
+                    text-white
+                    font-bold
+                    text-lg
+                    "
+                  >
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+
+                  <div>
+                    <h3
+                      className="
+                      font-bold
+                      text-slate-800
+                      "
+                    >
+                      {user.username}
+                    </h3>
+
+                    <p
+                      className="
+                      text-sm
+                      text-slate-500
+                      truncate
+                      "
+                    >
+                      {user.email}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* DETAILS */}
+
+              <div className="p-4">
+                <div
+                  className="
+                  mb-4
+                  "
+                >
+                  <p
+                    className="
+                    text-sm
+                    text-slate-400
+                    "
+                  >
+                    Role
+                  </p>
+
+                  <p
+                    className="
+                    font-semibold
+                    capitalize
+                    "
+                  >
+                    {user.role}
+                  </p>
+                </div>
+
+                {/* LOGOUT */}
+
+                <button
+                  onClick={onLogout}
+                  className="
+                  w-full
+
+                  flex
+                  items-center
+                  justify-center
+                  gap-2
+
+                  py-2
+
+                  rounded-lg
+
+                  bg-red-500
+                  hover:bg-red-600
+
+                  text-white
+
+                  transition
+                  "
+                >
+                  <LogOut size={16} />
+                  Logout
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>

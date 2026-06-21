@@ -1,3 +1,4 @@
+// frontend/src/features/dashboard/AdminDashboard.tsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -32,7 +33,6 @@ function AdminDashboard() {
 
         if (userRes.data.role !== "admin") {
           navigate("/dashboard", { replace: true });
-
           return;
         }
 
@@ -40,24 +40,18 @@ function AdminDashboard() {
 
         if (!loaded.current) {
           const adminRes = await API.get("/admin/dashboard");
-
           setAdminData(adminRes.data);
         }
 
         loaded.current = true;
-
         setSessionStatus("active");
 
         timer = setTimeout(poll, SESSION_POLL_INTERVAL_MS);
       } catch (error: any) {
         if (error?.response?.status === 401) {
-          if (!loaded.current) {
-            navigate("/login", { replace: true });
-
-            return;
-          }
-
-          setSessionStatus("kicked");
+          // Immediately redirect to login instead of setting the status to "kicked"
+          navigate("/login", { replace: true });
+          return;
         }
       }
     };
@@ -66,7 +60,6 @@ function AdminDashboard() {
 
     return () => {
       active = false;
-
       clearTimeout(timer);
     };
   }, [navigate]);
@@ -87,6 +80,7 @@ function AdminDashboard() {
     );
   }
 
+  // We can leave this here as a fallback, but the redirect above will handle the navigation
   if (sessionStatus === "kicked") {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -97,7 +91,12 @@ function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <TopBar appName="G-TRISP" user={user!} notificationCount={3} />
+      <TopBar
+        appName="G-TRISP"
+        user={user!}
+        notificationCount={3}
+        onLogout={logout}
+      />
 
       <main className="p-8">
         <div
@@ -116,19 +115,6 @@ border-amber-500
             <h1 className="text-3xl font-bold text-blue-900">
               Admin Control Panel
             </h1>
-
-            <button
-              onClick={logout}
-              className="
-bg-red-500
-text-white
-px-4
-py-2
-rounded-lg
-"
-            >
-              Logout
-            </button>
           </div>
 
           <div
