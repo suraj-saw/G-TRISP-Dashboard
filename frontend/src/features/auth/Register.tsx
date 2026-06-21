@@ -34,15 +34,19 @@ function Register() {
     let cancelled = false;
 
     API.get("/auth/me")
-      .then(() => {
+      .then((res) => {
         if (!cancelled) {
-          navigate("/dashboard", { replace: true });
+          // Check role when they hit register page with an active session
+          if (res.data.role === "admin") {
+            navigate("/admin", { replace: true });
+          } else {
+            navigate("/dashboard", { replace: true });
+          }
         }
       })
       .catch(() => {
         // Not logged in, stay on Register page.
       });
-
     return () => {
       cancelled = true;
     };

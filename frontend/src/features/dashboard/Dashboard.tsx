@@ -1,11 +1,15 @@
+// frontend/src/features/dashboard/Dashboard.tsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../../api/axios";
+import TopBar from "../../components/layout/Topbar";
 
+// 1. Update User interface to include role
 interface User {
   id: number;
   username: string;
   email: string;
+  role: string; 
 }
 
 const SESSION_POLL_INTERVAL_MS = 5_000;
@@ -31,6 +35,12 @@ function Dashboard() {
 
         if (!isSubscribed) return;
 
+        // 2. Add this check: if the logged-in user is an admin, redirect them.
+        if (response.data.role === "admin") {
+          navigate("/admin", { replace: true });
+          return;
+        }
+
         setUser(response.data);
         setSessionStatus("active");
         hasInitiallyLoaded.current = true;
@@ -43,7 +53,6 @@ function Dashboard() {
 
         if (status === 401) {
           if (!hasInitiallyLoaded.current) {
-            // Changed fallback from /login to /signup
             navigate("/signup", { replace: true });
             return;
           }
@@ -85,31 +94,149 @@ function Dashboard() {
 
   if (sessionStatus === "checking") {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <svg
-            className="animate-spin h-5 w-5 text-indigo-600"
-            fill="none"
-            viewBox="0 0 24 24"
+  <div className="min-h-screen bg-gray-50">
+
+
+    <TopBar
+      appName="G-TRISP"
+      user={user!}
+      notificationCount={0}
+    />
+
+
+
+    <main
+    className="
+    flex
+    justify-center
+    px-4
+    py-10
+    "
+    >
+
+
+      <div
+      className="
+      w-full
+      max-w-xl
+      bg-white
+      rounded-2xl
+      shadow-md
+      p-8
+      border-t-4
+      border-green-600
+      "
+      >
+
+
+
+        <div
+        className="
+        flex
+        justify-between
+        items-center
+        mb-6
+        "
+        >
+
+
+          <h1
+          className="
+          text-2xl
+          font-bold
+          text-blue-900
+          "
           >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8v8H4z"
-            />
-          </svg>
-          Verifying session...
+
+            Dashboard
+
+          </h1>
+
+
+
+
+          <button
+            onClick={logout}
+            className="
+            border
+            rounded-lg
+            px-3
+            py-2
+            text-sm
+            hover:bg-gray-50
+            "
+          >
+
+            Log out
+
+          </button>
+
+
         </div>
+
+
+
+
+        {user && (
+
+
+        <div
+        className="
+        border
+        rounded-xl
+        overflow-hidden
+        "
+        >
+
+
+          <div className="p-4 border-b">
+
+            Username:
+            {" "}
+            <b>{user.username}</b>
+
+          </div>
+
+
+
+          <div className="p-4 border-b">
+
+            Email:
+            {" "}
+            <b>{user.email}</b>
+
+          </div>
+
+
+
+          <div className="p-4">
+
+            Role:
+            {" "}
+            <b className="uppercase">
+              {user.role}
+            </b>
+
+          </div>
+
+
+
+        </div>
+
+
+        )}
+
+
+
       </div>
-    );
+
+
+
+    </main>
+
+
+  </div>
+);
   }
 
   if (sessionStatus === "kicked") {

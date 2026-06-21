@@ -1,3 +1,5 @@
+// frontend/src/features/auth/Login.tsx
+
 import {
   useEffect,
   useRef,
@@ -8,27 +10,26 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import API from "../../api/axios";
 
-// Changed: username to email
 interface LoginForm {
   email: string;
   password: string;
 }
 
+// 1. Add the role to the User interface
 interface User {
   id: number;
   username: string;
   email: string;
+  role: string;
 }
 
 type FastAPIDetail = string | { msg: string; loc: string[] }[];
 
 function extractErrorMessage(detail: FastAPIDetail): string {
   if (typeof detail === "string") return detail;
-
   if (Array.isArray(detail)) {
     return detail.map((d) => d.msg.replace("Value error, ", "")).join(" · ");
   }
-
   return "Something went wrong. Please try again.";
 }
 
@@ -39,7 +40,6 @@ function sleep(ms: number) {
 function Login() {
   const navigate = useNavigate();
 
-  // Changed: initialized with email
   const [form, setForm] = useState<LoginForm>({ email: "", password: "" });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,12 +53,17 @@ function Login() {
       console.groupCollapsed("[Login] Initial session check");
 
       try {
-        await API.get<User>("/auth/me", {
+        const res = await API.get<User>("/auth/me", {
           skipAuthRefresh: true,
         });
 
         if (!cancelled && !isSubmittingLogin.current) {
-          navigate("/dashboard", { replace: true });
+          // 2. Conditionally navigate based on role
+          if (res.data.role === "admin") {
+            navigate("/admin", { replace: true });
+          } else {
+            navigate("/dashboard", { replace: true });
+          }
         }
       } catch (err: any) {
         // Ignored
@@ -74,7 +79,7 @@ function Login() {
     };
   }, [navigate]);
 
-  const verifySessionAfterLogin = async () => {
+  const verifySessionAfterLogin = async (): Promise<User | null> => {
     const delays = [0, 100, 250, 500, 1000];
 
     console.groupCollapsed("[Login] Verifying session after login");
@@ -87,11 +92,12 @@ function Login() {
       }
 
       try {
-        await API.get<User>("/auth/me", {
+        const res = await API.get<User>("/auth/me", {
           skipAuthRefresh: true,
         });
         console.groupEnd();
-        return true;
+        // 3. Return the user object instead of true
+        return res.data;
       } catch (err: any) {
         console.warn(`Attempt ${attempt + 1} failed.`);
       }
@@ -100,7 +106,7 @@ function Login() {
     console.error("Session was not available after login response.");
     console.groupEnd();
 
-    return false;
+    return null;
   };
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -118,20 +124,25 @@ function Login() {
     console.groupCollapsed("[Login] Submit");
 
     try {
-      const loginResponse = await API.post("/auth/login", form, {
+      await API.post("/auth/login", form, {
         skipAuthRefresh: true,
       });
 
-      const sessionReady = await verifySessionAfterLogin();
+      const user = await verifySessionAfterLogin();
 
-      if (!sessionReady) {
+      if (!user) {
         setError(
           "Login succeeded, but the session was not ready. Please try again."
         );
         return;
       }
 
-      navigate("/dashboard", { replace: true });
+      // 4. Navigate based on the newly logged-in user's role
+      if (user.role === "admin") {
+        navigate("/admin", { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
     } catch (err: unknown) {
       const detail = (
         err as {

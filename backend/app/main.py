@@ -6,13 +6,11 @@ from dotenv import load_dotenv
 from app.database import engine, Base
 from app import models
 from app.routes import auth
+from app.routes import admin
 
 
 load_dotenv()
-
-
 Base.metadata.create_all(bind=engine)
-
 
 app = FastAPI(
     title="G-TRISP Dashboard API",
@@ -21,9 +19,8 @@ app = FastAPI(
     openapi_url="/api/openapi.json"
 )
 
-
 app.include_router(auth.router)
-
+app.include_router(admin.router)
 
 allowed_origins = [
     x.strip()

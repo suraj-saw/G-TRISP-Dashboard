@@ -1,16 +1,12 @@
+// frontend/src/App.tsx
 import { useEffect } from "react";
-import {
-  BrowserRouter,
-  Navigate,
-  Route,
-  Routes,
-  useNavigate,
-} from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import API from "./api/axios";
 
 import Signup from "./features/auth/Register";
 import Login from "./features/auth/Login";
 import Dashboard from "./features/dashboard/Dashboard";
+import AdminDashboard from "./features/dashboard/AdminDashboard"; // <-- Import AdminDashboard
 
 function RootHandler() {
   const navigate = useNavigate();
@@ -20,14 +16,18 @@ function RootHandler() {
 
     const checkAuth = async () => {
       try {
-        await API.get("/auth/me");
+        const res = await API.get("/auth/me");
 
         if (!cancelled) {
-          navigate("/dashboard", { replace: true });
+          // Route based on role
+          if (res.data.role === "admin") {
+            navigate("/admin", { replace: true });
+          } else {
+            navigate("/dashboard", { replace: true });
+          }
         }
       } catch {
         if (!cancelled) {
-          // Changed fallback from /login to /signup
           navigate("/signup", { replace: true });
         }
       }
@@ -42,28 +42,7 @@ function RootHandler() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="flex items-center gap-2 text-sm text-gray-500">
-        <svg
-          className="animate-spin h-5 w-5 text-indigo-600"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8v8H4z"
-          />
-        </svg>
-        Loading...
-      </div>
+      <div className="flex items-center gap-2 text-sm text-gray-500">Loading...</div>
     </div>
   );
 }
@@ -76,6 +55,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/admin" element={<AdminDashboard />} /> {/* <-- Add the admin route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

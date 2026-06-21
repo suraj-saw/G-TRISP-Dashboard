@@ -1,1 +1,11 @@
 @import "tailwindcss";
+
+:root {
+
+--primary-blue:#1E3A8A;
+
+--safety-green:#16A34A;
+
+--gov-gold:#D97706;
+
+}

@@ -199,3 +199,9 @@ def logout(request: Request, response: Response):
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+# function to check if the current user is an admin
+def get_current_admin_user(current_user: User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not enough privileges. Admin access required.")
+    return current_user
