@@ -23,6 +23,7 @@ from app.services.auth_service import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     REFRESH_TOKEN_EXPIRE_HOURS,
 )
+from app.models.notification import Notification
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
@@ -59,6 +60,8 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    if user.status != "approved":
+        raise HTTPException(status_code=403, detail="Your account is not currently approved for access.")
 
     return user
 
@@ -76,13 +79,24 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         username=user.username,
         email=user.email,
         hashed_password=hash_password(user.password),
+        status="pending",
     )
 
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
-    return {"message": "User registered successfully", "user_id": new_user.id}
+    db.add(Notification(
+        type="user_registration",
+        message=f"New user '{new_user.username}' ({new_user.email}) registered and is awaiting approval.",
+        related_user_id=new_user.id,
+    ))
+    db.commit()
+
+    return {
+        "message": "Registration successful. Your account is pending admin approval.",
+        "user_id": new_user.id,
+    }
 
 
 @router.post("/login")
@@ -93,6 +107,17 @@ def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
     if not db_user or not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    if db_user.status == "pending":
+        raise HTTPException(
+            status_code=403,
+            detail="Your account is pending admin approval. Please check back later."
+        )
+    
+    if db_user.status == "rejected":
+        raise HTTPException(
+            status_code=403,
+            detail="Your registration was not approved. Contact an administrator."
+        )
     # Changed to use ID as the token subject (sub)
     access_token, refresh_token = create_token_pair({
         "sub": str(db_user.id),
