@@ -1,6 +1,6 @@
 # backend/app/services/auth_service.py
 
-from passlib.context import CryptContext
+import bcrypt
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 import os
@@ -11,8 +11,6 @@ from datetime import timezone
 from dotenv import load_dotenv
 
 load_dotenv()
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
@@ -42,11 +40,18 @@ IDLE_TIMEOUT_MINUTES = int(os.getenv("IDLE_TIMEOUT_MINUTES", "30"))
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    # Fixed: Use bcrypt directly to avoid passlib 1.7.4 incompatibility with bcrypt 4+
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
 
 
 def verify_password(password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(password, hashed_password)
+    try:
+        # Fixed: Use bcrypt directly to verify
+        return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except ValueError:
+        return False
 
 
 def create_token_pair(data: dict) -> tuple[str, str]:

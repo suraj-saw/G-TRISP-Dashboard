@@ -43,7 +43,8 @@ function Dashboard() {
 
         if (status === 401) {
           if (!hasInitiallyLoaded.current) {
-            navigate("/login", { replace: true });
+            // Changed fallback from /login to /signup
+            navigate("/signup", { replace: true });
             return;
           }
 

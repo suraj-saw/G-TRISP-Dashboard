@@ -8,7 +8,6 @@ import {
 } from "react-router-dom";
 import API from "./api/axios";
 
-// Fixed: Corrected the import paths to point to the features directory
 import Signup from "./features/auth/Register";
 import Login from "./features/auth/Login";
 import Dashboard from "./features/dashboard/Dashboard";
@@ -28,7 +27,8 @@ function RootHandler() {
         }
       } catch {
         if (!cancelled) {
-          navigate("/login", { replace: true });
+          // Changed fallback from /login to /signup
+          navigate("/signup", { replace: true });
         }
       }
     };

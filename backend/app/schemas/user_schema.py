@@ -28,8 +28,9 @@ class UserCreate(BaseModel):
     def username_valid(cls, v: str) -> str:
         if len(v) < 3:
             raise ValueError("Username must be at least 3 characters long")
-        if not re.match(r"^[a-zA-Z0-9_]+$", v):
-            raise ValueError("Username can only contain letters, numbers, and underscores")
+        # Fixed: Added a space to the allowed characters regex
+        if not re.match(r"^[a-zA-Z0-9_ ]+$", v):
+            raise ValueError("Username can only contain letters, numbers, spaces, and underscores")
         return v
 
 
