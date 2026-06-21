@@ -1,5 +1,10 @@
 # backend/app/routes/auth.py
 
+import os
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+COOKIE_SECURE = ENVIRONMENT == "production"
+COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "strict")
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 from jose import JWTError
@@ -82,7 +87,8 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.username == user.username).first()
 
-    if not db_user or not verify_password(user.hashed_password, db_user.hashed_password):
+    # Fixed: Change user.hashed_password to user.password
+    if not db_user or not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     access_token, refresh_token = create_token_pair({
@@ -95,8 +101,8 @@ def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
         value=access_token,
         httponly=True,
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        secure=False,
-        samesite="strict",
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE, # Fixed: removed quotes
         path="/",
     )
 
@@ -105,8 +111,8 @@ def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
         value=refresh_token,
         httponly=True,
         max_age=REFRESH_TOKEN_EXPIRE_HOURS * 3600,
-        secure=False,
-        samesite="strict",
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE, # Fixed: removed quotes
         path="/",
     )
 
@@ -156,7 +162,8 @@ def refresh(request: Request, response: Response):
         value=access_token,
         httponly=True,
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
         path="/",
     )
 
@@ -165,7 +172,8 @@ def refresh(request: Request, response: Response):
         value=refresh_token,
         httponly=True,
         max_age=REFRESH_TOKEN_EXPIRE_HOURS * 3600,
-        samesite="lax",
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
         path="/",
     )
 

@@ -7,5 +7,5 @@ __pycache__/
 *.pyc
 *.pyo
 .DS_Store
-/nginx/nginx.conf
+nginx/nginx.conf
 docker-compose.yml

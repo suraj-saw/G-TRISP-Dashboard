@@ -36,9 +36,9 @@ except Exception:
         "Redis connection failed"
     )
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 20
-REFRESH_TOKEN_EXPIRE_HOURS = 8
-IDLE_TIMEOUT_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "20"))
+REFRESH_TOKEN_EXPIRE_HOURS = int(os.getenv("REFRESH_TOKEN_EXPIRE_HOURS", "8"))
+IDLE_TIMEOUT_MINUTES = int(os.getenv("IDLE_TIMEOUT_MINUTES", "30"))
 
 
 def hash_password(password: str) -> str:
