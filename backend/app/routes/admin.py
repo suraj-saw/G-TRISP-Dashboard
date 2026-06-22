@@ -1,6 +1,8 @@
 # backend/app/routes/admin.py
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from typing import Literal
 
 from app.database import get_db
 from app.models.user import User
@@ -10,6 +12,10 @@ from app.schemas.user_schema import UserResponse
 from app.schemas.notification_schema import NotificationResponse
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
+
+
+class StatusChangeRequest(BaseModel):
+    status: Literal["approved", "rejected"]
 
 
 @router.get("/dashboard")
@@ -48,6 +54,7 @@ def _set_user_status(
     db: Session,
     decided_by: User,
 ) -> User:
+    """Used for first-time decisions on pending users."""
     target = db.query(User).filter(User.id == user_id).first()
 
     if not target:
@@ -56,8 +63,6 @@ def _set_user_status(
     if target.role == "admin":
         raise HTTPException(status_code=400, detail="Cannot change status of an admin account")
 
-    # Guards against two admins acting on the same user at the same time,
-    # and against re-approving/re-rejecting an already-decided user.
     if target.status != "pending":
         raise HTTPException(
             status_code=400,
@@ -66,8 +71,6 @@ def _set_user_status(
 
     target.status = new_status
 
-    # Resolve the original registration notification so it stops showing
-    # as an unread, actionable item for every other admin.
     related_notifications = (
         db.query(Notification)
         .filter(
@@ -83,6 +86,52 @@ def _set_user_status(
         notif.message = (
             f"User '{target.username}' ({target.email}) was {verb} by {decided_by.username}."
         )
+
+    db.commit()
+    db.refresh(target)
+    return target
+
+
+def _force_set_user_status(
+    user_id: int,
+    new_status: str,
+    db: Session,
+    decided_by: User,
+) -> User:
+    """Used for re-decisions on already approved/rejected users."""
+    target = db.query(User).filter(User.id == user_id).first()
+
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if target.role == "admin":
+        raise HTTPException(status_code=400, detail="Cannot change status of an admin account")
+
+    if target.status == "pending":
+        raise HTTPException(
+            status_code=400,
+            detail="Use the standard approve/reject endpoints for pending users.",
+        )
+
+    if target.status == new_status:
+        raise HTTPException(
+            status_code=400,
+            detail=f"User is already {new_status}.",
+        )
+
+    old_status = target.status
+    target.status = new_status
+
+    verb = "approved" if new_status == "approved" else "rejected"
+    db.add(Notification(
+        type="status_change",
+        message=(
+            f"User '{target.username}' ({target.email}) status changed "
+            f"from {old_status} to {new_status} by {decided_by.username}."
+        ),
+        related_user_id=target.id,
+        is_read=False,
+    ))
 
     db.commit()
     db.refresh(target)
@@ -105,6 +154,17 @@ def reject_user(
     current_user: User = Depends(get_current_admin_user),
 ):
     return _set_user_status(user_id, "rejected", db, decided_by=current_user)
+
+
+@router.post("/users/{user_id}/set-status", response_model=UserResponse)
+def change_user_status(
+    user_id: int,
+    payload: StatusChangeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Re-decide the status of an already approved or rejected user."""
+    return _force_set_user_status(user_id, payload.status, db, decided_by=current_user)
 
 
 @router.get("/notifications", response_model=list[NotificationResponse])
