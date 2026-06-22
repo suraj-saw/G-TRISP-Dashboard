@@ -14,7 +14,7 @@ from app.database import engine, Base
 from app import models                          # registers all ORM models
 from app.routes import auth
 from app.routes import admin
-from app.seed.seed_geo import run_geo_seeds     # geo seeder
+from app.seed.seed_geo import run_geo_seeds     # master seeder (geo + accidents)
 
 load_dotenv()
 
@@ -29,12 +29,13 @@ async def lifespan(app: FastAPI):
     Runs once on startup:
       1. Create all tables (DDL is idempotent).
       2. Seed Gujarat boundary + districts if not already present.
+      3. Seed accident records if not already present.
     """
     # 1. DDL
     Base.metadata.create_all(bind=engine)
 
-    # 2. Geo seeds (skips automatically if tables already populated)
-    run_geo_seeds(force=False)
+    # 2 & 3. Geo seeds + accident data (all idempotent — skip if populated)
+    run_geo_seeds(force=False, skip_validation=False)
 
     yield   # App is live
 
