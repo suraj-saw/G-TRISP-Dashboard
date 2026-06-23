@@ -6,6 +6,7 @@ export interface DashboardFilters {
   weather_condition: string;
   light_condition: string;
   collision_type: string;
+  baseMap?: string;
 }
 
 export interface FilterOptions {

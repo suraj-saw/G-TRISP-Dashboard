@@ -30,6 +30,7 @@ import {
   Sun,
   PanelLeftOpen,
   PanelLeftClose,
+  Layers,
 } from "lucide-react";
 
 import {
@@ -85,6 +86,7 @@ export default function Dashboard() {
     weather_condition: "all",
     light_condition: "all",
     collision_type: "all",
+    baseMap: "osm",
   });
 
   const [districtSearch] = useState("");
@@ -134,22 +136,6 @@ export default function Dashboard() {
   useEffect(() => {
     fetchFilterOptions().then(setFilterOptions);
   }, []);
-
-  // Fix jagged map/chart resizing during sidebar transition
-  useEffect(() => {
-    let start = performance.now();
-    let frameId: number;
-
-    const loop = (now: number) => {
-      if (now - start < 350) { // slightly longer than the 300ms CSS transition
-        window.dispatchEvent(new Event("resize"));
-        frameId = requestAnimationFrame(loop);
-      }
-    };
-    frameId = requestAnimationFrame(loop);
-
-    return () => cancelAnimationFrame(frameId);
-  }, [sidebarOpen]);
 
   const logout = async () => {
     try {
@@ -243,6 +229,7 @@ export default function Dashboard() {
           overflow-y-auto
           border-r border-[#E4E8F4] bg-white
           shadow-lg
+          will-change-transform
           transition-transform duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
@@ -253,6 +240,30 @@ export default function Dashboard() {
             <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#9BA3C2]">
               Filters
             </span>
+          </div>
+
+          <div className="mb-3 flex flex-col gap-1.5">
+            <label className="px-1 flex items-center gap-1.5 text-[11px] font-semibold text-[#6B7299]">
+              <Layers size={12} className="text-[#2C6EF2]" />
+              Base Map
+            </label>
+            <div className="relative">
+              <select
+                value={filters.baseMap || "osm"}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, baseMap: e.target.value }))
+                }
+                className="w-full appearance-none rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-3 py-2 pr-8 text-[13px] text-[#1A1D2E] font-medium outline-none focus:border-[#2C6EF2] focus:ring-2 focus:ring-[#2C6EF2]/10 cursor-pointer transition"
+              >
+                <option value="osm">OpenStreetMap</option>
+                <option value="satellite">Satellite</option>
+                <option value="positron">Carto Light</option>
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9BA3C2] pointer-events-none"
+              />
+            </div>
           </div>
 
           <div className="mb-3 flex flex-col gap-1.5">
@@ -456,6 +467,7 @@ export default function Dashboard() {
                 weather_condition: "all",
                 light_condition: "all",
                 collision_type: "all",
+                baseMap: "osm",
               })
             }
             className="flex items-center justify-center gap-2 rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-4 py-2 text-[12px] font-semibold text-[#6B7299] transition hover:border-[#C9CEDF] hover:bg-[#EDF0F8] hover:text-[#1A1D2E] active:scale-[0.98]"
@@ -466,10 +478,13 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      {/* ── MAIN CONTENT — shifts right when sidebar is open ── */}
+      {/* ── MAIN CONTENT — shrinks/grows when sidebar toggles ── */}
       <main
-        className="min-w-0 px-6 pb-7 pt-[104px] xl:px-8 transition-[margin-left] duration-300 ease-in-out"
-        style={{ marginLeft: sidebarOpen ? 260 : 0 }}
+        className="min-w-0 pb-7 pt-[104px] transition-[padding-left] duration-300 ease-in-out"
+        style={{
+          paddingLeft: sidebarOpen ? `calc(260px + 1.5rem)` : `1.5rem`,
+          paddingRight: `1.5rem`,
+        }}
       >
         {error && (
           <div className="mb-5 flex items-start gap-3 rounded-xl border border-[#FECACA] bg-[#FFF5F5] px-4 py-3 text-sm text-[#B91C1C]">
@@ -809,41 +824,32 @@ export default function Dashboard() {
                 </p>
               </div>
             </div> */}
-            <SuratBaseMap height="calc(100vh - 80px)" />
+            <SuratBaseMap height="calc(100vh - 80px)" sidebarOpen={sidebarOpen} baseMap={filters.baseMap || "osm"} />
           </div>
 
           <div className="mb-4">
             <Panel title="Accident Density Heatmap" icon={<MapPin size={14} />}>
-              <AccidentHeatmap />
+              <AccidentHeatmap baseMap={filters.baseMap || "osm"} />
             </Panel>
           </div>
 
           <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Panel
-              title="Accident Location Markers"
-              icon={<MapPin size={14} />}
-            >
-              <AccidentMarkerMap />
+            <Panel title="Accident Location Markers" icon={<MapPin size={14} />}>
+              <AccidentMarkerMap baseMap={filters.baseMap || "osm"} />
             </Panel>
 
-            <Panel
-              title="GIS Accident Visualization"
-              icon={<MapPin size={14} />}
-            >
-              <AccidentGISMap />
+            <Panel title="GIS Accident Visualization" icon={<MapPin size={14} />}>
+              <AccidentGISMap baseMap={filters.baseMap || "osm"} />
             </Panel>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Panel title="District Hotspot Map" icon={<MapPin size={14} />}>
-              <DistrictHotspotMap />
+          <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Panel title="District Heatmap" icon={<MapPin size={14} />}>
+              <DistrictHotspotMap baseMap={filters.baseMap || "osm"} />
             </Panel>
 
-            <Panel
-              title="Accident Blackspot Detection"
-              icon={<MapPin size={14} />}
-            >
-              <BlackspotMap />
+            <Panel title="Blackspot Analysis" icon={<AlertTriangle size={14} />}>
+              <BlackspotMap baseMap={filters.baseMap || "osm"} />
             </Panel>
           </div>
         </motion.div>
