@@ -1,7 +1,7 @@
 // frontend/src/components/layout/TopBar.tsx
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut, PanelLeftOpen, PanelLeftClose } from "lucide-react";
 
 import NotificationBell from "./NotificationBell";
 import type { User } from "../../types/user";
@@ -11,9 +11,11 @@ interface Props {
   user: User;
   notificationCount?: number;
   onLogout: () => void;
+  sidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
-function TopBar({ appName, user, notificationCount = 0, onLogout }: Props) {
+function TopBar({ appName, user, notificationCount = 0, onLogout, sidebarOpen, onToggleSidebar }: Props) {
   const [open, setOpen] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -61,7 +63,7 @@ function TopBar({ appName, user, notificationCount = 0, onLogout }: Props) {
       z-40
       "
     >
-      {/* LEFT SIDE - BRAND */}
+      {/* LEFT SIDE - TOGGLE + BRAND */}
 
       <div
         className="
@@ -70,6 +72,28 @@ function TopBar({ appName, user, notificationCount = 0, onLogout }: Props) {
         gap-3
         "
       >
+        {/* SIDEBAR TOGGLE BUTTON */}
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            className="
+            flex items-center justify-center
+            h-9 w-9
+            rounded-lg
+            text-slate-500
+            hover:bg-slate-100
+            hover:text-slate-800
+            transition-all duration-200
+            shrink-0
+            "
+          >
+            {sidebarOpen
+              ? <PanelLeftClose size={20} strokeWidth={1.8} />
+              : <PanelLeftOpen  size={20} strokeWidth={1.8} />
+            }
+          </button>
+        )}
         <div
           className="
           h-11

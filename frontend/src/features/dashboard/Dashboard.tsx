@@ -28,6 +28,8 @@ import {
   RotateCcw,
   Filter,
   Sun,
+  PanelLeftOpen,
+  PanelLeftClose,
 } from "lucide-react";
 
 import {
@@ -49,6 +51,7 @@ import { useDashboard } from "../../hooks/useDashboard";
 import type { DashboardFilters, FilterOptions } from "../../types/dashboard";
 import { GujaratMap } from "../../components/charts/GujaratMap";
 import { fetchFilterOptions } from "../../api/dashboardApi";
+import SuratBaseMap from "../../components/maps/SuratBaseMap";
 
 function fmt(n: number) {
   return n.toLocaleString("en-IN");
@@ -72,6 +75,7 @@ export default function Dashboard() {
 
   const [user, setUser] = useState<User | null>(null);
   const [sessionChecking, setSessionChecking] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [filters, setFilters] = useState<DashboardFilters>({
     district: "all",
@@ -130,6 +134,22 @@ export default function Dashboard() {
   useEffect(() => {
     fetchFilterOptions().then(setFilterOptions);
   }, []);
+
+  // Fix jagged map/chart resizing during sidebar transition
+  useEffect(() => {
+    let start = performance.now();
+    let frameId: number;
+
+    const loop = (now: number) => {
+      if (now - start < 350) { // slightly longer than the 300ms CSS transition
+        window.dispatchEvent(new Event("resize"));
+        frameId = requestAnimationFrame(loop);
+      }
+    };
+    frameId = requestAnimationFrame(loop);
+
+    return () => cancelAnimationFrame(frameId);
+  }, [sidebarOpen]);
 
   const logout = async () => {
     try {
@@ -202,7 +222,31 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#F1F4FB]">
-      <aside className="hidden xl:flex fixed left-0 top-0 z-30 h-screen w-[260px] shrink-0 flex-col overflow-y-auto border-r border-[#E4E8F4] bg-white">
+      {/* ── TOPBAR — always full viewport width ── */}
+      <div className="fixed left-0 right-0 top-0 z-50">
+        <TopBar
+          appName="G-TRISP"
+          user={user}
+          notificationCount={0}
+          onLogout={logout}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen((v) => !v)}
+        />
+      </div>
+
+      {/* ── SIDEBAR — slides in/out below the TopBar ── */}
+      <aside
+        className={`
+          fixed left-0 top-[80px] z-40
+          h-[calc(100vh-80px)] w-[260px]
+          flex flex-col
+          overflow-y-auto
+          border-r border-[#E4E8F4] bg-white
+          shadow-lg
+          transition-transform duration-300 ease-in-out
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
+      >
         <div className="flex-1 px-4 py-5 flex flex-col gap-0">
           <div className="flex items-center gap-2 mb-4 px-1">
             <Filter size={13} className="text-[#9BA3C2]" />
@@ -422,16 +466,11 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      <div className="fixed left-0 right-0 top-0 z-50 xl:left-[260px]">
-        <TopBar
-          appName="G-TRISP"
-          user={user}
-          notificationCount={0}
-          onLogout={logout}
-        />
-      </div>
-
-      <main className="min-w-0 px-6 pb-7 pt-[104px] xl:ml-[260px] xl:px-8">
+      {/* ── MAIN CONTENT — shifts right when sidebar is open ── */}
+      <main
+        className="min-w-0 px-6 pb-7 pt-[104px] xl:px-8 transition-[margin-left] duration-300 ease-in-out"
+        style={{ marginLeft: sidebarOpen ? 260 : 0 }}
+      >
         {error && (
           <div className="mb-5 flex items-start gap-3 rounded-xl border border-[#FECACA] bg-[#FFF5F5] px-4 py-3 text-sm text-[#B91C1C]">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" />
@@ -753,6 +792,25 @@ export default function Dashboard() {
               </div>
             </Panel>
           )} */}
+
+          {/* ── HERO SURAT MAP — full viewport, no data overlay ── */}
+          <div className="mb-6 w-full rounded-2xl overflow-hidden shadow-xl border border-[#E4E8F4] relative">
+            {/* Gradient title badge overlaid top-left */}
+            {/* <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 backdrop-blur-sm border border-white/50 rounded-xl px-4 py-2.5 shadow-lg">
+              <div className="h-7 w-7 rounded-lg bg-[radial-gradient(circle_at_top_left,#2C6EF2,#1e3a8a)] flex items-center justify-center shrink-0">
+                <MapPin size={13} className="text-white" />
+              </div>
+              <div>
+                <p className="text-[13px] font-bold text-slate-800 leading-none">
+                  Surat District
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Road Safety Dashboard
+                </p>
+              </div>
+            </div> */}
+            <SuratBaseMap height="calc(100vh - 80px)" />
+          </div>
 
           <div className="mb-4">
             <Panel title="Accident Density Heatmap" icon={<MapPin size={14} />}>

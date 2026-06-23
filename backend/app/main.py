@@ -14,7 +14,9 @@ from app.database import engine, Base
 from app import models                          # registers all ORM models
 from app.routes import auth
 from app.routes import admin
-from app.routes import dashboard               # ← new dashboard router
+from app.routes import dashboard              
+from app.routes import surat_dashboard         
+from app.routes import geo
 
 load_dotenv()
 
@@ -58,7 +60,9 @@ app = FastAPI(
 # Routers
 app.include_router(auth.router)
 app.include_router(admin.router)
-app.include_router(dashboard.router)    # ← /api/dashboard/*
+app.include_router(dashboard.router)         # ← /api/dashboard/*
+app.include_router(surat_dashboard.router)   # ← /api/surat/dashboard/*
+app.include_router(geo.router)               # ← /api/geo/*
 
 # CORS
 allowed_origins = [
