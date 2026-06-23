@@ -14,6 +14,7 @@ from app.database import engine, Base
 from app import models                          # registers all ORM models
 from app.routes import auth
 from app.routes import admin
+from app.routes import dashboard               # ← new dashboard router
 
 load_dotenv()
 
@@ -27,20 +28,14 @@ async def lifespan(app: FastAPI):
     """
     Runs once on startup:
       1. Create all tables (DDL is idempotent).
-      2. Seed Gujarat boundary + districts if not already present.
-      3. Seed accident records if not already present.
+      2. Seed data is managed manually via CLI — see app/seed/seed_geo.py
     """
     from sqlalchemy import text
 
     with engine.connect() as conn:
-        # Use a Postgres advisory lock to prevent concurrent workers from running DDL/seeds simultaneously
         conn.execute(text("SELECT pg_advisory_lock(11223344)"))
         try:
-            # 1. DDL
             Base.metadata.create_all(bind=engine)
-            
-            # Auto-seeding has been removed per user request.
-            # To seed manually, run: python -m app.seed.seed_geo
         finally:
             conn.execute(text("SELECT pg_advisory_unlock(11223344)"))
             conn.commit()
@@ -60,8 +55,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Routers
 app.include_router(auth.router)
 app.include_router(admin.router)
+app.include_router(dashboard.router)    # ← /api/dashboard/*
 
 # CORS
 allowed_origins = [
