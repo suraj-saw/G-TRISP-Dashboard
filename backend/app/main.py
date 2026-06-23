@@ -14,7 +14,6 @@ from app.database import engine, Base
 from app import models                          # registers all ORM models
 from app.routes import auth
 from app.routes import admin
-from app.seed.seed_geo import run_geo_seeds     # master seeder (geo + accidents)
 
 load_dotenv()
 
@@ -31,11 +30,20 @@ async def lifespan(app: FastAPI):
       2. Seed Gujarat boundary + districts if not already present.
       3. Seed accident records if not already present.
     """
-    # 1. DDL
-    Base.metadata.create_all(bind=engine)
+    from sqlalchemy import text
 
-    # 2 & 3. Geo seeds + accident data (all idempotent — skip if populated)
-    run_geo_seeds(force=False, skip_validation=False)
+    with engine.connect() as conn:
+        # Use a Postgres advisory lock to prevent concurrent workers from running DDL/seeds simultaneously
+        conn.execute(text("SELECT pg_advisory_lock(11223344)"))
+        try:
+            # 1. DDL
+            Base.metadata.create_all(bind=engine)
+            
+            # Auto-seeding has been removed per user request.
+            # To seed manually, run: python -m app.seed.seed_geo
+        finally:
+            conn.execute(text("SELECT pg_advisory_unlock(11223344)"))
+            conn.commit()
 
     yield   # App is live
 

@@ -33,10 +33,4 @@ class GujaratBoundary(Base):
         nullable=False,
     )
 
-
-# Explicit GIST spatial index
-Index(
-    "idx_gujarat_boundary_geometry",
-    GujaratBoundary.geometry,
-    postgresql_using="gist",
-)
+

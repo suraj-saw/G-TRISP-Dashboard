@@ -36,10 +36,4 @@ class GujaratDistrict(Base):
         nullable=False,
     )
 
-
-# Explicit GIST spatial index
-Index(
-    "idx_gujarat_districts_geometry",
-    GujaratDistrict.geometry,
-    postgresql_using="gist",
-)
+

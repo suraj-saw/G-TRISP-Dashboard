@@ -4,10 +4,15 @@ Accident Data Seeder
 ====================
 Seeds accident records from the Excel dataset into the `accidents` table.
 
+The seeder contains a COLUMN_MAP that translates whatever column headers
+exist in the Excel file into the iRAD-aligned internal field names used by
+the Accident model.  Only this map needs to change if the spreadsheet is
+ever renamed — no logic elsewhere is touched.
+
 Each row is:
   - Validated against the Gujarat state boundary (PostGIS ST_Within)
   - Enriched with the matched district name from PostGIS if the record's
-    own district field needs correction
+    own district field is blank
   - Inserted in configurable batch sizes (default 500) for memory safety
 
 Usage:
@@ -16,10 +21,9 @@ Usage:
     python -m app.seed.seed_accidents --skip-validation  # skip PostGIS check
 
 Environment variables (all optional – sensible defaults provided):
-    ACCIDENT_DATASET_PATH     path to the .xlsx file
-                              default: backend/data/accident_dummy_data.xlsx
-    SEED_BATCH_SIZE           rows per DB commit   (default: 500)
-    ACCIDENT_DATETIME_COLUMN  column name          (default: Accident_DateTime)
+    ACCIDENT_DATASET_PATH   path to the .xlsx file
+                            default: backend/data/accident_dummy_data.xlsx
+    SEED_BATCH_SIZE         rows per DB commit  (default: 500)
 """
 
 from __future__ import annotations
@@ -43,10 +47,7 @@ if str(_BACKEND) not in sys.path:
 from app.database import Base, engine, SessionLocal
 from app.models.accident import Accident
 from app.core.config import POSTGIS_SRID
-from app.utils.coordinate_validator import (
-    validate_coordinates_batch,
-    ValidationStatus,
-)
+from app.utils.coordinate_validator import validate_coordinates_batch
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,36 +58,73 @@ logger = logging.getLogger("seed_accidents")
 
 # ── file / env config ─────────────────────────────────────────────────────────
 
-_THIS_DIR    = Path(__file__).resolve().parent       # app/seed/
-_APP_DIR     = _THIS_DIR.parent                      # app/
-_BACKEND_DIR = _APP_DIR.parent                       # backend/
+_THIS_DIR    = Path(__file__).resolve().parent
+_APP_DIR     = _THIS_DIR.parent
+_BACKEND_DIR = _APP_DIR.parent
 
 DEFAULT_DATA_FILE = _BACKEND_DIR / "data" / "accident_dummy_data.xlsx"
 
-DATA_FILE = Path(
-    os.getenv("ACCIDENT_DATASET_PATH", str(DEFAULT_DATA_FILE))
-).resolve()
-
+DATA_FILE  = Path(os.getenv("ACCIDENT_DATASET_PATH", str(DEFAULT_DATA_FILE))).resolve()
 CHUNK_SIZE = int(os.getenv("SEED_BATCH_SIZE", "500"))
-DATE_COLUMN = os.getenv("ACCIDENT_DATETIME_COLUMN", "Accident_DateTime")
 
-REQUIRED_COLUMNS = {
-    "Accident_ID", "District", "Police_Station", "Accident_DateTime",
-    "Latitude", "Longitude", "Road_Name", "Road_Classification",
-    "Severity", "No_of_Vehicles",
-    "Drivers_Killed", "Drivers_Grievous_Injury", "Drivers_Minor_Injury",
-    "Passengers_Killed", "Passengers_Grievous_Injury", "Passengers_Minor_Injury",
-    "Pedestrians_Killed", "Pedestrians_Grievous_Injury", "Pedestrians_Minor_Injury",
-    "Collision_Type", "Collision_Feature",
-    "Weather_Condition", "Light_Condition", "Visibility",
-    "Traffic_Violation",
+# ── Column mapping ────────────────────────────────────────────────────────────
+# Maps Excel column headers  →  iRAD internal field names (Accident model attrs).
+# Edit only this dict if the spreadsheet is ever re-exported with different headers.
+#
+# Key   = exact column header as it appears in the Excel file
+# Value = Accident model attribute name (iRAD-aligned)
+COLUMN_MAP: dict[str, str] = {
+    # Identification
+    "Accident_ID":    "accident_id",
+    "District":       "district",
+    "Police_Station": "police_station",
+
+    # Date & Time  (iRAD: "Accident Date & Time")
+    "Accident_DateTime": "accident_date_time",
+
+    # Location
+    "Latitude":             "latitude",
+    "Longitude":            "longitude",
+    "Road_Name":            "road_name",
+    "Road_Classification":  "road_classification",
+
+    # Severity & vehicles
+    "Severity":       "severity",
+    "No_of_Vehicles": "number_of_vehicles",  # iRAD: "Number of Vehicle(s)"
+
+    # Driver casualties  (iRAD: "Number of Driver(s) impacted")
+    "Drivers_Killed":           "driver_killed",
+    "Drivers_Grievous_Injury":  "driver_grievous_injury",
+    "Drivers_Minor_Injury":     "driver_minor_injury",
+
+    # Passenger casualties  (iRAD: "Number of Passenger(s) impacted")
+    "Passengers_Killed":           "passenger_killed",
+    "Passengers_Grievous_Injury":  "passenger_grievous_injury",
+    "Passengers_Minor_Injury":     "passenger_minor_injury",
+
+    # Pedestrian casualties  (iRAD: "Number of Pedestrian(s) impacted")
+    "Pedestrians_Killed":           "pedestrian_killed",
+    "Pedestrians_Grievous_Injury":  "pedestrian_grievous_injury",
+    "Pedestrians_Minor_Injury":     "pedestrian_minor_injury",
+
+    # Collision  (iRAD: "Type of Collision")
+    "Collision_Type":    "type_of_collision",
+    "Collision_Feature": "collision_feature",
+
+    # Conditions
+    "Weather_Condition": "weather_condition",
+    "Light_Condition":   "light_condition",
+    "Visibility":        "visibility",
+    "Traffic_Violation": "traffic_violation",
 }
+
+# Derive the reverse map (iRAD field → normalised column in the renamed df)
+_IRAD_TO_INTERNAL = {v: v for v in COLUMN_MAP.values()}
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _clean_text(value) -> str | None:
-    """Return None for NaN / empty / literal 'nan' strings."""
     if pd.isna(value):
         return None
     s = str(value).strip()
@@ -112,7 +150,6 @@ def _clean_float(value) -> float | None:
 
 
 def _make_point(lat: float | None, lon: float | None):
-    """Return a PostGIS WKBElement or None if coordinates are missing."""
     if lat is None or lon is None:
         return None
     try:
@@ -124,6 +161,10 @@ def _make_point(lat: float | None, lon: float | None):
 # ── dataset loader ────────────────────────────────────────────────────────────
 
 def _load_dataset() -> pd.DataFrame:
+    """
+    Read the Excel file and rename its columns to iRAD internal field names
+    via COLUMN_MAP.  Raises clearly if required columns are absent.
+    """
     if not DATA_FILE.exists():
         raise FileNotFoundError(
             f"Dataset not found at:\n  {DATA_FILE}\n"
@@ -133,11 +174,22 @@ def _load_dataset() -> pd.DataFrame:
     logger.info("Reading dataset: %s", DATA_FILE)
     df = pd.read_excel(DATA_FILE)
 
-    missing = REQUIRED_COLUMNS - set(df.columns)
+    # Check that every mapped source column is present
+    missing = set(COLUMN_MAP.keys()) - set(df.columns)
     if missing:
-        raise ValueError(f"Missing columns in dataset: {sorted(missing)}")
+        raise ValueError(
+            f"The following expected Excel columns are missing from the dataset:\n"
+            f"  {sorted(missing)}\n"
+            "Update COLUMN_MAP in seed_accidents.py to match your spreadsheet headers."
+        )
 
-    df[DATE_COLUMN] = pd.to_datetime(df[DATE_COLUMN], errors="coerce", dayfirst=True)
+    # Rename Excel headers → iRAD internal field names
+    df = df.rename(columns=COLUMN_MAP)
+
+    # Parse datetime using the iRAD field name (after rename)
+    df["accident_date_time"] = pd.to_datetime(
+        df["accident_date_time"], errors="coerce", dayfirst=True
+    )
 
     logger.info("Loaded %d rows, %d columns.", len(df), len(df.columns))
     return df
@@ -146,41 +198,52 @@ def _load_dataset() -> pd.DataFrame:
 # ── row → ORM model ──────────────────────────────────────────────────────────
 
 def _build_accident(row) -> Accident:
-    lat = _clean_float(row["Latitude"])
-    lon = _clean_float(row["Longitude"])
-    location = _make_point(lat, lon)
+    """
+    Convert a DataFrame row (already renamed to iRAD field names) into an
+    Accident ORM object.  All type coercion happens here; no raw column names
+    from the Excel are referenced.
+    """
+    lat = _clean_float(row["latitude"])
+    lon = _clean_float(row["longitude"])
 
     return Accident(
-        accident_id=_clean_text(row["Accident_ID"]),
-        district=_clean_text(row["District"]),
-        police_station=_clean_text(row["Police_Station"]),
-        accident_datetime=row[DATE_COLUMN] if not pd.isna(row[DATE_COLUMN]) else None,
-        latitude=lat,
-        longitude=lon,
-        location=location,
-        road_name=_clean_text(row["Road_Name"]),
-        road_classification=_clean_text(row["Road_Classification"]),
-        severity=_clean_text(row["Severity"]),
-        no_of_vehicles=_clean_int(row["No_of_Vehicles"]),
-        drivers_killed=_clean_int(row["Drivers_Killed"]),
-        drivers_grievous_injury=_clean_int(row["Drivers_Grievous_Injury"]),
-        drivers_minor_injury=_clean_int(row["Drivers_Minor_Injury"]),
-        passengers_killed=_clean_int(row["Passengers_Killed"]),
-        passengers_grievous_injury=_clean_int(row["Passengers_Grievous_Injury"]),
-        passengers_minor_injury=_clean_int(row["Passengers_Minor_Injury"]),
-        pedestrians_killed=_clean_int(row["Pedestrians_Killed"]),
-        pedestrians_grievous_injury=_clean_int(row["Pedestrians_Grievous_Injury"]),
-        pedestrians_minor_injury=_clean_int(row["Pedestrians_Minor_Injury"]),
-        collision_type=_clean_text(row["Collision_Type"]),
-        collision_feature=_clean_text(row["Collision_Feature"]),
-        weather_condition=_clean_text(row["Weather_Condition"]),
-        light_condition=_clean_text(row["Light_Condition"]),
-        visibility=_clean_text(row["Visibility"]),
-        traffic_violation=_clean_text(row["Traffic_Violation"]),
+        accident_id         = _clean_text(row["accident_id"]),
+        district            = _clean_text(row["district"]),
+        police_station      = _clean_text(row["police_station"]),
+        accident_date_time  = row["accident_date_time"] if not pd.isna(row["accident_date_time"]) else None,
+        latitude            = lat,
+        longitude           = lon,
+        location            = _make_point(lat, lon),
+        road_name           = _clean_text(row["road_name"]),
+        road_classification = _clean_text(row["road_classification"]),
+        severity            = _clean_text(row["severity"]),
+        number_of_vehicles  = _clean_int(row["number_of_vehicles"]),
+
+        # Driver casualties
+        driver_killed          = _clean_int(row["driver_killed"]),
+        driver_grievous_injury = _clean_int(row["driver_grievous_injury"]),
+        driver_minor_injury    = _clean_int(row["driver_minor_injury"]),
+
+        # Passenger casualties
+        passenger_killed          = _clean_int(row["passenger_killed"]),
+        passenger_grievous_injury = _clean_int(row["passenger_grievous_injury"]),
+        passenger_minor_injury    = _clean_int(row["passenger_minor_injury"]),
+
+        # Pedestrian casualties
+        pedestrian_killed          = _clean_int(row["pedestrian_killed"]),
+        pedestrian_grievous_injury = _clean_int(row["pedestrian_grievous_injury"]),
+        pedestrian_minor_injury    = _clean_int(row["pedestrian_minor_injury"]),
+
+        type_of_collision = _clean_text(row["type_of_collision"]),
+        collision_feature = _clean_text(row["collision_feature"]),
+        weather_condition = _clean_text(row["weather_condition"]),
+        light_condition   = _clean_text(row["light_condition"]),
+        visibility        = _clean_text(row["visibility"]),
+        traffic_violation = _clean_text(row["traffic_violation"]),
     )
 
 
-# ── PostGIS coordinate validation ────────────────────────────────────────────
+# ── PostGIS coordinate validation ─────────────────────────────────────────────
 
 def _validate_coordinates(
     df: pd.DataFrame,
@@ -188,41 +251,36 @@ def _validate_coordinates(
 ) -> tuple[pd.DataFrame, int]:
     """
     Run PostGIS validation against the gujarat_boundary table.
+    df columns are already renamed to iRAD internal names.
     Returns (valid_df, rejected_count).
     """
     logger.info("Running PostGIS coordinate validation …")
-    coords = list(zip(df["Latitude"].tolist(), df["Longitude"].tolist()))
+    coords = list(zip(df["latitude"].tolist(), df["longitude"].tolist()))
     report = validate_coordinates_batch(
         coords,
         db,
-        check_district=False,   # state-level only — fast enough for 1 500 rows
+        check_district=False,
         log_progress_every=500,
     )
 
     valid_mask = [r.is_valid for r in report.results]
-    valid_df = df[[m for m in valid_mask]].copy()   # boolean index via list
-    # rebuild properly
-    valid_df = df[valid_mask].copy()
+    valid_df   = df[valid_mask].copy()
 
-    # Enrich district from PostGIS where the record's own district is blank
+    # Enrich blank district values from PostGIS spatial join
     for idx, result in enumerate(report.results):
         if result.is_valid and result.matched_district:
-            original_district = _clean_text(df.iloc[idx]["District"])
-            if not original_district and result.matched_district:
-                valid_df.at[df.index[idx], "District"] = result.matched_district
+            if not _clean_text(df.iloc[idx]["district"]):
+                valid_df.at[df.index[idx], "district"] = result.matched_district
 
     rejected = len(df) - len(valid_df)
     logger.info(
         "Validation complete — valid: %d, rejected: %d (%.1f%%)",
-        len(valid_df),
-        rejected,
+        len(valid_df), rejected,
         (rejected / len(df) * 100) if len(df) else 0,
     )
     logger.info(
         "  outside-state: %d, invalid-coords: %d, db-errors: %d",
-        report.outside_state,
-        report.invalid_coords,
-        report.db_errors,
+        report.outside_state, report.invalid_coords, report.db_errors,
     )
     return valid_df, rejected
 
@@ -233,14 +291,6 @@ def seed_accidents(
     force: bool = False,
     skip_validation: bool = False,
 ) -> None:
-    """
-    Seed accident records into the `accidents` table.
-
-    Parameters
-    ----------
-    force            : Drop existing rows and re-seed from scratch.
-    skip_validation  : Skip PostGIS coordinate validation (faster, less safe).
-    """
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
@@ -260,17 +310,15 @@ def seed_accidents(
             db.query(Accident).delete()
             db.commit()
 
-        # ── load ──────────────────────────────────────────────────────────────
-        df = _load_dataset()
+        df        = _load_dataset()
         total_raw = len(df)
 
-        # ── validate ──────────────────────────────────────────────────────────
         if skip_validation:
             logger.warning(
                 "Coordinate validation SKIPPED — all %d rows will be inserted.",
                 total_raw,
             )
-            valid_df = df
+            valid_df      = df
             rejected_count = 0
         else:
             valid_df, rejected_count = _validate_coordinates(df, db)
@@ -278,10 +326,9 @@ def seed_accidents(
         total = len(valid_df)
         logger.info("Inserting %d accident records in batches of %d …", total, CHUNK_SIZE)
 
-        # ── insert in batches ─────────────────────────────────────────────────
         inserted = 0
         for start in range(0, total, CHUNK_SIZE):
-            chunk = valid_df.iloc[start : start + CHUNK_SIZE]
+            chunk   = valid_df.iloc[start : start + CHUNK_SIZE]
             objects = [_build_accident(row) for _, row in chunk.iterrows()]
             db.bulk_save_objects(objects)
             db.commit()
@@ -290,8 +337,7 @@ def seed_accidents(
 
         logger.info(
             "✓ Seed complete — %d inserted, %d rejected (outside Gujarat / bad coords).",
-            inserted,
-            rejected_count,
+            inserted, rejected_count,
         )
 
     except Exception:
@@ -308,16 +354,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Seed accident data from Excel into the accidents table."
     )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Delete existing rows and re-seed.",
-    )
-    parser.add_argument(
-        "--skip-validation",
-        action="store_true",
-        help="Skip PostGIS coordinate validation (faster).",
-    )
+    parser.add_argument("--force", action="store_true",
+                        help="Delete existing rows and re-seed.")
+    parser.add_argument("--skip-validation", action="store_true",
+                        help="Skip PostGIS coordinate validation (faster).")
     args = parser.parse_args()
-
     seed_accidents(force=args.force, skip_validation=args.skip_validation)
