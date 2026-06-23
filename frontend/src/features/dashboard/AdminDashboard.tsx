@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import API from "../../api/axios";
-import TopBar from "../../components/layout/Topbar";
+import TopBar from "../../components/layout/TopBar";
 
 import type { User } from "../../types/user";
 import type { Notification } from "../../types/notification";
