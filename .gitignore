@@ -9,5 +9,5 @@ __pycache__/
 .DS_Store
 nginx/nginx.conf
 docker-compose.yml
-backend/data/
-backend/app/core/config.py
+/backend/data/
+/backend/app/core/config.py
