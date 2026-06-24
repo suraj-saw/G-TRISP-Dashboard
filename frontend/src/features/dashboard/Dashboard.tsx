@@ -4,75 +4,24 @@ import { motion } from "framer-motion";
 import API from "../../api/axios";
 import type { User } from "../../types/user";
 
-import AccidentGISMap from "../../components/maps/AccidentGISMap";
-import AccidentHeatmap from "../../components/maps/AccidentHeatmap";
-import DistrictHotspotMap from "../../components/maps/DistrictHotspotMap";
-import AccidentMarkerMap from "../../components/maps/AccidentMarkerMap";
-import BlackspotMap from "../../components/maps/BlackspotMap";
+import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import TopBar from "../../components/layout/TopBar";
 
 import {
-  Activity,
-  AlertTriangle,
-  Car,
-  Users,
-  Building2,
-  RadioTower,
   MapPin,
-  ShieldAlert,
-  CloudSun,
-  Moon,
-  Route,
-  TrendingUp,
+  Filter,
+  Layers,
   ChevronDown,
   RotateCcw,
-  Filter,
-  Sun,
-  PanelLeftOpen,
-  PanelLeftClose,
-  Layers,
+  AlertTriangle
 } from "lucide-react";
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
 
-import { MetricCard } from "../../components/cards/MetricCard";
-import { AccidentTrend } from "../../components/charts/AccidentTrend";
-import { SeverityChart } from "../../components/charts/SeverityChart";
-import { Panel } from "../../components/layout/Panel";
 import { useDashboard } from "../../hooks/useDashboard";
 import type { DashboardFilters, FilterOptions } from "../../types/dashboard";
-import { GujaratMap } from "../../components/charts/GujaratMap";
 import { fetchFilterOptions } from "../../api/dashboardApi";
 import SuratBaseMap from "../../components/maps/SuratBaseMap";
-
-function fmt(n: number) {
-  return n.toLocaleString("en-IN");
-}
-
 import { MAP_STYLES } from "../../components/maps/mapStyles";
-
-const ViolationTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-
-  return (
-    <div className="rounded-lg border border-[#E4E8F4] bg-white px-3 py-2 shadow-lg text-xs">
-      <p className="mb-1 font-semibold text-[#6B7299]">{label}</p>
-      <p className="font-bold text-[#0891B2]">
-        {payload[0].value.toLocaleString("en-IN")}
-      </p>
-    </div>
-  );
-};
-
 export default function Dashboard() {
   const navigate = useNavigate();
 
@@ -89,9 +38,9 @@ export default function Dashboard() {
     light_condition: "all",
     collision_type: "all",
     baseMap: "google-streets",
+    visualization_type: "location_markers",
   });
 
-  const [districtSearch] = useState("");
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(
     null
   );
@@ -170,35 +119,7 @@ export default function Dashboard() {
     return ["all", ...labels];
   }, [allData.severity]);
 
-  const districts = useMemo(() => {
-    if (!data?.districts) return ["all"];
 
-    const names = data.districts.map((d) => d.district).filter(Boolean);
-    return ["all", ...Array.from(new Set(names))];
-  }, [data.districts]);
-
-  const filteredDistricts = useMemo(
-    () =>
-      districts.filter((d) =>
-        d.toLowerCase().includes(districtSearch.toLowerCase())
-      ),
-    [districts, districtSearch]
-  );
-
-  const topDangerous = data?.dangerous?.[0];
-  const topViolations = data?.violations?.slice(0, 6) || [];
-  const topRoads = data?.roads?.slice(0, 5) || [];
-
-  const dangerousAsDistricts = useMemo(
-    () =>
-      data?.dangerous?.map((d) => ({
-        district: d.district,
-        accident_count: d.fatal_accidents,
-        fatal_accidents: d.fatal_accidents,
-        fatalities: d.total_killed,
-      })) || [],
-    [data.dangerous]
-  );
 
   if (sessionChecking || !user) {
     return (
@@ -272,6 +193,31 @@ export default function Dashboard() {
 
           <div className="mb-3 flex flex-col gap-1.5">
             <label className="px-1 text-[11px] font-semibold text-[#6B7299]">
+              Visualization Type
+            </label>
+            <div className="relative">
+              <select
+                value={filters.visualization_type || "location_markers"}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, visualization_type: e.target.value }))
+                }
+                className="w-full appearance-none rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-3 py-2 pr-8 text-[13px] text-[#1A1D2E] font-medium outline-none focus:border-[#2C6EF2] focus:ring-2 focus:ring-[#2C6EF2]/10 cursor-pointer transition"
+              >
+                <option value="location_markers">Location Markers</option>
+                <option value="density_heatmap">Density Heatmap</option>
+                <option value="blackspot">Blackspot Detection</option>
+                <option value="gis">GIS Visualization</option>
+                <option value="district_hotspot">District Hotspot</option>
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9BA3C2] pointer-events-none"
+              />
+            </div>
+          </div>
+
+          <div className="mb-3 flex flex-col gap-1.5">
+            <label className="px-1 text-[11px] font-semibold text-[#6B7299]">
               Year
             </label>
             <div className="relative">
@@ -297,7 +243,7 @@ export default function Dashboard() {
 
           <div className="mb-3 flex flex-col gap-1.5">
             <label className="px-1 text-[11px] font-semibold text-[#6B7299]">
-              District
+              Police Station
             </label>
             <div className="relative">
               <select
@@ -307,9 +253,10 @@ export default function Dashboard() {
                 }
                 className="w-full appearance-none rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-3 py-2 pr-8 text-[13px] text-[#1A1D2E] font-medium outline-none focus:border-[#2C6EF2] focus:ring-2 focus:ring-[#2C6EF2]/10 cursor-pointer transition"
               >
-                {filteredDistricts.map((d) => (
+                <option value="all">All police stations</option>
+                {filterOptions?.police_stations?.map((d) => (
                   <option key={d} value={d}>
-                    {d === "all" ? "All districts" : d}
+                    {d}
                   </option>
                 ))}
               </select>
@@ -472,6 +419,7 @@ export default function Dashboard() {
                 light_condition: "all",
                 collision_type: "all",
                 baseMap: "google-streets",
+                visualization_type: "location_markers",
               })
             }
             className="flex items-center justify-center gap-2 rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-4 py-2 text-[12px] font-semibold text-[#6B7299] transition hover:border-[#C9CEDF] hover:bg-[#EDF0F8] hover:text-[#1A1D2E] active:scale-[0.98]"
@@ -812,10 +760,9 @@ export default function Dashboard() {
             </Panel>
           )} */}
 
-          {/* ── HERO SURAT MAP — full viewport, no data overlay ── */}
+          {/* ── HERO SURAT MAP WITH VISUALIZATIONS ── */}
           <div className="mb-6 w-full rounded-2xl overflow-hidden shadow-xl border border-[#E4E8F4] relative">
-            {/* Gradient title badge overlaid top-left */}
-            {/* <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 backdrop-blur-sm border border-white/50 rounded-xl px-4 py-2.5 shadow-lg">
+            <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 backdrop-blur-sm border border-white/50 rounded-xl px-4 py-2.5 shadow-lg">
               <div className="h-7 w-7 rounded-lg bg-[radial-gradient(circle_at_top_left,#2C6EF2,#1e3a8a)] flex items-center justify-center shrink-0">
                 <MapPin size={13} className="text-white" />
               </div>
@@ -827,34 +774,14 @@ export default function Dashboard() {
                   Road Safety Dashboard
                 </p>
               </div>
-            </div> */}
-            <SuratBaseMap height="calc(100vh - 80px)" sidebarOpen={sidebarOpen} baseMap={filters.baseMap || "osm"} />
-          </div>
-
-          <div className="mb-4">
-            <Panel title="Accident Density Heatmap" icon={<MapPin size={14} />}>
-              <AccidentHeatmap baseMap={filters.baseMap || "osm"} />
-            </Panel>
-          </div>
-
-          <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Panel title="Accident Location Markers" icon={<MapPin size={14} />}>
-              <AccidentMarkerMap baseMap={filters.baseMap || "osm"} />
-            </Panel>
-
-            <Panel title="GIS Accident Visualization" icon={<MapPin size={14} />}>
-              <AccidentGISMap baseMap={filters.baseMap || "osm"} />
-            </Panel>
-          </div>
-
-          <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Panel title="District Heatmap" icon={<MapPin size={14} />}>
-              <DistrictHotspotMap baseMap={filters.baseMap || "osm"} />
-            </Panel>
-
-            <Panel title="Blackspot Analysis" icon={<AlertTriangle size={14} />}>
-              <BlackspotMap baseMap={filters.baseMap || "osm"} />
-            </Panel>
+            </div>
+            
+            <SuratBaseMap height="calc(100vh - 80px)" sidebarOpen={sidebarOpen} baseMap={filters.baseMap || "osm"}>
+              <VisualizationLayers 
+                data={data?.heatmap} 
+                type={filters.visualization_type || "location_markers"} 
+              />
+            </SuratBaseMap>
           </div>
         </motion.div>
       </main>

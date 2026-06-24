@@ -1,5 +1,6 @@
 // frontend/src/components/maps/SuratBaseMap.tsx
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
+import type { ReactNode } from "react";
 import Map, {
   Source,
   Layer,
@@ -56,10 +57,11 @@ interface Props {
   height?: string;
   sidebarOpen?: boolean;
   baseMap?: string;
+  children?: ReactNode;
 }
 
 const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
-  ({ height = "calc(100vh - 80px)", sidebarOpen, baseMap = "positron" }, ref) => {
+  ({ height = "calc(100vh - 80px)", sidebarOpen, baseMap = "positron", children }, ref) => {
     const mapRef = useRef<MapRef>(null);
     const [mapLoaded, setMapLoaded] = useState(false);
     const [boundary, setBoundary] = useState<GeoJSON.FeatureCollection | null>(null);
@@ -169,6 +171,7 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
               />
             </Source>
           )}
+          {children}
         </Map>
         <div className="absolute bottom-1 right-2 z-10 text-[10px] text-slate-400" style={{ pointerEvents: "none" }}>
           © MapLibre · © CARTO · © OpenStreetMap

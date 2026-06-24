@@ -23,7 +23,7 @@ export default function AccidentGISMap({ baseMap }: Props) {
   }, [data]);
 
   return (
-    <div className="h-[400px] w-full rounded-xl overflow-hidden shadow-sm border border-[#E4E8F4] relative">
+    <div className="h-full w-full rounded-xl overflow-hidden shadow-sm border border-[#E4E8F4] relative">
       <Map
         initialViewState={{ longitude: 71.1924, latitude: 22.2587, zoom: 6 }}
         mapStyle={getMapStyleUrl(baseMap)}

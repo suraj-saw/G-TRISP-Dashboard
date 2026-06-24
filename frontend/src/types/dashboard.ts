@@ -7,6 +7,7 @@ export interface DashboardFilters {
   light_condition: string;
   collision_type: string;
   baseMap?: string;
+  visualization_type?: string;
 }
 
 export interface FilterOptions {
@@ -14,6 +15,7 @@ export interface FilterOptions {
   weather_conditions: string[];
   light_conditions: string[];
   collision_types: string[];
+  police_stations?: string[];
 }
 
 export interface SummaryData {
