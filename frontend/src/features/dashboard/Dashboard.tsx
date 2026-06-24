@@ -199,7 +199,10 @@ export default function Dashboard() {
               <select
                 value={filters.visualization_type || "location_markers"}
                 onChange={(e) =>
-                  setFilters((f) => ({ ...f, visualization_type: e.target.value }))
+                  setFilters((f) => ({
+                    ...f,
+                    visualization_type: e.target.value,
+                  }))
                 }
                 className="w-full appearance-none rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-3 py-2 pr-8 text-[13px] text-[#1A1D2E] font-medium outline-none focus:border-[#2C6EF2] focus:ring-2 focus:ring-[#2C6EF2]/10 cursor-pointer transition"
               >
@@ -775,11 +778,16 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            
-            <SuratBaseMap height="calc(100vh - 80px)" sidebarOpen={sidebarOpen} baseMap={filters.baseMap || "osm"}>
-              <VisualizationLayers 
-                data={data?.heatmap} 
-                type={filters.visualization_type || "location_markers"} 
+
+            <SuratBaseMap
+              height="calc(100vh - 80px)"
+              sidebarOpen={sidebarOpen}
+              baseMap={filters.baseMap || "osm"}
+            >
+              <VisualizationLayers
+                data={data?.heatmap}
+                type={filters.visualization_type || "location_markers"}
+                selectedSeverity={filters.severity}
               />
             </SuratBaseMap>
           </div>

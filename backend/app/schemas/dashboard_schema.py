@@ -5,6 +5,7 @@ Pydantic response schemas for the dashboard API.
 
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
+from datetime import datetime
 
 
 class ResponseModel(BaseModel):
@@ -92,7 +93,13 @@ class HeatmapPoint(ResponseModel):
     longitude: float
     severity: str
     district: str
-
+    police_station: Optional[str] = None
+    road_name: Optional[str] = None
+    road_classification: Optional[str] = None
+    weather_condition: Optional[str] = None
+    light_condition: Optional[str] = None
+    collision_type: Optional[str] = None
+    accident_date_time: Optional[datetime] = None
 
 class HeatmapResponse(ResponseModel):
     total: int

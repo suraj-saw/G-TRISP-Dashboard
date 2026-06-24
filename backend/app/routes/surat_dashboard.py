@@ -353,7 +353,14 @@ def get_heatmap(
                 latitude=a.latitude,
                 longitude=a.longitude,
                 severity=safe_text(a.severity),
-                district=safe_text(a.police_station),   # police_station used as geo label
+                district=safe_text(a.police_station),
+                police_station=safe_text(a.police_station),
+                road_name=safe_text(a.road_name),
+                road_classification=safe_text(a.road_classification),
+                weather_condition=safe_text(a.weather_condition),
+                light_condition=safe_text(a.light_condition),
+                collision_type=safe_text(a.type_of_collision),
+                accident_date_time=a.accident_date_time,
             )
             for a in accidents
             if a.latitude is not None and a.longitude is not None

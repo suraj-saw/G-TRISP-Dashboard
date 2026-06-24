@@ -1,162 +1,415 @@
-import { useMemo } from 'react';
-import { Source, Layer } from 'react-map-gl/maplibre';
-import type { HeatmapPoint } from '../../types/dashboard';
+import { useEffect, useMemo, useState } from "react";
+import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
+import type { HeatmapPoint } from "../../types/dashboard";
 
 interface Props {
   data?: HeatmapPoint[];
   type: string;
+  selectedSeverity?: string;
 }
 
-export function VisualizationLayers({ data, type }: Props) {
-  const geojsonData = useMemo(() => {
+type SelectedAccident = {
+  longitude: number;
+  latitude: number;
+  accident_id?: string | null;
+  severity?: string;
+  police_station?: string | null;
+  road_name?: string | null;
+  road_classification?: string | null;
+  weather_condition?: string | null;
+  light_condition?: string | null;
+  collision_type?: string | null;
+  accident_date_time?: string | null;
+};
+
+const safeText = (value?: string | null) => {
+  if (!value || value === "nan") return "Unknown";
+  return value;
+};
+
+const formatDate = (value?: string | null) => {
+  if (!value) return "Unknown";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+
+  return date.toLocaleDateString("en-IN", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+  });
+};
+
+export function VisualizationLayers({
+  data,
+  type,
+  selectedSeverity = "all",
+}: Props) {
+  const { current: mapRef } = useMap();
+  const [selected, setSelected] = useState<SelectedAccident | null>(null);
+
+  const geojsonData = useMemo<GeoJSON.FeatureCollection>(() => {
     return {
-      type: 'FeatureCollection',
-      features: data?.map(p => ({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [p.longitude, p.latitude] },
-        properties: { id: p.accident_id, severity: p.severity }
-      })) || []
+      type: "FeatureCollection",
+      features:
+        data
+          ?.filter(
+            (p) => Number.isFinite(p.longitude) && Number.isFinite(p.latitude)
+          )
+          .map((p) => ({
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [p.longitude, p.latitude],
+            },
+            properties: {
+              accident_id: p.accident_id,
+              severity: p.severity,
+              police_station: p.police_station ?? p.district,
+              road_name: p.road_name,
+              road_classification: p.road_classification,
+              weather_condition: p.weather_condition,
+              light_condition: p.light_condition,
+              collision_type: p.collision_type,
+              accident_date_time: p.accident_date_time,
+            },
+          })) || [],
     };
   }, [data]);
 
+  useEffect(() => {
+    if (type !== "location_markers") {
+      setSelected(null);
+      return;
+    }
+
+    const map = mapRef?.getMap();
+    if (!map) return;
+
+    const handleClick = (event: any) => {
+      if (!map.getLayer("accident-points")) return;
+
+      const feature = map.queryRenderedFeatures(event.point, {
+        layers: ["accident-points"],
+      })[0];
+
+      if (!feature) return;
+
+      setSelected({
+        longitude: event.lngLat.lng,
+        latitude: event.lngLat.lat,
+        ...feature.properties,
+      });
+    };
+
+    const handleMouseMove = (event: any) => {
+      if (!map.getLayer("accident-points")) {
+        map.getCanvas().style.cursor = "";
+        return;
+      }
+
+      const features = map.queryRenderedFeatures(event.point, {
+        layers: ["accident-points"],
+      });
+
+      map.getCanvas().style.cursor = features.length ? "pointer" : "";
+    };
+
+    map.on("click", handleClick);
+    map.on("mousemove", handleMouseMove);
+
+    return () => {
+      map.off("click", handleClick);
+      map.off("mousemove", handleMouseMove);
+      map.getCanvas().style.cursor = "";
+    };
+  }, [mapRef, type]);
+
   if (!geojsonData.features.length) return null;
 
-  if (type === 'density_heatmap') {
+  if (type === "density_heatmap") {
     return (
-      <Source type="geojson" data={geojsonData as any}>
+      <Source
+        id="accident-density-source"
+        type="geojson"
+        data={geojsonData as any}
+      >
         <Layer
-          id="heatmap-layer"
-          type="heatmap"
+          id="accident-density-soft-base"
+          type="circle"
           paint={{
-            'heatmap-weight': 1,
-            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 9, 3],
-            'heatmap-color': [
-              'interpolate', ['linear'], ['heatmap-density'],
-              0, 'rgba(33,102,172,0)',
-              0.2, 'rgb(103,169,207)',
-              0.4, 'rgb(209,229,240)',
-              0.6, 'rgb(253,219,199)',
-              0.8, 'rgb(239,138,98)',
-              1, 'rgb(178,24,43)'
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              8,
+              16,
+              11,
+              30,
+              14,
+              54,
             ],
-            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 9, 20],
-            'heatmap-opacity': 0.8
+            "circle-color": "#818cf8",
+            "circle-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              8,
+              0.22,
+              11,
+              0.28,
+              14,
+              0.34,
+            ],
+            "circle-blur": 1,
+            "circle-stroke-width": 0,
+          }}
+        />
+        <Layer
+          id="accident-density-hot-core"
+          type="circle"
+          paint={{
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              8,
+              5,
+              11,
+              10,
+              14,
+              18,
+            ],
+            "circle-color": "#4f46e5",
+            "circle-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              8,
+              0.06,
+              11,
+              0.1,
+              14,
+              0.16,
+            ],
+            "circle-blur": 0.85,
+            "circle-stroke-width": 0,
           }}
         />
       </Source>
     );
   }
 
-  if (type === 'blackspot') {
+  if (type === "blackspot") {
     return (
-      <Source type="geojson" data={geojsonData as any} cluster={true} clusterMaxZoom={12} clusterRadius={30}>
+      <Source
+        id="blackspot-source"
+        type="geojson"
+        data={geojsonData as any}
+        cluster
+        clusterMaxZoom={14}
+        clusterRadius={45}
+      >
         <Layer
           id="clusters"
           type="circle"
-          filter={['has', 'point_count']}
+          filter={["has", "point_count"]}
           paint={{
-            'circle-color': ['step', ['get', 'point_count'], '#666', 20, '#333', 100, '#000'],
-            'circle-radius': ['step', ['get', 'point_count'], 10, 20, 20, 100, 30],
-            'circle-stroke-width': 2,
-            'circle-stroke-color': '#fff'
+            "circle-color": [
+              "step",
+              ["get", "point_count"],
+              "#64748b",
+              20,
+              "#334155",
+              75,
+              "#020617",
+            ],
+            "circle-radius": [
+              "step",
+              ["get", "point_count"],
+              12,
+              20,
+              20,
+              75,
+              30,
+            ],
+            "circle-stroke-width": 2,
+            "circle-stroke-color": "#ffffff",
           }}
         />
         <Layer
           id="cluster-count"
           type="symbol"
-          filter={['has', 'point_count']}
-          layout={{ 'text-field': '{point_count_abbreviated}', 'text-size': 12 }}
-          paint={{ 'text-color': '#FFF' }}
+          filter={["has", "point_count"]}
+          layout={{
+            "text-field": "{point_count_abbreviated}",
+            "text-size": 12,
+          }}
+          paint={{ "text-color": "#ffffff" }}
         />
         <Layer
           id="unclustered-point"
           type="circle"
-          filter={['!', ['has', 'point_count']]}
-          paint={{ 'circle-color': '#000', 'circle-radius': 4 }}
-        />
-      </Source>
-    );
-  }
-
-  if (type === 'gis') {
-    return (
-      <Source type="geojson" data={geojsonData as any}>
-        <Layer
-          id="gis-points"
-          type="circle"
+          filter={["!", ["has", "point_count"]]}
           paint={{
-            'circle-color': [
-              'match', ['get', 'severity'],
-              'Fatal', '#E85D4A',
-              'Grievous Injury', '#F5A623',
-              'Minor Injury', '#2C6EF2',
-              '#9BA3C2'
-            ],
-            'circle-radius': 6,
-            'circle-stroke-width': 1,
-            'circle-stroke-color': '#fff',
-            'circle-opacity': 0.8
+            "circle-color": "#111827",
+            "circle-radius": 4,
+            "circle-stroke-width": 1,
+            "circle-stroke-color": "#ffffff",
           }}
         />
       </Source>
     );
   }
 
-  if (type === 'district_hotspot') {
+  if (type === "district_hotspot") {
     return (
-      <Source type="geojson" data={geojsonData as any} cluster={true} clusterMaxZoom={10} clusterRadius={40}>
+      <Source
+        id="hotspot-source"
+        type="geojson"
+        data={geojsonData as any}
+        cluster
+        clusterMaxZoom={13}
+        clusterRadius={42}
+      >
         <Layer
           id="hotspot-clusters"
           type="circle"
-          filter={['has', 'point_count']}
+          filter={["has", "point_count"]}
           paint={{
-            'circle-color': ['step', ['get', 'point_count'], '#FFA500', 50, '#FF4500', 200, '#8B0000'],
-            'circle-radius': ['step', ['get', 'point_count'], 20, 50, 30, 200, 40],
-            'circle-opacity': 0.8
+            "circle-color": [
+              "step",
+              ["get", "point_count"],
+              "#f59e0b",
+              25,
+              "#ef4444",
+              100,
+              "#7f1d1d",
+            ],
+            "circle-radius": [
+              "step",
+              ["get", "point_count"],
+              16,
+              25,
+              26,
+              100,
+              38,
+            ],
+            "circle-opacity": 0.82,
           }}
         />
         <Layer
           id="hotspot-cluster-count"
           type="symbol"
-          filter={['has', 'point_count']}
-          layout={{ 'text-field': '{point_count_abbreviated}', 'text-size': 14 }}
-          paint={{ 'text-color': '#FFFFFF' }}
-        />
-        <Layer
-          id="hotspot-unclustered-point"
-          type="circle"
-          filter={['!', ['has', 'point_count']]}
-          paint={{ 'circle-color': '#FFA500', 'circle-radius': 6, 'circle-opacity': 0.7 }}
+          filter={["has", "point_count"]}
+          layout={{
+            "text-field": "{point_count_abbreviated}",
+            "text-size": 13,
+          }}
+          paint={{ "text-color": "#ffffff" }}
         />
       </Source>
     );
   }
 
-  // Default to location markers
+  const markerColor =
+    selectedSeverity === "all"
+      ? "#E85D4A"
+      : [
+          "match",
+          ["get", "severity"],
+          "Fatal",
+          "#dc2626",
+          "Grievous Injury",
+          "#f97316",
+          "Minor Injury",
+          "#2563eb",
+          "Damage Only",
+          "#22c55e",
+          "#64748b",
+        ];
+
   return (
-    <Source type="geojson" data={geojsonData as any} cluster={true} clusterMaxZoom={14} clusterRadius={50}>
-      <Layer
-        id="clusters"
-        type="circle"
-        filter={['has', 'point_count']}
-        paint={{
-          'circle-color': ['step', ['get', 'point_count'], '#51bbd6', 100, '#f1f075', 750, '#f28cb1'],
-          'circle-radius': ['step', ['get', 'point_count'], 15, 100, 20, 750, 25]
-        }}
-      />
-      <Layer
-        id="cluster-count"
-        type="symbol"
-        filter={['has', 'point_count']}
-        layout={{ 'text-field': '{point_count_abbreviated}', 'text-size': 12 }}
-        paint={{ 'text-color': '#000' }}
-      />
-      <Layer
-        id="unclustered-point"
-        type="circle"
-        filter={['!', ['has', 'point_count']]}
-        paint={{ 'circle-color': '#E85D4A', 'circle-radius': 5, 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' }}
-      />
-    </Source>
+    <>
+      <Source
+        id="accident-marker-source"
+        type="geojson"
+        data={geojsonData as any}
+      >
+        <Layer
+          id="accident-points"
+          type="circle"
+          paint={{
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              3,
+              12,
+              4.5,
+              15,
+              6,
+            ],
+            "circle-color": markerColor as any,
+            "circle-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              0.65,
+              13,
+              0.9,
+            ],
+            "circle-stroke-width": 1,
+            "circle-stroke-color": "#ffffff",
+          }}
+        />
+      </Source>
+
+      {selected && (
+        <Popup
+          longitude={selected.longitude}
+          latitude={selected.latitude}
+          anchor="top"
+          closeButton
+          closeOnClick={false}
+          onClose={() => setSelected(null)}
+        >
+          <div className="min-w-[210px] text-[12px] text-slate-700">
+            <p className="mb-2 text-[13px] font-bold text-slate-900">
+              Accident Details
+            </p>
+
+            <div className="space-y-1">
+              <p>
+                <b>Severity:</b> {safeText(selected.severity)}
+              </p>
+              <p>
+                <b>Police station:</b> {safeText(selected.police_station)}
+              </p>
+              <p>
+                <b>Road:</b> {safeText(selected.road_name)}
+              </p>
+              <p>
+                <b>Road type:</b> {safeText(selected.road_classification)}
+              </p>
+              <p>
+                <b>Weather:</b> {safeText(selected.weather_condition)}
+              </p>
+              <p>
+                <b>Light:</b> {safeText(selected.light_condition)}
+              </p>
+              <p>
+                <b>Collision:</b> {safeText(selected.collision_type)}
+              </p>
+              <p>
+                <b>Date:</b> {formatDate(selected.accident_date_time)}
+              </p>
+            </div>
+          </div>
+        </Popup>
+      )}
+    </>
   );
 }

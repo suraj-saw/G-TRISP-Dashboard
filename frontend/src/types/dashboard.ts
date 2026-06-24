@@ -49,11 +49,18 @@ export interface DistrictCount {
 }
 
 export interface HeatmapPoint {
-  accident_id: number;
+  accident_id: string | null;
   latitude: number;
   longitude: number;
   severity: string;
   district: string;
+  police_station?: string | null;
+  road_name?: string | null;
+  road_classification?: string | null;
+  weather_condition?: string | null;
+  light_condition?: string | null;
+  collision_type?: string | null;
+  accident_date_time?: string | null;
 }
 
 export interface CasualtyBreakdown {
