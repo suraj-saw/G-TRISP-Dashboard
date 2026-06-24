@@ -58,6 +58,8 @@ function fmt(n: number) {
   return n.toLocaleString("en-IN");
 }
 
+import { MAP_STYLES } from "../../components/maps/mapStyles";
+
 const ViolationTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
 
@@ -86,7 +88,7 @@ export default function Dashboard() {
     weather_condition: "all",
     light_condition: "all",
     collision_type: "all",
-    baseMap: "osm",
+    baseMap: "google-streets",
   });
 
   const [districtSearch] = useState("");
@@ -249,15 +251,17 @@ export default function Dashboard() {
             </label>
             <div className="relative">
               <select
-                value={filters.baseMap || "osm"}
+                value={filters.baseMap || "google-streets"}
                 onChange={(e) =>
                   setFilters((f) => ({ ...f, baseMap: e.target.value }))
                 }
                 className="w-full appearance-none rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-3 py-2 pr-8 text-[13px] text-[#1A1D2E] font-medium outline-none focus:border-[#2C6EF2] focus:ring-2 focus:ring-[#2C6EF2]/10 cursor-pointer transition"
               >
-                <option value="osm">OpenStreetMap</option>
-                <option value="satellite">Satellite</option>
-                <option value="positron">Carto Light</option>
+                {MAP_STYLES.map((style) => (
+                  <option key={style.id} value={style.id}>
+                    {style.label}
+                  </option>
+                ))}
               </select>
               <ChevronDown
                 size={14}
@@ -467,7 +471,7 @@ export default function Dashboard() {
                 weather_condition: "all",
                 light_condition: "all",
                 collision_type: "all",
-                baseMap: "osm",
+                baseMap: "google-streets",
               })
             }
             className="flex items-center justify-center gap-2 rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-4 py-2 text-[12px] font-semibold text-[#6B7299] transition hover:border-[#C9CEDF] hover:bg-[#EDF0F8] hover:text-[#1A1D2E] active:scale-[0.98]"

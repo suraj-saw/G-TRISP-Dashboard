@@ -34,9 +34,21 @@ export const useDashboard = (filters: DashboardFilters) => {
     }
   };
 
+  // Memoize filters to prevent infinite loops from inline objects,
+  // and ignore visual-only filters like baseMap
+  const filterKey = JSON.stringify({
+    district: filters.district,
+    year: filters.year,
+    severity: filters.severity,
+    road_classification: filters.road_classification,
+    weather_condition: filters.weather_condition,
+    light_condition: filters.light_condition,
+    collision_type: filters.collision_type,
+  });
+
   useEffect(() => {
     loadData();
-  }, [filters]);
+  }, [filterKey]);
 
   return { data, loading, error, refetch: loadData };
 };
