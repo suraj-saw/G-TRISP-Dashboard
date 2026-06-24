@@ -38,3 +38,44 @@ class PoliceStationSummaryCount(ResponseModel):
 
 class PoliceStationSummaryResponse(ResponseModel):
     data: List[PoliceStationSummaryCount]
+
+
+# ---------------------------------------------------------------------------
+# Temporal Analysis
+# ---------------------------------------------------------------------------
+
+class HourDayCount(ResponseModel):
+    hour: int
+    day: str
+    count: int
+
+
+class HourlyAccidentCount(ResponseModel):
+    hour: int
+    count: int
+
+
+class MonthlyAccidentCount(ResponseModel):
+    year: int
+    month: int
+    month_label: str
+    count: int
+
+
+class PeakSummary(ResponseModel):
+    peak_hour: str
+    peak_hour_count: int
+    peak_day: str
+    peak_day_count: int
+    peak_month: str
+    peak_month_count: int
+    peak_time_period: str
+    peak_time_period_count: int
+    total_accidents: int
+
+
+class TemporalAnalysisResponse(ResponseModel):
+    hour_day: List[HourDayCount]
+    hourly: List[HourlyAccidentCount]
+    monthly: List[MonthlyAccidentCount]
+    summary: PeakSummary

@@ -1,5 +1,10 @@
 import API from "./axios";
-import type { DashboardFilters, FilterOptions, DashboardData } from "../types/dashboard";
+import type {
+  DashboardFilters,
+  FilterOptions,
+  DashboardData,
+  TemporalAnalysisData,
+} from "../types/dashboard";
 
 const getParams = (filters: DashboardFilters) => {
   const params: Record<string, string | number> = {};
@@ -53,4 +58,34 @@ export const fetchDashboardData = async (filters: DashboardFilters): Promise<Das
     roads: roads.data.data,
     violations: violations.data.data.map((v: any) => ({ ...v, name: v.collision_type })),
   };
+};
+
+export const fetchTemporalAnalysis = async (
+  filters: DashboardFilters
+): Promise<TemporalAnalysisData> => {
+  const params: Record<string, string | number> = {};
+
+  const hasValue = (value?: string) =>
+    value !== undefined && value !== "" && value !== "all";
+
+  if (hasValue(filters.district) && filters.district !== "Surat") {
+    params.police_station = filters.district;
+  }
+  if (hasValue(filters.year)) params.year = filters.year;
+  if (hasValue(filters.month)) params.month = filters.month!;
+  if (hasValue(filters.day)) params.day = filters.day!;
+  if (hasValue(filters.time_period)) params.time_period = filters.time_period!;
+  if (hasValue(filters.severity)) params.severity = filters.severity;
+  if (hasValue(filters.weather_condition)) {
+    params.weather_condition = filters.weather_condition;
+  }
+  if (hasValue(filters.light_condition)) {
+    params.light_condition = filters.light_condition;
+  }
+
+  const { data } = await API.get("/surat/dashboard/temporal-analysis", {
+    params,
+  });
+
+  return data;
 };

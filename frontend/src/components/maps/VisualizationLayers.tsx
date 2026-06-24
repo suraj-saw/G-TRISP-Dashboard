@@ -40,6 +40,18 @@ const formatDate = (value?: string | null) => {
   });
 };
 
+// Add near safeText / formatDate helpers
+const getSeverityWeight = (severity?: string | null) => {
+  const value = (severity || "").toLowerCase();
+
+  if (value.includes("fatal")) return 1;
+  if (value.includes("grievous")) return 0.85;
+  if (value.includes("minor")) return 0.55;
+  if (value.includes("damage")) return 0.3;
+
+  return 0.5;
+};
+
 export function VisualizationLayers({
   data,
   type,
@@ -65,6 +77,7 @@ export function VisualizationLayers({
             properties: {
               accident_id: p.accident_id,
               severity: p.severity,
+              severity_weight: getSeverityWeight(p.severity),
               police_station: p.police_station ?? p.district,
               road_name: p.road_name,
               road_classification: p.road_classification,
@@ -129,74 +142,77 @@ export function VisualizationLayers({
 
   if (type === "density_heatmap") {
     return (
-      <Source
-        id="accident-density-source"
-        type="geojson"
-        data={geojsonData as any}
-      >
-        <Layer
-          id="accident-density-soft-base"
-          type="circle"
-          paint={{
-            "circle-radius": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              8,
-              16,
-              11,
-              30,
-              14,
-              54,
-            ],
-            "circle-color": "#818cf8",
-            "circle-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              8,
-              0.22,
-              11,
-              0.28,
-              14,
-              0.34,
-            ],
-            "circle-blur": 1,
-            "circle-stroke-width": 0,
-          }}
-        />
-        <Layer
-          id="accident-density-hot-core"
-          type="circle"
-          paint={{
-            "circle-radius": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              8,
-              5,
-              11,
-              10,
-              14,
-              18,
-            ],
-            "circle-color": "#4f46e5",
-            "circle-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              8,
-              0.06,
-              11,
-              0.1,
-              14,
-              0.16,
-            ],
-            "circle-blur": 0.85,
-            "circle-stroke-width": 0,
-          }}
-        />
-      </Source>
+      <>
+        <Source
+          id="accident-density-source"
+          type="geojson"
+          data={geojsonData as any}
+        >
+          <Layer
+            id="accident-density-heatmap"
+            type="heatmap"
+            paint={{
+              "heatmap-weight": [
+                "interpolate",
+                ["linear"],
+                ["coalesce", ["get", "severity_weight"], 0.5],
+                0,
+                0,
+                1,
+                1,
+              ],
+              "heatmap-intensity": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                9,
+                0.8,
+                12,
+                1.8,
+                15,
+                3,
+              ],
+              "heatmap-radius": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                9,
+                14,
+                12,
+                28,
+                15,
+                44,
+              ],
+              "heatmap-opacity": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                9,
+                0.85,
+                14,
+                0.75,
+              ],
+              "heatmap-color": [
+                "interpolate",
+                ["linear"],
+                ["heatmap-density"],
+                0,
+                "rgba(59,130,246,0)",
+                0.2,
+                "rgba(96,165,250,0.45)",
+                0.4,
+                "rgba(34,197,94,0.55)",
+                0.6,
+                "rgba(250,204,21,0.7)",
+                0.8,
+                "rgba(249,115,22,0.85)",
+                1,
+                "rgba(220,38,38,0.95)",
+              ],
+            }}
+          />
+        </Source>
+      </>
     );
   }
 
@@ -207,106 +223,160 @@ export function VisualizationLayers({
         type="geojson"
         data={geojsonData as any}
         cluster
-        clusterMaxZoom={14}
-        clusterRadius={45}
+        clusterMaxZoom={15}
+        clusterRadius={34}
       >
         <Layer
-          id="clusters"
+          id="blackspot-halo"
           type="circle"
           filter={["has", "point_count"]}
           paint={{
             "circle-color": [
               "step",
               ["get", "point_count"],
-              "#64748b",
-              20,
-              "#334155",
-              75,
-              "#020617",
+              "rgba(245, 158, 11, 0.35)",
+              50,
+              "rgba(249, 115, 22, 0.38)",
+              150,
+              "rgba(220, 38, 38, 0.42)",
+              300,
+              "rgba(127, 29, 29, 0.48)",
+            ],
+            "circle-radius": [
+              "step",
+              ["get", "point_count"],
+              22,
+              50,
+              30,
+              150,
+              40,
+              300,
+              52,
+            ],
+            "circle-blur": 0.65,
+            "circle-opacity": 0.95,
+          }}
+        />
+
+        <Layer
+          id="blackspot-core"
+          type="circle"
+          filter={["has", "point_count"]}
+          paint={{
+            "circle-color": [
+              "step",
+              ["get", "point_count"],
+              "#F59E0B",
+              50,
+              "#F97316",
+              150,
+              "#DC2626",
+              300,
+              "#7F1D1D",
             ],
             "circle-radius": [
               "step",
               ["get", "point_count"],
               12,
-              20,
-              20,
-              75,
+              50,
+              17,
+              150,
+              23,
+              300,
               30,
             ],
-            "circle-stroke-width": 2,
-            "circle-stroke-color": "#ffffff",
+            "circle-opacity": 0.92,
+            "circle-stroke-width": 2.5,
+            "circle-stroke-color": "#FFFFFF",
           }}
         />
-        <Layer
-          id="cluster-count"
-          type="symbol"
-          filter={["has", "point_count"]}
-          layout={{
-            "text-field": "{point_count_abbreviated}",
-            "text-size": 12,
-          }}
-          paint={{ "text-color": "#ffffff" }}
-        />
-        <Layer
-          id="unclustered-point"
-          type="circle"
-          filter={["!", ["has", "point_count"]]}
-          paint={{
-            "circle-color": "#111827",
-            "circle-radius": 4,
-            "circle-stroke-width": 1,
-            "circle-stroke-color": "#ffffff",
-          }}
-        />
-      </Source>
-    );
-  }
 
-  if (type === "district_hotspot") {
-    return (
-      <Source
-        id="hotspot-source"
-        type="geojson"
-        data={geojsonData as any}
-        cluster
-        clusterMaxZoom={13}
-        clusterRadius={42}
-      >
         <Layer
-          id="hotspot-clusters"
+          id="blackspot-inner-shine"
           type="circle"
           filter={["has", "point_count"]}
           paint={{
-            "circle-color": [
-              "step",
-              ["get", "point_count"],
-              "#f59e0b",
-              25,
-              "#ef4444",
-              100,
-              "#7f1d1d",
-            ],
+            "circle-color": "rgba(255,255,255,0.26)",
             "circle-radius": [
               "step",
               ["get", "point_count"],
-              16,
-              25,
-              26,
-              100,
-              38,
+              5,
+              50,
+              7,
+              150,
+              9,
+              300,
+              12,
             ],
-            "circle-opacity": 0.82,
+            "circle-translate": [-3, -3],
           }}
         />
+
         <Layer
-          id="hotspot-cluster-count"
+          id="blackspot-count"
           type="symbol"
           filter={["has", "point_count"]}
           layout={{
             "text-field": "{point_count_abbreviated}",
-            "text-size": 13,
+            "text-size": [
+              "step",
+              ["get", "point_count"],
+              11,
+              50,
+              12,
+              150,
+              13,
+              300,
+              14,
+            ],
+            "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+            "text-allow-overlap": true,
           }}
-          paint={{ "text-color": "#ffffff" }}
+          paint={{
+            "text-color": "#FFFFFF",
+            "text-halo-color": "rgba(0,0,0,0.28)",
+            "text-halo-width": 1,
+          }}
+        />
+
+        <Layer
+          id="blackspot-single-point-halo"
+          type="circle"
+          filter={["!", ["has", "point_count"]]}
+          paint={{
+            "circle-color": "rgba(239, 68, 68, 0.22)",
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              5,
+              15,
+              10,
+            ],
+            "circle-blur": 0.6,
+          }}
+        />
+
+        <Layer
+          id="blackspot-single-point"
+          type="circle"
+          filter={["!", ["has", "point_count"]]}
+          paint={{
+            "circle-color": "#EF4444",
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              2.5,
+              15,
+              4.5,
+            ],
+            "circle-opacity": 0.75,
+            "circle-stroke-width": 1,
+            "circle-stroke-color": "#FFFFFF",
+          }}
         />
       </Source>
     );

@@ -157,6 +157,36 @@ def _make_point(lat: float | None, lon: float | None):
     except Exception:
         return None
 
+def _parse_accident_datetime(value):
+    if pd.isna(value):
+        return None
+
+    if isinstance(value, pd.Timestamp):
+        return value.to_pydatetime()
+
+    text = str(value).strip()
+    if not text or text.lower() == "nan":
+        return None
+
+    formats = [
+        "%d-%b-%Y : %I:%M %p",  # 17-Jan-2023 : 11:00 AM
+        "%d-%b-%Y: %I:%M %p",
+        "%d-%b-%Y %I:%M %p",
+        "%d/%m/%Y : %I:%M %p",
+        "%d-%m-%Y : %I:%M %p",
+        "%Y-%m-%d %H:%M:%S",
+    ]
+
+    for fmt in formats:
+        parsed = pd.to_datetime(text, format=fmt, errors="coerce")
+        if not pd.isna(parsed):
+            return parsed.to_pydatetime()
+
+    parsed = pd.to_datetime(text, errors="coerce", dayfirst=True)
+    if pd.isna(parsed):
+        return None
+
+    return parsed.to_pydatetime()
 
 # ── dataset loader ────────────────────────────────────────────────────────────
 
@@ -187,11 +217,14 @@ def _load_dataset() -> pd.DataFrame:
     df = df.rename(columns=COLUMN_MAP)
 
     # Parse datetime using the iRAD field name (after rename)
-    df["accident_date_time"] = pd.to_datetime(
-        df["accident_date_time"], errors="coerce", dayfirst=True
-    )
+    df["accident_date_time"] = df["accident_date_time"].apply(_parse_accident_datetime)
 
-    logger.info("Loaded %d rows, %d columns.", len(df), len(df.columns))
+    parsed_count = df["accident_date_time"].notna().sum()
+    logger.info(
+        "Parsed accident_date_time for %d / %d rows.",
+        parsed_count,
+        len(df),
+    )
     return df
 
 

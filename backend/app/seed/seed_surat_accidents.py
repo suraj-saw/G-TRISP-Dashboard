@@ -113,6 +113,49 @@ def _make_point(lat: float | None, lon: float | None):
         return None
 
 
+def _parse_accident_datetime(value):
+    if pd.isna(value):
+        return None
+
+    if isinstance(value, pd.Timestamp):
+        return value.to_pydatetime()
+
+    # Excel serial date support, in case pandas reads the cell as a number.
+    if isinstance(value, (int, float)):
+        parsed = pd.to_datetime(value, unit="D", origin="1899-12-30", errors="coerce")
+        return None if pd.isna(parsed) else parsed.to_pydatetime()
+
+    text = str(value).strip()
+    if not text or text.lower() == "nan":
+        return None
+
+    # Normalize common separators from values like "17-Jan-2023 : 11:00 AM".
+    text = " ".join(text.replace("\u00a0", " ").split())
+
+    formats = [
+        "%d-%b-%Y : %I:%M %p",
+        "%d-%b-%Y: %I:%M %p",
+        "%d-%b-%Y %I:%M %p",
+        "%d/%m/%Y : %I:%M %p",
+        "%d/%m/%Y %I:%M %p",
+        "%d-%m-%Y : %I:%M %p",
+        "%d-%m-%Y %I:%M %p",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %I:%M:%S %p",
+    ]
+
+    for fmt in formats:
+        parsed = pd.to_datetime(text, format=fmt, errors="coerce")
+        if not pd.isna(parsed):
+            return parsed.to_pydatetime()
+
+    parsed = pd.to_datetime(text, errors="coerce", dayfirst=True)
+    if pd.isna(parsed):
+        return None
+
+    return parsed.to_pydatetime()
+
+
 # ── Spatial validation ────────────────────────────────────────────────────────
 def is_inside_surat(lat: float, lon: float, db: Session) -> bool:
     """
@@ -204,7 +247,20 @@ def _load_dataset() -> pd.DataFrame:
         )
 
     df = df.rename(columns=COLUMN_MAP)
-    df["accident_date_time"] = pd.to_datetime(df["accident_date_time"], errors="coerce")
+    raw_datetime = df["accident_date_time"].copy()
+    df["accident_date_time"] = raw_datetime.apply(_parse_accident_datetime)
+
+    parsed_count = int(df["accident_date_time"].notna().sum())
+    logger.info(
+        "Parsed accident_date_time for %d / %d rows.",
+        parsed_count,
+        len(df),
+    )
+    if parsed_count == 0:
+        logger.warning(
+            "No accident_date_time values parsed. Sample raw values: %s",
+            raw_datetime.head(10).tolist(),
+        )
     
     logger.info("Loaded %d rows, %d columns.", len(df), len(df.columns))
     return df

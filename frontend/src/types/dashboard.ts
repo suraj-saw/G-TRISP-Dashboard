@@ -1,6 +1,9 @@
 export interface DashboardFilters {
   district: string;
   year: string;
+  month?: string;
+  day?: string;
+  time_period?: string;
   severity: string;
   road_classification: string;
   weather_condition: string;
@@ -113,4 +116,41 @@ export interface DashboardData {
   dangerous: DangerousDistrict[];
   roads: RoadClassCount[];
   violations: ViolationCount[];
+}
+
+export interface HourDayCount {
+  hour: number;
+  day: string;
+  count: number;
+}
+
+export interface HourlyAccidentCount {
+  hour: number;
+  count: number;
+}
+
+export interface MonthlyAccidentCount {
+  year: number;
+  month: number;
+  month_label: string;
+  count: number;
+}
+
+export interface PeakSummary {
+  peak_hour: string;
+  peak_hour_count: number;
+  peak_day: string;
+  peak_day_count: number;
+  peak_month: string;
+  peak_month_count: number;
+  peak_time_period: string;
+  peak_time_period_count: number;
+  total_accidents: number;
+}
+
+export interface TemporalAnalysisData {
+  hour_day: HourDayCount[];
+  hourly: HourlyAccidentCount[];
+  monthly: MonthlyAccidentCount[];
+  summary: PeakSummary;
 }
