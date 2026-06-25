@@ -14,29 +14,74 @@ interface Props {
   onChange: (value: string) => void;
 }
 
+// Max height the menu would like, and the breathing room we keep from the
+// viewport edges so the last option is never flush against the screen/taskbar.
+const MENU_MAX_HEIGHT = 256;
+const VIEWPORT_MARGIN = 12;
+const TRIGGER_GAP = 6;
+
+type MenuPos =
+  | {
+      openUp: false;
+      top: number;
+      left: number;
+      width: number;
+      maxHeight: number;
+    }
+  | {
+      openUp: true;
+      bottom: number;
+      left: number;
+      width: number;
+      maxHeight: number;
+    };
+
 export default function FilterSelect({ value, options, onChange }: Props) {
   const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+  const [pos, setPos] = useState<MenuPos | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLUListElement>(null);
 
   const selected = options.find((o) => o.value === value) ?? options[0];
 
-  // Position the menu from the trigger's on-screen rect (escapes overflow clipping)
+  // Position the menu from the trigger's on-screen rect (escapes overflow clipping).
   const updatePosition = () => {
     const el = triggerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const menuMaxHeight = 256;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    // Flip above the trigger if there isn't enough room below
-    const openUp = spaceBelow < menuMaxHeight && rect.top > spaceBelow;
 
-    setCoords({
-      top: openUp ? rect.top - 6 : rect.bottom + 6,
-      left: rect.left,
-      width: rect.width,
-    });
+    const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_MARGIN;
+    const spaceAbove = rect.top - VIEWPORT_MARGIN;
+
+    // Flip up only when below is too cramped AND above has more room.
+    const openUp = spaceBelow < MENU_MAX_HEIGHT && spaceAbove > spaceBelow;
+
+    // Clamp the menu height to whatever space is actually available on that side
+    // so its content scrolls internally instead of overflowing the viewport.
+    const available = openUp ? spaceAbove : spaceBelow;
+    const maxHeight = Math.max(
+      96,
+      Math.min(MENU_MAX_HEIGHT, available - TRIGGER_GAP)
+    );
+
+    if (openUp) {
+      setPos({
+        openUp: true,
+        // Anchor the menu's BOTTOM just above the trigger so it grows upward.
+        bottom: window.innerHeight - rect.top + TRIGGER_GAP,
+        left: rect.left,
+        width: rect.width,
+        maxHeight,
+      });
+    } else {
+      setPos({
+        openUp: false,
+        top: rect.bottom + TRIGGER_GAP,
+        left: rect.left,
+        width: rect.width,
+        maxHeight,
+      });
+    }
   };
 
   useLayoutEffect(() => {
@@ -94,17 +139,18 @@ export default function FilterSelect({ value, options, onChange }: Props) {
 
       {/* MENU (portal — fixed, escapes the sidebar's overflow clipping) */}
       {open &&
+        pos &&
         createPortal(
           <ul
             ref={menuRef}
             role="listbox"
             style={{
               position: "fixed",
-              top: coords.top,
-              left: coords.left,
-              width: coords.width,
-              maxHeight: 256,
+              left: pos.left,
+              width: pos.width,
+              maxHeight: pos.maxHeight,
               zIndex: 9999,
+              ...(pos.openUp ? { bottom: pos.bottom } : { top: pos.top }),
             }}
             className="overflow-y-auto no-scrollbar rounded-xl border border-[#E4E8F4] bg-white p-1.5 shadow-[0_12px_32px_rgba(15,23,42,0.18)]"
           >

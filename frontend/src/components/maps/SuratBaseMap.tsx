@@ -118,25 +118,30 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
 
     const isSatelliteMap = SATELLITE_BASE_MAP_IDS.has(baseMap ?? "");
 
+    // Re-fit the map to the district bounding box for the *current* container
+    // size. Used on initial load, on the imperative `resize()` handle, and after
+    // the sidebar open/close animation so the district always stays fully
+    // contained instead of shifting.
+    const fitToBounds = useCallback((duration: number) => {
+      if (!bboxRef.current) return;
+      const [w, s, e, n] = bboxRef.current;
+      mapRef.current?.fitBounds(
+        [
+          [w, s],
+          [e, n],
+        ],
+        {
+          padding: MAP_FIT_PADDING_PX,
+          duration,
+          maxZoom: MAP_FIT_MAX_ZOOM,
+        }
+      );
+    }, []);
+
     useImperativeHandle(ref, () => ({
       resize: () => {
-        const map = mapRef.current?.getMap();
-        if (!map) return;
-        map.resize();
-        if (bboxRef.current) {
-          const [w, s, e, n] = bboxRef.current;
-          mapRef.current?.fitBounds(
-            [
-              [w, s],
-              [e, n],
-            ],
-            {
-              padding: MAP_FIT_PADDING_PX,
-              duration: MAP_FIT_DURATION_MS,
-              maxZoom: MAP_FIT_MAX_ZOOM,
-            }
-          );
-        }
+        mapRef.current?.getMap()?.resize();
+        fitToBounds(MAP_FIT_DURATION_MS);
       },
     }));
 
@@ -161,36 +166,31 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
 
     useEffect(() => {
       if (!mapLoaded || !boundary) return;
-      const bbox = getBbox(boundary);
-      if (!bbox) return;
-      mapRef.current?.fitBounds(
-        [
-          [bbox[0], bbox[1]],
-          [bbox[2], bbox[3]],
-        ],
-        {
-          padding: MAP_FIT_PADDING_PX,
-          duration: 900,
-          maxZoom: MAP_FIT_MAX_ZOOM,
-        }
-      );
-    }, [mapLoaded, boundary]);
+      fitToBounds(900);
+    }, [mapLoaded, boundary, fitToBounds]);
 
+    // When the sidebar opens/closes the map container changes width. Keep the
+    // canvas in sync during the CSS transition via repeated resize() calls, then
+    // re-fit the district bounds once the animation settles so the map zooms to
+    // contain the district instead of just shifting its center.
     useEffect(() => {
       if (!mapLoaded) return;
-      let start = performance.now();
+      const start = performance.now();
       let frameId: number;
 
       const loop = (now: number) => {
+        mapRef.current?.resize();
         if (now - start < MAP_RESIZE_LOOP_MS) {
-          mapRef.current?.resize();
           frameId = requestAnimationFrame(loop);
+        } else {
+          // Final refit against the settled container size.
+          fitToBounds(MAP_FIT_DURATION_MS);
         }
       };
       frameId = requestAnimationFrame(loop);
 
       return () => cancelAnimationFrame(frameId);
-    }, [sidebarOpen, mapLoaded]);
+    }, [sidebarOpen, mapLoaded, fitToBounds]);
 
     const handleMapLoad = useCallback(() => setMapLoaded(true), []);
     const mapStyleUrl = getMapStyleUrl(baseMap);

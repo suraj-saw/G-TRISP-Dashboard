@@ -47,11 +47,17 @@ export const TOPBAR_Z_INDEX = "z-50";
 /** Default map height string (full viewport minus topbar) */
 export const MAP_DEFAULT_HEIGHT = BELOW_TOPBAR_HEIGHT;
 
-/** Degrees of padding applied around the district bounding box on map fit */
-export const MAP_BOUNDS_PAD_DEGREES = 0.05;
+/**
+ * Degrees of padding applied around the district bounding box for `maxBounds`.
+ * This must be generous: a wide (landscape) viewport forces MapLibre to zoom IN
+ * to keep the viewport inside a tight maxBounds box, which crops the taller
+ * north–south extent of the district. Extra horizontal room lets the map zoom
+ * out far enough to contain the whole district on initial load.
+ */
+export const MAP_BOUNDS_PAD_DEGREES = 0.4;
 
 /** Minimum zoom level for the Surat district map */
-export const MAP_MIN_ZOOM = 9;
+export const MAP_MIN_ZOOM = 8;
 
 /** Maximum zoom level used when fitting bounds after sidebar toggle */
 export const MAP_FIT_MAX_ZOOM = 12;
@@ -60,7 +66,7 @@ export const MAP_FIT_MAX_ZOOM = 12;
 export const MAP_FIT_DURATION_MS = 400;
 
 /** Padding (px) applied inside fitBounds call */
-export const MAP_FIT_PADDING_PX = 120;
+export const MAP_FIT_PADDING_PX = 40;
 
 /**
  * Duration (ms) to keep calling map.resize() after a sidebar animation ends.
