@@ -15,9 +15,15 @@ import { Loader2, AlertCircle } from "lucide-react";
 import { fetchSuratBoundary } from "../../api/geoApi";
 import { getMapStyleUrl } from "./mapStyles";
 import { SURAT_MAP_CENTER } from "../../config/constants";
+import {
+  MAP_BOUNDS_PAD_DEGREES,
+  MAP_MIN_ZOOM,
+  MAP_FIT_MAX_ZOOM,
+  MAP_FIT_DURATION_MS,
+  MAP_FIT_PADDING_PX,
+  MAP_RESIZE_LOOP_MS,
+} from "../../config/layout";
 
-const BOUNDS_PAD = 0.05;
-const MIN_ZOOM = 9;
 const WORLD_RING: GeoJSON.Position[] = [
   [-180, -90],
   [180, -90],
@@ -113,7 +119,11 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
               [w, s],
               [e, n],
             ],
-            { padding: 120, duration: 400, maxZoom: 12 }
+            {
+              padding: MAP_FIT_PADDING_PX,
+              duration: MAP_FIT_DURATION_MS,
+              maxZoom: MAP_FIT_MAX_ZOOM,
+            }
           );
         }
       },
@@ -129,8 +139,8 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
             bboxRef.current = bbox;
             const [w, s, e, n] = bbox;
             setMaxBounds([
-              [w - BOUNDS_PAD, s - BOUNDS_PAD],
-              [e + BOUNDS_PAD, n + BOUNDS_PAD],
+              [w - MAP_BOUNDS_PAD_DEGREES, s - MAP_BOUNDS_PAD_DEGREES],
+              [e + MAP_BOUNDS_PAD_DEGREES, n + MAP_BOUNDS_PAD_DEGREES],
             ]);
           }
         })
@@ -147,7 +157,11 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
           [bbox[0], bbox[1]],
           [bbox[2], bbox[3]],
         ],
-        { padding: 120, duration: 900, maxZoom: 12 }
+        {
+          padding: MAP_FIT_PADDING_PX,
+          duration: 900,
+          maxZoom: MAP_FIT_MAX_ZOOM,
+        }
       );
     }, [mapLoaded, boundary]);
 
@@ -157,7 +171,7 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
       let frameId: number;
 
       const loop = (now: number) => {
-        if (now - start < 350) {
+        if (now - start < MAP_RESIZE_LOOP_MS) {
           mapRef.current?.resize();
           frameId = requestAnimationFrame(loop);
         }
@@ -197,7 +211,7 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
           onLoad={handleMapLoad}
           attributionControl={false}
           reuseMaps
-          minZoom={MIN_ZOOM}
+          minZoom={MAP_MIN_ZOOM}
           maxBounds={maxBounds}
         >
           <NavigationControl position="top-right" showCompass />

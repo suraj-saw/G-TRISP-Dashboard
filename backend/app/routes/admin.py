@@ -10,8 +10,9 @@ from app.models.notification import Notification
 from app.routes.auth import get_current_admin_user
 from app.schemas.user_schema import UserResponse
 from app.schemas.notification_schema import NotificationResponse
+from app.core.constants import ADMIN_PREFIX
 
-router = APIRouter(prefix="/api/admin", tags=["Admin"])
+router = APIRouter(prefix=ADMIN_PREFIX, tags=["Admin"])
 
 
 class StatusChangeRequest(BaseModel):

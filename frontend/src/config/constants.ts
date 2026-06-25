@@ -17,6 +17,12 @@ export const GUJARAT_API_BASE = "/dashboard";
 /** Base path for the GeoJSON / boundary endpoints */
 export const GEO_API_BASE = "/geo";
 
+/** Base path for auth endpoints */
+export const AUTH_API_BASE = "/auth";
+
+/** Base path for admin endpoints */
+export const ADMIN_API_BASE = "/admin";
+
 // ---------------------------------------------------------------------------
 // Map defaults — Surat District
 // ---------------------------------------------------------------------------
@@ -78,3 +84,20 @@ export const DEFAULT_BASE_MAP = "google-streets";
 
 export const GEO_FILTER_LABEL =
   DASHBOARD_MODE === "surat" ? "Police Station" : "District";
+
+// ---------------------------------------------------------------------------
+// Pagination / data limits
+// ---------------------------------------------------------------------------
+
+/** Default number of top-dangerous items to fetch */
+export const TOP_DANGEROUS_DEFAULT_N = 10;
+
+/** Maximum number of top-dangerous items available */
+export const TOP_DANGEROUS_MAX_N = 50;
+
+// ---------------------------------------------------------------------------
+// Seed / batch sizes (mirrored from backend for documentation)
+// ---------------------------------------------------------------------------
+
+/** Default batch size used by data seeders */
+export const SEED_BATCH_SIZE = 500;

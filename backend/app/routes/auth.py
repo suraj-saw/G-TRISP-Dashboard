@@ -25,9 +25,13 @@ from app.services.auth_service import (
     REFRESH_TOKEN_EXPIRE_HOURS,
 )
 from app.models.notification import Notification
-from app.core.constants import ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE
+from app.core.constants import (
+    ACCESS_TOKEN_COOKIE,
+    REFRESH_TOKEN_COOKIE,
+    AUTH_PREFIX,
+)
 
-router = APIRouter(prefix="/api/auth", tags=["Auth"])
+router = APIRouter(prefix=AUTH_PREFIX, tags=["Auth"])
 
 # ---------------------------------------------------------------------------
 # Shared cookie helper

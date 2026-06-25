@@ -25,6 +25,15 @@ import { MAP_STYLES } from "../../components/maps/mapStyles";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
 import { ROUTES } from "../../config/constants";
 import {
+  SIDEBAR_WIDTH_PX,
+  TOPBAR_HEIGHT_PX,
+  MAIN_CONTENT_TOP_PADDING_PX,
+  SIDEBAR_Z_INDEX,
+  TOPBAR_Z_INDEX,
+  SIDEBAR_TRANSITION,
+  MAP_DEFAULT_HEIGHT,
+} from "../../config/layout";
+import {
   defaultFilters,
   getFilterConfig,
   VISUALIZATION_OPTIONS,
@@ -56,7 +65,6 @@ export default function Dashboard() {
         if (!active) return;
 
         if (res.data.role === "admin") {
-          // Use the canonical ROUTES constant — not a hardcoded string
           navigate(ROUTES.ADMIN, { replace: true });
           return;
         }
@@ -260,7 +268,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#F1F4FB]">
       {/* ── TOPBAR — always full viewport width ── */}
-      <div className="fixed left-0 right-0 top-0 z-50">
+      <div className={`fixed left-0 right-0 top-0 ${TOPBAR_Z_INDEX}`}>
         <TopBar
           appName="G-TRISP"
           user={user}
@@ -273,15 +281,16 @@ export default function Dashboard() {
 
       {/* ── SIDEBAR ── */}
       <aside
+        style={{ top: `${TOPBAR_HEIGHT_PX}px`, width: `${SIDEBAR_WIDTH_PX}px` }}
         className={`
-          fixed left-0 top-[80px] z-40
-          h-[calc(100vh-80px)] w-[260px]
+          fixed left-0 ${SIDEBAR_Z_INDEX}
+          h-[calc(100vh-var(--topbar-h,80px))]
           flex flex-col
           overflow-y-auto
           border-r border-[#E4E8F4] bg-white
           shadow-lg
           will-change-transform
-          transition-transform duration-300 ease-in-out
+          ${SIDEBAR_TRANSITION}
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
@@ -307,9 +316,10 @@ export default function Dashboard() {
 
       {/* ── MAIN CONTENT ── */}
       <main
-        className="min-w-0 pb-7 pt-[104px] transition-[padding-left] duration-300 ease-in-out"
+        className="min-w-0 pb-7 transition-[padding-left] duration-300 ease-in-out"
         style={{
-          paddingLeft: sidebarOpen ? `calc(260px + 1.5rem)` : `1.5rem`,
+          paddingTop: `${MAIN_CONTENT_TOP_PADDING_PX}px`,
+          paddingLeft: sidebarOpen ? `${SIDEBAR_WIDTH_PX + 24}px` : `1.5rem`,
           paddingRight: `1.5rem`,
         }}
       >
@@ -347,7 +357,7 @@ export default function Dashboard() {
               </div>
 
               <SuratBaseMap
-                height="calc(100vh - 80px)"
+                height={MAP_DEFAULT_HEIGHT}
                 sidebarOpen={sidebarOpen}
                 baseMap={filters.baseMap || "osm"}
               >

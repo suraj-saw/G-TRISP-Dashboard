@@ -13,8 +13,9 @@ from geoalchemy2.functions import ST_AsGeoJSON
 
 from app.database import get_db
 from app.models.surat_boundary import SuratBoundary
+from app.core.constants import GEO_PREFIX, GEO_CACHE_MAX_AGE_SECONDS
 
-router = APIRouter(prefix="/api/geo", tags=["Geo"])
+router = APIRouter(prefix=GEO_PREFIX, tags=["Geo"])
 
 
 @router.get("/surat-boundary")
@@ -48,5 +49,7 @@ def get_surat_boundary(db: Session = Depends(get_db)):
             "type": "FeatureCollection",
             "features": features,
         },
-        headers={"Cache-Control": "public, max-age=86400"},  # cache for 1 day
+        headers={
+            "Cache-Control": f"public, max-age={GEO_CACHE_MAX_AGE_SECONDS}",
+        },
     )

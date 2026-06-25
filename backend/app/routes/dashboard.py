@@ -1,14 +1,8 @@
 # backend/app/routes/dashboard.py
 """
-Dashboard API router.
+Dashboard API router — Gujarat-wide endpoints.
 
-All field references use the iRAD-aligned names from the main project:
-  accident_date_time        (was: accident_datetime)
-  number_of_vehicles        (was: no_of_vehicles)
-  driver_killed/grievous/minor
-  passenger_killed/grievous/minor
-  pedestrian_killed/grievous/minor
-  type_of_collision         (was: collision_type)
+All field references use the iRAD-aligned names from the main project.
 """
 
 import calendar
@@ -66,10 +60,13 @@ from app.core.constants import (
     SEVERITY_DAMAGE_ONLY,
     CASUALTY_TYPES,
     UNKNOWN_LABEL,
+    DASHBOARD_PREFIX,
+    TOP_DANGEROUS_DEFAULT_N,
+    TOP_DANGEROUS_MAX_N,
 )
 
 router = APIRouter(
-    prefix="/api/dashboard",
+    prefix=DASHBOARD_PREFIX,
     tags=["Dashboard"],
 )
 
@@ -144,7 +141,7 @@ def get_summary(
 
 
 # ---------------------------------------------------------------------------
-# By District   (no district filter — used for district-level charts/maps)
+# By District
 # ---------------------------------------------------------------------------
 
 @router.get("/by-district", response_model=DistrictResponse)
@@ -214,7 +211,7 @@ def get_by_severity(
 
 
 # ---------------------------------------------------------------------------
-# Time Series  (no year filter — always show full timeline)
+# Time Series
 # ---------------------------------------------------------------------------
 
 @router.get("/time-series", response_model=TimeSeriesResponse)
@@ -301,7 +298,7 @@ def get_by_collision(
 
 
 # ---------------------------------------------------------------------------
-# Heatmap  (supports severity filter on top of standard filters)
+# Heatmap
 # ---------------------------------------------------------------------------
 
 @router.get("/heatmap", response_model=HeatmapResponse)
@@ -384,7 +381,7 @@ def get_by_violation(
 
 
 # ---------------------------------------------------------------------------
-# Road Classification  (no district filter)
+# Road Classification
 # ---------------------------------------------------------------------------
 
 @router.get("/by-road", response_model=RoadClassResponse)
@@ -529,7 +526,7 @@ def get_by_police_station(
     )
     for a in query.all():
         key = safe_text(a.police_station)
-        stations[key]["district"]      = safe_text(a.district)
+        stations[key]["district"]       = safe_text(a.district)
         stations[key]["accident_count"] += 1
         stations[key]["fatalities"]     += total_fatalities(a)
 
@@ -585,12 +582,12 @@ def get_casualty_breakdown(
 
 
 # ---------------------------------------------------------------------------
-# Top Dangerous Districts  (no district filter)
+# Top Dangerous Districts
 # ---------------------------------------------------------------------------
 
 @router.get("/top-dangerous", response_model=TopDangerousResponse)
 def get_top_dangerous(
-    top_n: int = Query(10, ge=1, le=50),
+    top_n: int = Query(TOP_DANGEROUS_DEFAULT_N, ge=1, le=TOP_DANGEROUS_MAX_N),
     year: Optional[int] = Query(None),
     road_classification: Optional[str] = Query(None),
     weather_condition: Optional[str] = Query(None),
@@ -630,7 +627,7 @@ def get_top_dangerous(
 
 
 # ---------------------------------------------------------------------------
-# Yearly Comparison  (no year filter)
+# Yearly Comparison
 # ---------------------------------------------------------------------------
 
 @router.get("/yearly-comparison", response_model=YearlyResponse)

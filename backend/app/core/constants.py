@@ -34,6 +34,16 @@ ACCESS_TOKEN_COOKIE  = "access_token"
 REFRESH_TOKEN_COOKIE = "refresh_token"
 
 # ---------------------------------------------------------------------------
+# API route prefixes
+# ---------------------------------------------------------------------------
+
+AUTH_PREFIX          = "/api/auth"
+ADMIN_PREFIX         = "/api/admin"
+DASHBOARD_PREFIX     = "/api/dashboard"
+SURAT_DASH_PREFIX    = "/api/surat/dashboard"
+GEO_PREFIX           = "/api/geo"
+
+# ---------------------------------------------------------------------------
 # Redis key prefixes
 # ---------------------------------------------------------------------------
 
@@ -84,3 +94,25 @@ ACCIDENT_DATETIME_FORMATS = [
 # ---------------------------------------------------------------------------
 
 SURAT_DISTRICT_NAME = "Surat"
+
+# ---------------------------------------------------------------------------
+# API / pagination defaults
+# ---------------------------------------------------------------------------
+
+# Default and maximum values for the top-N dangerous locations endpoint.
+TOP_DANGEROUS_DEFAULT_N = 10
+TOP_DANGEROUS_MAX_N     = 50
+
+# HTTP cache lifetime for GeoJSON boundary responses (seconds).
+GEO_CACHE_MAX_AGE_SECONDS = 86_400  # 1 day
+
+# ---------------------------------------------------------------------------
+# Data seeder defaults
+# ---------------------------------------------------------------------------
+
+# Number of rows committed to the DB in a single batch during seeding.
+# Override via the SEED_BATCH_SIZE environment variable.
+DEFAULT_SEED_BATCH_SIZE = 500
+
+# How often (in rows) the batch validator logs progress.
+VALIDATION_LOG_INTERVAL = 500
