@@ -59,35 +59,19 @@ from app.utils.accident_utils import (
     total_grievous,
     total_minor,
 )
+from app.utils.text_utils import safe_text
 
 from app.core.constants import (
     SEVERITY_FATAL,
     SEVERITY_DAMAGE_ONLY,
     CASUALTY_TYPES,
+    UNKNOWN_LABEL,
 )
 
 router = APIRouter(
     prefix="/api/dashboard",
     tags=["Dashboard"],
 )
-
-
-# ---------------------------------------------------------------------------
-# Internal helper
-# ---------------------------------------------------------------------------
-
-def safe_text(value, default: str = "Unknown") -> str:
-    """
-    Converts NULL, empty strings, and legacy 'nan' strings to a safe default.
-    """
-    if value is None:
-        return default
-    if isinstance(value, str):
-        v = value.strip()
-        if v == "" or v.lower() == "nan":
-            return default
-        return v
-    return str(value)
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +96,6 @@ def get_filter_options(db: Session = Depends(get_db)):
         road_classifications=distinct(Accident.road_classification),
         weather_conditions=distinct(Accident.weather_condition),
         light_conditions=distinct(Accident.light_condition),
-        # iRAD field: type_of_collision — exposed to frontend as collision_type
         collision_types=distinct(Accident.type_of_collision),
     )
 
@@ -131,7 +114,7 @@ def get_summary(
     collision_type: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    query = apply_filters(
+    query     = apply_filters(
         db.query(Accident),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
@@ -150,12 +133,12 @@ def get_summary(
         districts_covered=len({
             safe_text(a.district)
             for a in accidents
-            if safe_text(a.district) != "Unknown"
+            if safe_text(a.district) != UNKNOWN_LABEL
         }),
         police_stations=len({
             safe_text(a.police_station)
             for a in accidents
-            if safe_text(a.police_station) != "Unknown"
+            if safe_text(a.police_station) != UNKNOWN_LABEL
         }),
     )
 
@@ -183,7 +166,7 @@ def get_by_district(
     for a in query.all():
         key = safe_text(a.district)
         district_map[key]["accident_count"] += 1
-        district_map[key]["fatalities"] += total_fatalities(a)
+        district_map[key]["fatalities"]     += total_fatalities(a)
 
     return DistrictResponse(
         data=[
@@ -256,7 +239,7 @@ def get_time_series(
         if not dt:
             continue
         key = (dt.year, dt.month if granularity == "month" else 1)
-        buckets[key]["count"] += 1
+        buckets[key]["count"]      += 1
         buckets[key]["fatalities"] += total_fatalities(a)
 
     return TimeSeriesResponse(
@@ -291,7 +274,6 @@ def get_by_collision(
     collision_type: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    # Query on iRAD field type_of_collision
     query = apply_filters(
         db.query(
             Accident.type_of_collision,
@@ -424,7 +406,7 @@ def get_by_road(
     for a in query.all():
         key = safe_text(a.road_classification)
         road_map[key]["accident_count"] += 1
-        road_map[key]["fatalities"] += total_fatalities(a)
+        road_map[key]["fatalities"]     += total_fatalities(a)
 
     return RoadClassResponse(
         data=[
@@ -547,9 +529,9 @@ def get_by_police_station(
     )
     for a in query.all():
         key = safe_text(a.police_station)
-        stations[key]["district"] = safe_text(a.district)
+        stations[key]["district"]      = safe_text(a.district)
         stations[key]["accident_count"] += 1
-        stations[key]["fatalities"] += total_fatalities(a)
+        stations[key]["fatalities"]     += total_fatalities(a)
 
     return PoliceStationResponse(
         data=[
@@ -626,7 +608,7 @@ def get_top_dangerous(
     for a in query.all():
         key = safe_text(a.district)
         ranking[key]["fatal_accidents"] += 1
-        ranking[key]["total_killed"] += total_fatalities(a)
+        ranking[key]["total_killed"]    += total_fatalities(a)
 
     rows = sorted(
         ranking.items(),
@@ -674,8 +656,8 @@ def get_yearly_comparison(
             continue
         yr = a.accident_date_time.year
         years[yr]["total_accidents"] += 1
-        years[yr]["fatalities"] += total_fatalities(a)
-        years[yr]["grievous"] += total_grievous(a)
+        years[yr]["fatalities"]      += total_fatalities(a)
+        years[yr]["grievous"]        += total_grievous(a)
 
     return YearlyResponse(
         data=[

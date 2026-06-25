@@ -28,6 +28,7 @@ Design
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, Sequence
@@ -37,18 +38,10 @@ from sqlalchemy.orm import Session
 
 from app.models.gujarat_boundary import GujaratBoundary
 from app.models.gujarat_district import GujaratDistrict
+from app.core.config import POSTGIS_SRID
+from app.core.constants import BOUNDARY_TOLERANCE_DEGREES
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-# Small buffer (≈ ~1 m at Gujarat's latitude) to handle floating-point edge
-# cases where a coordinate sits exactly on a polygon boundary.
-BOUNDARY_TOLERANCE_DEGREES: float = 0.00001
-
-SRID = 4326  # WGS-84
 
 
 # ---------------------------------------------------------------------------
@@ -56,34 +49,29 @@ SRID = 4326  # WGS-84
 # ---------------------------------------------------------------------------
 
 class ValidationStatus(str, Enum):
-    VALID           = "valid"            # Inside Gujarat & inside a known district
-    VALID_BOUNDARY  = "valid_boundary"   # Inside Gujarat but on district boundary
-    OUTSIDE_STATE   = "outside_state"    # Coordinate is outside Gujarat entirely
-    NO_DISTRICT     = "no_district"      # Inside Gujarat but matched no district polygon
-    INVALID_COORDS  = "invalid_coords"   # lat/lon is None, NaN, or out of range
-    DB_ERROR        = "db_error"         # Unexpected DB / PostGIS error
+    VALID           = "valid"
+    VALID_BOUNDARY  = "valid_boundary"
+    OUTSIDE_STATE   = "outside_state"
+    NO_DISTRICT     = "no_district"
+    INVALID_COORDS  = "invalid_coords"
+    DB_ERROR        = "db_error"
 
 
 @dataclass
 class ValidationResult:
     """Returned by validate_coordinate() for a single (lat, lon) pair."""
 
-    # Raw inputs
     latitude:   Optional[float]
     longitude:  Optional[float]
 
-    # Outcome
     status:          ValidationStatus
-    is_valid:        bool              = False   # True only for VALID / VALID_BOUNDARY
+    is_valid:        bool            = False
 
-    # Enrichment (filled when validation passes)
-    matched_district: Optional[str]   = None    # e.g. "Ahmadabad"
-    district_shape_id: Optional[str]  = None    # GADM/GeoBoundaries unique id
+    matched_district:  Optional[str] = None
+    district_shape_id: Optional[str] = None
 
-    # Human-readable explanation
     message: str = ""
 
-    # Full list of candidate districts (normally 0 or 1, but can be >1 on borders)
     candidate_districts: list[str] = field(default_factory=list)
 
 
@@ -98,10 +86,7 @@ class BatchValidationReport:
     invalid_coords:  int = 0
     db_errors:       int = 0
 
-    # Indices (0-based) of records that failed validation
     failed_indices:  list[int] = field(default_factory=list)
-
-    # Per-record results (same length as input, same order)
     results: list[ValidationResult] = field(default_factory=list)
 
     @property
@@ -123,18 +108,10 @@ def _is_plausible_wgs84(lat: Optional[float], lon: Optional[float]) -> bool:
     except (TypeError, ValueError):
         return False
 
-    import math
     if math.isnan(lat_f) or math.isnan(lon_f):
         return False
 
-    # Gujarat roughly spans: lat 20.1–24.7°N, lon 68.2–74.5°E
-    # Widen slightly so border areas aren't rejected before PostGIS decides.
     return -90.0 <= lat_f <= 90.0 and -180.0 <= lon_f <= 180.0
-
-
-def _build_point_wkt(lat: float, lon: float) -> str:
-    """Return a PostGIS-compatible WKT point string."""
-    return f"SRID={SRID};POINT({lon} {lat})"
 
 
 # ---------------------------------------------------------------------------
@@ -147,12 +124,7 @@ def is_inside_gujarat(
     db: Session,
     use_buffer: bool = True,
 ) -> bool:
-    """
-    Returns True if the coordinate lies within (or on the boundary of) Gujarat.
-
-    Uses ST_Within with an optional small buffer applied to the *point* (not the
-    polygon) so that boundary-exact coordinates aren't incorrectly rejected.
-    """
+    """Return True if the coordinate lies within (or on the boundary of) Gujarat."""
     if use_buffer:
         sql = text(
             """
@@ -189,7 +161,7 @@ def is_inside_gujarat(
 
     row = db.execute(
         sql,
-        {"lat": lat, "lon": lon, "srid": SRID, "tol": BOUNDARY_TOLERANCE_DEGREES},
+        {"lat": lat, "lon": lon, "srid": POSTGIS_SRID, "tol": BOUNDARY_TOLERANCE_DEGREES},
     ).fetchone()
 
     return bool(row[0]) if row else False
@@ -206,7 +178,7 @@ def find_district(
     use_buffer: bool = True,
 ) -> list[dict]:
     """
-    Returns a list of matching districts for the coordinate.
+    Return a list of matching districts for the coordinate.
 
     Normally returns 0 or 1 items. Returns >1 when a point lies exactly on
     a shared district boundary (extremely rare in practice).
@@ -240,7 +212,7 @@ def find_district(
 
     rows = db.execute(
         sql,
-        {"lat": lat, "lon": lon, "srid": SRID, "tol": BOUNDARY_TOLERANCE_DEGREES},
+        {"lat": lat, "lon": lon, "srid": POSTGIS_SRID, "tol": BOUNDARY_TOLERANCE_DEGREES},
     ).fetchall()
 
     return [{"shape_name": r[0], "shape_id": r[1]} for r in rows]
@@ -265,25 +237,23 @@ def validate_coordinate(
     db              : Active SQLAlchemy session.
     check_district  : If True (default), also resolve the matched district.
                       Set to False for a faster state-only check.
-
-    Returns
-    -------
-    ValidationResult with full context about why the coordinate passed or failed.
     """
-    base = ValidationResult(latitude=lat, longitude=lon, status=ValidationStatus.INVALID_COORDS)
+    base = ValidationResult(
+        latitude=lat,
+        longitude=lon,
+        status=ValidationStatus.INVALID_COORDS,
+    )
 
-    # ---- 1. Basic sanity check -------------------------------------------
     if not _is_plausible_wgs84(lat, lon):
         base.message = (
             f"Coordinate ({lat}, {lon}) is None, NaN, or outside valid WGS-84 range."
         )
         return base
 
-    lat_f = float(lat)
-    lon_f = float(lon)
+    lat_f = float(lat)  # type: ignore[arg-type]
+    lon_f = float(lon)  # type: ignore[arg-type]
 
     try:
-        # ---- 2. State boundary check ------------------------------------
         inside_state = is_inside_gujarat(lat_f, lon_f, db)
 
         if not inside_state:
@@ -292,13 +262,9 @@ def validate_coordinate(
                 longitude=lon,
                 status=ValidationStatus.OUTSIDE_STATE,
                 is_valid=False,
-                message=(
-                    f"Coordinate ({lat_f}, {lon_f}) lies outside the Gujarat "
-                    "state boundary."
-                ),
+                message=f"Coordinate ({lat_f}, {lon_f}) lies outside the Gujarat state boundary.",
             )
 
-        # ---- 3. District check ------------------------------------------
         if not check_district:
             return ValidationResult(
                 latitude=lat,
@@ -311,32 +277,24 @@ def validate_coordinate(
         districts = find_district(lat_f, lon_f, db)
 
         if not districts:
-            # Rare: inside state boundary but outside all district polygons.
-            # This can happen in coastal areas or tiny gaps in the district dataset.
             return ValidationResult(
                 latitude=lat,
                 longitude=lon,
                 status=ValidationStatus.NO_DISTRICT,
-                is_valid=True,   # Still inside Gujarat — treat as valid with warning
+                is_valid=True,
                 message=(
                     f"Coordinate ({lat_f}, {lon_f}) is inside Gujarat but could "
                     "not be matched to any district polygon. Possible coastal/gap area."
                 ),
             )
 
-        # Primary district is the first match (alphabetically stable)
-        primary = districts[0]
-        candidate_names = [d["shape_name"] for d in districts]
-
-        status = (
-            ValidationStatus.VALID_BOUNDARY
-            if len(districts) > 1
-            else ValidationStatus.VALID
+        primary          = districts[0]
+        candidate_names  = [d["shape_name"] for d in districts]
+        status           = (
+            ValidationStatus.VALID_BOUNDARY if len(districts) > 1 else ValidationStatus.VALID
         )
 
-        msg = (
-            f"Coordinate ({lat_f}, {lon_f}) is valid — district: {primary['shape_name']}."
-        )
+        msg = f"Coordinate ({lat_f}, {lon_f}) is valid — district: {primary['shape_name']}."
         if len(districts) > 1:
             msg += f" (On boundary with: {', '.join(candidate_names[1:])})"
 
@@ -374,24 +332,7 @@ def validate_coordinates_batch(
     check_district: bool = True,
     log_progress_every: int = 500,
 ) -> BatchValidationReport:
-    """
-    Validate a sequence of (lat, lon) tuples in one call.
-
-    This iterates through each coordinate individually so that a single bad
-    record doesn't abort the whole batch. For very large datasets (>50 k rows)
-    consider chunking across multiple transactions.
-
-    Parameters
-    ----------
-    coordinates         : Iterable of (lat, lon) tuples.
-    db                  : Active SQLAlchemy session.
-    check_district      : Passed to validate_coordinate().
-    log_progress_every  : Log a progress message every N records (0 = silent).
-
-    Returns
-    -------
-    BatchValidationReport with per-record results and aggregate counts.
-    """
+    """Validate a sequence of (lat, lon) tuples in one call."""
     report = BatchValidationReport(total=len(coordinates))
 
     for idx, (lat, lon) in enumerate(coordinates):
@@ -413,7 +354,6 @@ def validate_coordinates_batch(
                 report.invalid_coords += 1
             elif result.status == ValidationStatus.DB_ERROR:
                 report.db_errors += 1
-            # NO_DISTRICT is valid=True so it won't reach here
 
     logger.info(
         "validate_coordinates_batch complete: %d/%d valid (%.1f%%), "
@@ -434,7 +374,7 @@ def validate_coordinates_batch(
 # ---------------------------------------------------------------------------
 
 def validate_dataframe(
-    df,                         # pandas.DataFrame
+    df,
     lat_col: str = "Latitude",
     lon_col: str = "Longitude",
     db: Session = None,
@@ -444,43 +384,27 @@ def validate_dataframe(
     """
     Validate all rows in a pandas DataFrame and return:
         (valid_df, rejected_df, report)
-
-    Parameters
-    ----------
-    df             : Input DataFrame with accident records.
-    lat_col        : Name of the latitude column.
-    lon_col        : Name of the longitude column.
-    db             : Active SQLAlchemy session.
-    check_district : Whether to resolve matched district.
-    add_columns    : If True, add `_validation_status` and `_matched_district`
-                     columns to both returned DataFrames.
-
-    Returns
-    -------
-    valid_df    : Rows that passed validation.
-    rejected_df : Rows that failed validation (outside Gujarat / bad coords).
-    report      : BatchValidationReport with aggregate stats.
     """
-    import pandas as pd  # local import so this module doesn't force pandas
+    import pandas as pd
 
     coords = list(zip(df[lat_col].tolist(), df[lon_col].tolist()))
     report = validate_coordinates_batch(coords, db, check_district=check_district)
 
     if add_columns:
         df = df.copy()
-        df["_validation_status"]   = [r.status.value       for r in report.results]
-        df["_matched_district"]    = [r.matched_district    for r in report.results]
-        df["_validation_message"]  = [r.message             for r in report.results]
+        df["_validation_status"]  = [r.status.value    for r in report.results]
+        df["_matched_district"]   = [r.matched_district for r in report.results]
+        df["_validation_message"] = [r.message          for r in report.results]
 
-    valid_mask   = pd.Series([r.is_valid for r in report.results], index=df.index)
-    valid_df     = df[valid_mask].copy()
-    rejected_df  = df[~valid_mask].copy()
+    valid_mask  = pd.Series([r.is_valid for r in report.results], index=df.index)
+    valid_df    = df[valid_mask].copy()
+    rejected_df = df[~valid_mask].copy()
 
     return valid_df, rejected_df, report
 
 
 # ---------------------------------------------------------------------------
-# Convenience: pre-flight check (requires only DB tables to exist)
+# Convenience: pre-flight check
 # ---------------------------------------------------------------------------
 
 def check_validation_tables_ready(db: Session) -> dict:

@@ -17,7 +17,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from datetime import datetime
 
 from app.database import get_db
 from app.models.surat_accident import SuratAccident
@@ -68,11 +67,15 @@ from app.utils.surat_accident_utils import (
     total_grievous,
     total_minor,
 )
+from app.utils.text_utils import safe_text
+from app.utils.datetime_utils import parse_accident_datetime_from_str
 
 from app.core.constants import (
     SEVERITY_FATAL,
     SEVERITY_DAMAGE_ONLY,
     CASUALTY_TYPES,
+    WEEKDAY_ORDER,
+    UNKNOWN_LABEL,
 )
 
 router = APIRouter(
@@ -82,25 +85,10 @@ router = APIRouter(
 
 
 # ---------------------------------------------------------------------------
-# Internal helper
+# Internal helpers
 # ---------------------------------------------------------------------------
 
-def safe_text(value, default: str = "Unknown") -> str:
-    """Converts NULL, empty strings, and legacy 'nan' strings to a safe default."""
-    if value is None:
-        return default
-    if isinstance(value, str):
-        v = value.strip()
-        if v == "" or v.lower() == "nan":
-            return default
-        return v
-    return str(value)
-
-
-DAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
-
-def time_period_for_hour(hour: int) -> str:
+def _time_period_for_hour(hour: int) -> str:
     if 5 <= hour < 12:
         return "Morning"
     if 12 <= hour < 17:
@@ -110,13 +98,14 @@ def time_period_for_hour(hour: int) -> str:
     return "Night"
 
 
-def format_hour_label(hour: int) -> str:
+def _format_hour_label(hour: int) -> str:
     suffix = "AM" if hour < 12 else "PM"
-    value = hour % 12 or 12
+    value  = hour % 12 or 12
     return f"{value}:00 {suffix}"
 
 
-def peak_item(counts: dict, fallback_key):
+def _peak_item(counts: dict, fallback_key):
+    """Return (key, count) of the item with the highest count."""
     if not counts:
         return fallback_key, 0
     return max(counts.items(), key=lambda item: item[1])
@@ -163,7 +152,7 @@ def get_summary(
     collision_type: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    query = apply_surat_filters(
+    query     = apply_surat_filters(
         db.query(SuratAccident),
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
@@ -179,12 +168,12 @@ def get_summary(
             1 for a in accidents if a.severity == SEVERITY_DAMAGE_ONLY
         ),
         total_vehicles=sum(a.number_of_vehicles or 0 for a in accidents),
-        # districts_covered is always 1 (Surat), but kept for schema compatibility
+        # districts_covered is always 1 (Surat) — kept for schema compatibility
         districts_covered=1,
         police_stations=len({
             safe_text(a.police_station)
             for a in accidents
-            if safe_text(a.police_station) != "Unknown"
+            if safe_text(a.police_station) != UNKNOWN_LABEL
         }),
     )
 
@@ -209,7 +198,9 @@ def get_by_police_station(
         weather_condition, light_condition, collision_type,
     )
 
-    station_map: dict = defaultdict(lambda: {"accident_count": 0, "fatalities": 0, "grievous": 0, "minor": 0})
+    station_map: dict = defaultdict(
+        lambda: {"accident_count": 0, "fatalities": 0, "grievous": 0, "minor": 0}
+    )
     for a in query.all():
         key = safe_text(a.police_station)
         station_map[key]["accident_count"] += 1
@@ -398,39 +389,6 @@ def get_heatmap(
         ],
     )
 
-# ---------------------------------------------------------------------------
-# Temporal Analysis Helpers
-# ---------------------------------------------------------------------------
-
-def parse_accident_datetime(value):
-    if value is None:
-        return None
-
-    if isinstance(value, datetime):
-        return value
-
-    text = str(value).strip()
-
-    if not text or text.lower() == "nan":
-        return None
-
-    formats = [
-        "%d-%b-%Y : %I:%M %p",
-        "%d-%b-%Y: %I:%M %p",
-        "%d-%b-%Y %I:%M %p",
-        "%d-%m-%Y : %I:%M %p",
-        "%d/%m/%Y : %I:%M %p",
-        "%Y-%m-%d %H:%M:%S",
-    ]
-
-    for fmt in formats:
-        try:
-            return datetime.strptime(text, fmt)
-        except ValueError:
-            continue
-
-    return None
-
 
 # ---------------------------------------------------------------------------
 # Temporal Analysis
@@ -448,227 +406,98 @@ def get_temporal_analysis(
     light_condition: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-
     query = db.query(SuratAccident)
 
-
-    # Normal database filters
-
     if police_station:
-        query = query.filter(
-            SuratAccident.police_station == police_station
-        )
-
+        query = query.filter(SuratAccident.police_station == police_station)
     if severity:
-        query = query.filter(
-            SuratAccident.severity == severity
-        )
-
+        query = query.filter(SuratAccident.severity == severity)
     if weather_condition:
-        query = query.filter(
-            SuratAccident.weather_condition == weather_condition
-        )
-
+        query = query.filter(SuratAccident.weather_condition == weather_condition)
     if light_condition:
-        query = query.filter(
-            SuratAccident.light_condition == light_condition
-        )
+        query = query.filter(SuratAccident.light_condition == light_condition)
 
-
-    # Date parsing + temporal filters
-
+    # Parse datetimes and apply temporal filters in Python
     accidents_with_dt = []
-
     for accident in query.all():
-
-        dt = parse_accident_datetime(
-            accident.accident_date_time
-        )
-
+        dt = parse_accident_datetime_from_str(accident.accident_date_time)
         if not dt:
             continue
-
-
-        if year and dt.year != int(year):
+        if year        and dt.year              != int(year):
             continue
-
-        if month and dt.month != int(month):
+        if month       and dt.month             != int(month):
             continue
-
-        if day and dt.strftime("%A") != day:
+        if day         and dt.strftime("%A")    != day:
             continue
-
-        if (
-            time_period
-            and time_period_for_hour(dt.hour) != time_period
-        ):
+        if time_period and _time_period_for_hour(dt.hour) != time_period:
             continue
+        accidents_with_dt.append((accident, dt))
 
+    # Aggregation buckets
+    hour_day_counts: dict = defaultdict(int)
+    hourly_counts   = {h: 0 for h in range(24)}
+    monthly_counts: dict  = defaultdict(int)
+    day_counts: dict      = defaultdict(int)
+    period_counts: dict   = defaultdict(int)
 
-        accidents_with_dt.append(
-            (accident, dt)
-        )
-
-
-    # Aggregations
-
-    hour_day_counts = defaultdict(int)
-
-    hourly_counts = {
-        hour: 0
-        for hour in range(24)
-    }
-
-    monthly_counts = defaultdict(int)
-    day_counts = defaultdict(int)
-    period_counts = defaultdict(int)
-
-
-    for accident, dt in accidents_with_dt:
-
-        hour = dt.hour
-
+    for _accident, dt in accidents_with_dt:
+        hour     = dt.hour
         day_name = dt.strftime("%A")
+        period   = _time_period_for_hour(hour)
 
-        period = time_period_for_hour(hour)
+        hour_day_counts[(hour, day_name)] += 1
+        hourly_counts[hour]               += 1
+        monthly_counts[(dt.year, dt.month)] += 1
+        day_counts[day_name]              += 1
+        period_counts[period]             += 1
 
+    peak_hour,       peak_hour_count   = _peak_item(hourly_counts, 0)
+    peak_day,        peak_day_count    = _peak_item(day_counts, UNKNOWN_LABEL)
+    peak_month_key,  peak_month_count  = _peak_item(monthly_counts, (0, 0))
+    peak_period,     peak_period_count = _peak_item(period_counts, UNKNOWN_LABEL)
 
-        hour_day_counts[
-            (hour, day_name)
-        ] += 1
-
-
-        hourly_counts[
-            hour
-        ] += 1
-
-
-        monthly_counts[
-            (dt.year, dt.month)
-        ] += 1
-
-
-        day_counts[
-            day_name
-        ] += 1
-
-
-        period_counts[
-            period
-        ] += 1
-
-
-
-    peak_hour, peak_hour_count = peak_item(
-        hourly_counts,
-        0,
+    peak_month_label = (
+        f"{calendar.month_abbr[peak_month_key[1]]} {peak_month_key[0]}"
+        if peak_month_key != (0, 0)
+        else UNKNOWN_LABEL
     )
-
-
-    peak_day, peak_day_count = peak_item(
-        day_counts,
-        "Unknown",
-    )
-
-
-    peak_month_key, peak_month_count = peak_item(
-        monthly_counts,
-        (0, 0),
-    )
-
-
-    peak_period, peak_period_count = peak_item(
-        period_counts,
-        "Unknown",
-    )
-
-
-    peak_month_label = "Unknown"
-
-    if peak_month_key != (0, 0):
-        peak_month_label = (
-            f"{calendar.month_abbr[peak_month_key[1]]} "
-            f"{peak_month_key[0]}"
-        )
-
 
     return TemporalAnalysisResponse(
-
         hour_day=[
             HourDayCount(
                 hour=hour,
                 day=day_name,
-                count=hour_day_counts[
-                    (hour, day_name)
-                ],
+                count=hour_day_counts[(hour, day_name)],
             )
-
-            for day_name in DAY_ORDER
+            for day_name in WEEKDAY_ORDER
             for hour in range(24)
         ],
-
-
         hourly=[
-            HourlyAccidentCount(
-                hour=hour,
-                count=hourly_counts[hour],
-            )
-
-            for hour in range(24)
+            HourlyAccidentCount(hour=h, count=hourly_counts[h])
+            for h in range(24)
         ],
-
-
         monthly=[
-
             MonthlyAccidentCount(
-                year=year_value,
-                month=month_value,
-                month_label=(
-                    f"{calendar.month_abbr[month_value]} "
-                    f"{year_value}"
-                ),
+                year=yr,
+                month=mo,
+                month_label=f"{calendar.month_abbr[mo]} {yr}",
                 count=count,
             )
-
-            for (
-                year_value,
-                month_value
-            ), count in sorted(
-                monthly_counts.items()
-            )
-
+            for (yr, mo), count in sorted(monthly_counts.items())
         ],
-
-
         summary=PeakSummary(
-
-            peak_hour=format_hour_label(
-                int(peak_hour)
-            ),
-
+            peak_hour=_format_hour_label(int(peak_hour)),
             peak_hour_count=peak_hour_count,
-
             peak_day=peak_day,
-
             peak_day_count=peak_day_count,
-
-
             peak_month=peak_month_label,
-
             peak_month_count=peak_month_count,
-
-
             peak_time_period=peak_period,
-
             peak_time_period_count=peak_period_count,
-
-
-            total_accidents=len(
-                accidents_with_dt
-            ),
-
+            total_accidents=len(accidents_with_dt),
         ),
     )
+
 
 # ---------------------------------------------------------------------------
 # Traffic Violations
@@ -908,7 +737,7 @@ def get_top_dangerous(
         data=[
             DangerousDistrict(
                 rank=idx + 1,
-                district=safe_text(name),   # reusing DangerousDistrict.district for police_station
+                district=safe_text(name),
                 fatal_accidents=v["fatal_accidents"],
                 total_killed=v["total_killed"],
             )

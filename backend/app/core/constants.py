@@ -1,23 +1,86 @@
 # backend/app/core/constants.py
 
+# ---------------------------------------------------------------------------
+# Accident severity labels (iRAD)
+# ---------------------------------------------------------------------------
+
 SEVERITY_FATAL = "Fatal"
 SEVERITY_DAMAGE_ONLY = "Damage Only"
 
 # Maps display category → iRAD field names on the Accident model
 CASUALTY_TYPES = {
     "Drivers": {
-        "killed":  "driver_killed",
+        "killed":   "driver_killed",
         "grievous": "driver_grievous_injury",
-        "minor":   "driver_minor_injury",
+        "minor":    "driver_minor_injury",
     },
     "Passengers": {
-        "killed":  "passenger_killed",
+        "killed":   "passenger_killed",
         "grievous": "passenger_grievous_injury",
-        "minor":   "passenger_minor_injury",
+        "minor":    "passenger_minor_injury",
     },
     "Pedestrians": {
-        "killed":  "pedestrian_killed",
+        "killed":   "pedestrian_killed",
         "grievous": "pedestrian_grievous_injury",
-        "minor":   "pedestrian_minor_injury",
+        "minor":    "pedestrian_minor_injury",
     },
 }
+
+# ---------------------------------------------------------------------------
+# Auth / session cookie names
+# ---------------------------------------------------------------------------
+
+ACCESS_TOKEN_COOKIE  = "access_token"
+REFRESH_TOKEN_COOKIE = "refresh_token"
+
+# ---------------------------------------------------------------------------
+# Redis key prefixes
+# ---------------------------------------------------------------------------
+
+REDIS_SESSION_PREFIX   = "session:"
+REDIS_BLACKLIST_PREFIX = "blacklist:"
+
+# ---------------------------------------------------------------------------
+# Sentinel / placeholder values used in data cleaning
+# ---------------------------------------------------------------------------
+
+NULL_TEXT_SENTINEL = "nan"          # Excel/pandas NaN serialised as string
+UNKNOWN_LABEL      = "Unknown"      # Safe default for missing text fields
+
+# ---------------------------------------------------------------------------
+# Spatial / PostGIS
+# ---------------------------------------------------------------------------
+
+# Small buffer (~1 m at Gujarat's latitude) to handle floating-point edge
+# cases where a coordinate sits exactly on a polygon boundary.
+BOUNDARY_TOLERANCE_DEGREES: float = 0.00001
+
+# ---------------------------------------------------------------------------
+# Temporal helpers
+# ---------------------------------------------------------------------------
+
+# Day names ordered Monday → Sunday (ISO weekday order)
+WEEKDAY_ORDER = [
+    "Monday", "Tuesday", "Wednesday", "Thursday",
+    "Friday", "Saturday", "Sunday",
+]
+
+# Datetime format strings tried when parsing accident date/time strings.
+# Ordered from most-specific to most-generic.
+ACCIDENT_DATETIME_FORMATS = [
+    "%d-%b-%Y : %I:%M %p",   # 17-Jan-2023 : 11:00 AM
+    "%d-%b-%Y: %I:%M %p",
+    "%d-%b-%Y %I:%M %p",
+    "%d/%m/%Y : %I:%M %p",
+    "%d/%m/%Y %I:%M %p",
+    "%d-%m-%Y : %I:%M %p",
+    "%d-%m-%Y %I:%M %p",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d %I:%M:%S %p",
+]
+
+# ---------------------------------------------------------------------------
+# Surat-specific labels
+# ---------------------------------------------------------------------------
+
+SURAT_DISTRICT_NAME = "Surat"

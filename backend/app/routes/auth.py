@@ -1,8 +1,9 @@
 # backend/app/routes/auth.py
 
 import os
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-COOKIE_SECURE = ENVIRONMENT == "production"
+
+ENVIRONMENT     = os.getenv("ENVIRONMENT", "development")
+COOKIE_SECURE   = ENVIRONMENT == "production"
 COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "strict")
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
@@ -24,12 +25,46 @@ from app.services.auth_service import (
     REFRESH_TOKEN_EXPIRE_HOURS,
 )
 from app.models.notification import Notification
+from app.core.constants import ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
+# ---------------------------------------------------------------------------
+# Shared cookie helper
+# ---------------------------------------------------------------------------
 
-def get_current_user(request: Request, db: Session = Depends(get_db)):
-    token = request.cookies.get("access_token")
+def _set_auth_cookies(
+    response: Response,
+    access_token: str,
+    refresh_token: str,
+) -> None:
+    """Write both auth cookies onto *response* with consistent settings."""
+    _common = dict(
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        path="/",
+    )
+    response.set_cookie(
+        key=ACCESS_TOKEN_COOKIE,
+        value=access_token,
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        **_common,
+    )
+    response.set_cookie(
+        key=REFRESH_TOKEN_COOKIE,
+        value=refresh_token,
+        max_age=REFRESH_TOKEN_EXPIRE_HOURS * 3600,
+        **_common,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Dependency: resolve the current authenticated user
+# ---------------------------------------------------------------------------
+
+def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+    token = request.cookies.get(ACCESS_TOKEN_COOKIE)
 
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -40,9 +75,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Invalid token type")
 
-        # Changed to expect user ID in 'sub'
         user_id_str = payload.get("sub")
-
         if not user_id_str:
             raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -52,19 +85,38 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     if not is_session_valid(token):
         raise HTTPException(
             status_code=401,
-            detail="Session invalidated. Please log in again."
+            detail="Session invalidated. Please log in again.",
         )
 
-    # Changed to query by ID instead of username
     user = db.query(User).filter(User.id == int(user_id_str)).first()
 
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     if user.status != "approved":
-        raise HTTPException(status_code=403, detail="Your account is not currently approved for access.")
+        raise HTTPException(
+            status_code=403,
+            detail="Your account is not currently approved for access.",
+        )
 
     return user
 
+
+# ---------------------------------------------------------------------------
+# Dependency: resolve the current admin user
+# ---------------------------------------------------------------------------
+
+def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Not enough privileges. Admin access required.",
+        )
+    return current_user
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(user: UserCreate, db: Session = Depends(get_db)):
@@ -81,14 +133,16 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         hashed_password=hash_password(user.password),
         status="pending",
     )
-
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
     db.add(Notification(
         type="user_registration",
-        message=f"New user '{new_user.username}' ({new_user.email}) registered and is awaiting approval.",
+        message=(
+            f"New user '{new_user.username}' ({new_user.email}) "
+            "registered and is awaiting approval."
+        ),
         related_user_id=new_user.id,
     ))
     db.commit()
@@ -101,7 +155,6 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
-    # Still querying by email for the login request (as we changed previously)
     db_user = db.query(User).filter(User.email == user.email).first()
 
     if not db_user or not verify_password(user.password, db_user.hashed_password):
@@ -110,46 +163,26 @@ def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
     if db_user.status == "pending":
         raise HTTPException(
             status_code=403,
-            detail="Your account is pending admin approval. Please check back later."
+            detail="Your account is pending admin approval. Please check back later.",
         )
-    
     if db_user.status == "rejected":
         raise HTTPException(
             status_code=403,
-            detail="Your registration was not approved. Contact an administrator."
+            detail="Your registration was not approved. Contact an administrator.",
         )
-    # Changed to use ID as the token subject (sub)
+
     access_token, refresh_token = create_token_pair({
         "sub": str(db_user.id),
-        "id": db_user.id,
+        "id":  db_user.id,
     })
-
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        path="/",
-    )
-
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        max_age=REFRESH_TOKEN_EXPIRE_HOURS * 3600,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        path="/",
-    )
+    _set_auth_cookies(response, access_token, refresh_token)
 
     return {"message": "Logged in successfully"}
 
 
 @router.post("/refresh")
 def refresh(request: Request, response: Response):
-    token = request.cookies.get("refresh_token")
+    token = request.cookies.get(REFRESH_TOKEN_COOKIE)
 
     if not token:
         raise HTTPException(status_code=401, detail="Refresh token missing")
@@ -160,7 +193,7 @@ def refresh(request: Request, response: Response):
     if not is_session_valid(token):
         raise HTTPException(
             status_code=401,
-            detail="Session invalidated. Please log in again."
+            detail="Session invalidated. Please log in again.",
         )
 
     try:
@@ -170,7 +203,7 @@ def refresh(request: Request, response: Response):
             raise HTTPException(status_code=401, detail="Invalid token type")
 
         user_id_str = payload.get("sub")
-        user_id = payload.get("id")
+        user_id     = payload.get("id")
 
         if not user_id_str or not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -180,53 +213,28 @@ def refresh(request: Request, response: Response):
 
     blacklist_refresh_token(token, revoke_session=False)
 
-    access_token, refresh_token = create_token_pair({
+    access_token, new_refresh_token = create_token_pair({
         "sub": user_id_str,
-        "id": user_id,
+        "id":  user_id,
     })
-
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        path="/",
-    )
-
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        max_age=REFRESH_TOKEN_EXPIRE_HOURS * 3600,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        path="/",
-    )
+    _set_auth_cookies(response, access_token, new_refresh_token)
 
     return {"message": "Token refreshed successfully"}
 
 
 @router.post("/logout")
 def logout(request: Request, response: Response):
-    token = request.cookies.get("refresh_token")
+    token = request.cookies.get(REFRESH_TOKEN_COOKIE)
 
     if token:
         blacklist_refresh_token(token, revoke_session=True)
 
-    response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path="/")
+    response.delete_cookie(ACCESS_TOKEN_COOKIE,  path="/")
+    response.delete_cookie(REFRESH_TOKEN_COOKIE, path="/")
 
     return {"message": "Logged out successfully"}
 
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
-    return current_user
-
-# function to check if the current user is an admin
-def get_current_admin_user(current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not enough privileges. Admin access required.")
     return current_user
