@@ -1,3 +1,4 @@
+// frontend/src/components/charts/GujaratMap.tsx
 import { useEffect, useMemo, useState } from "react";
 import { geoMercator, geoPath } from "d3-geo";
 import { scaleLinear } from "d3-scale";
@@ -8,6 +9,7 @@ import type {
   GeoJsonProperties,
   Geometry,
 } from "geojson";
+import { GUJARAT_DISTRICTS_GEOJSON_PATH } from "../../config/constants";
 
 type GeoFeature = Feature<Geometry, GeoJsonProperties>;
 type GeoFeatureCollection = FeatureCollection<Geometry, GeoJsonProperties>;
@@ -85,7 +87,7 @@ export const GujaratMap = ({ data, metric }: GujaratMapProps) => {
   useEffect(() => {
     let cancelled = false;
 
-    fetch("/gujarat.json")
+    fetch(GUJARAT_DISTRICTS_GEOJSON_PATH)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load Gujarat map");
         return res.json();

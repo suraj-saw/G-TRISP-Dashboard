@@ -1,5 +1,4 @@
 // frontend/src/features/auth/Login.tsx
-
 import {
   useEffect,
   useRef,
@@ -9,13 +8,13 @@ import {
 } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../../api/axios";
+import { ROUTES } from "../../config/constants";
 
 interface LoginForm {
   email: string;
   password: string;
 }
 
-// 1. Add the role to the User interface
 interface User {
   id: number;
   username: string;
@@ -37,6 +36,11 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Resolve the correct post-login destination based on the user's role. */
+function destinationFor(user: User): string {
+  return user.role === "admin" ? ROUTES.ADMIN : ROUTES.DASHBOARD;
+}
+
 function Login() {
   const navigate = useNavigate();
 
@@ -46,66 +50,42 @@ function Login() {
 
   const isSubmittingLogin = useRef(false);
 
+  // Redirect already-authenticated users away from the login page
   useEffect(() => {
     let cancelled = false;
 
     const checkExistingSession = async () => {
-      console.groupCollapsed("[Login] Initial session check");
-
       try {
-        const res = await API.get<User>("/auth/me", {
-          skipAuthRefresh: true,
-        });
-
+        const res = await API.get<User>("/auth/me", { skipAuthRefresh: true });
         if (!cancelled && !isSubmittingLogin.current) {
-          // 2. Conditionally navigate based on role
-          if (res.data.role === "admin") {
-            navigate("/admin", { replace: true });
-          } else {
-            navigate("/dashboard", { replace: true });
-          }
+          navigate(destinationFor(res.data), { replace: true });
         }
-      } catch (err: any) {
-        // Ignored
-      } finally {
-        console.groupEnd();
+      } catch {
+        // Not logged in — stay on the Login page
       }
     };
 
     checkExistingSession();
-
     return () => {
       cancelled = true;
     };
   }, [navigate]);
 
+  /** Poll /auth/me after login to confirm the session cookie is available. */
   const verifySessionAfterLogin = async (): Promise<User | null> => {
     const delays = [0, 100, 250, 500, 1000];
 
-    console.groupCollapsed("[Login] Verifying session after login");
-
     for (let attempt = 0; attempt < delays.length; attempt += 1) {
-      const delay = delays[attempt];
-
-      if (delay > 0) {
-        await sleep(delay);
-      }
-
+      if (delays[attempt] > 0) await sleep(delays[attempt]);
       try {
-        const res = await API.get<User>("/auth/me", {
-          skipAuthRefresh: true,
-        });
-        console.groupEnd();
-        // 3. Return the user object instead of true
+        const res = await API.get<User>("/auth/me", { skipAuthRefresh: true });
         return res.data;
-      } catch (err: any) {
-        console.warn(`Attempt ${attempt + 1} failed.`);
+      } catch {
+        // Retry
       }
     }
 
     console.error("Session was not available after login response.");
-    console.groupEnd();
-
     return null;
   };
 
@@ -121,15 +101,10 @@ function Login() {
     setLoading(true);
     setError(null);
 
-    console.groupCollapsed("[Login] Submit");
-
     try {
-      await API.post("/auth/login", form, {
-        skipAuthRefresh: true,
-      });
+      await API.post("/auth/login", form, { skipAuthRefresh: true });
 
       const user = await verifySessionAfterLogin();
-
       if (!user) {
         setError(
           "Login succeeded, but the session was not ready. Please try again."
@@ -137,12 +112,7 @@ function Login() {
         return;
       }
 
-      // 4. Navigate based on the newly logged-in user's role
-      if (user.role === "admin") {
-        navigate("/admin", { replace: true });
-      } else {
-        navigate("/dashboard", { replace: true });
-      }
+      navigate(destinationFor(user), { replace: true });
     } catch (err: unknown) {
       const detail = (
         err as {
@@ -154,7 +124,6 @@ function Login() {
         detail ? extractErrorMessage(detail) : "Invalid email or password."
       );
     } finally {
-      console.groupEnd();
       isSubmittingLogin.current = false;
       setLoading(false);
     }
@@ -168,7 +137,7 @@ function Login() {
         <p className="text-sm text-gray-500 mb-6">
           New here?{" "}
           <Link
-            to="/signup"
+            to={ROUTES.SIGNUP}
             className="text-indigo-600 hover:underline font-medium"
           >
             Create an account
@@ -189,7 +158,6 @@ function Login() {
             >
               Email
             </label>
-
             <input
               id="email"
               type="email"
@@ -200,9 +168,9 @@ function Login() {
               required
               disabled={loading}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
-                                       placeholder-gray-400 focus:outline-none focus:ring-2
-                                       focus:ring-indigo-500 focus:border-transparent transition
-                                       disabled:opacity-60 disabled:cursor-not-allowed"
+                         placeholder-gray-400 focus:outline-none focus:ring-2
+                         focus:ring-indigo-500 focus:border-transparent transition
+                         disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -213,7 +181,6 @@ function Login() {
             >
               Password
             </label>
-
             <input
               id="password"
               type="password"
@@ -224,9 +191,9 @@ function Login() {
               required
               disabled={loading}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
-                                       placeholder-gray-400 focus:outline-none focus:ring-2
-                                       focus:ring-indigo-500 focus:border-transparent transition
-                                       disabled:opacity-60 disabled:cursor-not-allowed"
+                         placeholder-gray-400 focus:outline-none focus:ring-2
+                         focus:ring-indigo-500 focus:border-transparent transition
+                         disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -234,11 +201,11 @@ function Login() {
             type="submit"
             disabled={loading}
             className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold
-                                   text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed
-                                   focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
-                                   transition"
+                       text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed
+                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
+                       transition"
           >
-            {loading ? "Logging in..." : "Log in"}
+            {loading ? "Logging in…" : "Log in"}
           </button>
         </form>
       </div>

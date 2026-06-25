@@ -1,6 +1,8 @@
+// frontend/src/features/auth/Register.tsx
 import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../../api/axios";
+import { ROUTES } from "../../config/constants";
 
 interface RegisterForm {
   username: string;
@@ -8,7 +10,6 @@ interface RegisterForm {
   password: string;
 }
 
-// FastAPI validation errors can be a string OR an array of {msg, loc} objects
 type FastAPIDetail = string | { msg: string; loc: string[] }[];
 
 function extractErrorMessage(detail: FastAPIDetail): string {
@@ -30,23 +31,22 @@ function Register() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  // Redirect already-authenticated users away from the register page
   useEffect(() => {
     let cancelled = false;
 
     API.get("/auth/me")
       .then((res) => {
         if (!cancelled) {
-          // Check role when they hit register page with an active session
-          if (res.data.role === "admin") {
-            navigate("/admin", { replace: true });
-          } else {
-            navigate("/dashboard", { replace: true });
-          }
+          const destination =
+            res.data.role === "admin" ? ROUTES.ADMIN : ROUTES.DASHBOARD;
+          navigate(destination, { replace: true });
         }
       })
       .catch(() => {
-        // Not logged in, stay on Register page.
+        // Not logged in — stay on the Register page
       });
+
     return () => {
       cancelled = true;
     };
@@ -87,7 +87,7 @@ function Register() {
         <p className="text-sm text-gray-500 mb-6">
           Already registered?{" "}
           <Link
-            to="/login"
+            to={ROUTES.LOGIN}
             className="text-indigo-600 hover:underline font-medium"
           >
             Log in
@@ -107,7 +107,7 @@ function Register() {
               Your account is pending admin approval. You'll be able to log in
               once it's approved.{" "}
               <Link
-                to="/login"
+                to={ROUTES.LOGIN}
                 className="text-indigo-600 hover:underline font-medium"
               >
                 Back to login
@@ -116,7 +116,6 @@ function Register() {
           </div>
         ) : (
           <>
-            {/* Password rules hint */}
             <div className="mb-4 rounded-lg bg-blue-50 border border-blue-100 px-4 py-3 text-xs text-blue-700 space-y-0.5">
               <p className="font-medium mb-1">Password must contain:</p>
               <p>• At least 8 characters</p>
@@ -142,9 +141,9 @@ function Register() {
                   required
                   disabled={loading}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
-                                           placeholder-gray-400 focus:outline-none focus:ring-2
-                                           focus:ring-indigo-500 focus:border-transparent transition
-                                           disabled:opacity-60 disabled:cursor-not-allowed"
+                             placeholder-gray-400 focus:outline-none focus:ring-2
+                             focus:ring-indigo-500 focus:border-transparent transition
+                             disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -165,9 +164,9 @@ function Register() {
                   required
                   disabled={loading}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
-                                           placeholder-gray-400 focus:outline-none focus:ring-2
-                                           focus:ring-indigo-500 focus:border-transparent transition
-                                           disabled:opacity-60 disabled:cursor-not-allowed"
+                             placeholder-gray-400 focus:outline-none focus:ring-2
+                             focus:ring-indigo-500 focus:border-transparent transition
+                             disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -188,9 +187,9 @@ function Register() {
                   required
                   disabled={loading}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
-                                           placeholder-gray-400 focus:outline-none focus:ring-2
-                                           focus:ring-indigo-500 focus:border-transparent transition
-                                           disabled:opacity-60 disabled:cursor-not-allowed"
+                             placeholder-gray-400 focus:outline-none focus:ring-2
+                             focus:ring-indigo-500 focus:border-transparent transition
+                             disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -198,9 +197,9 @@ function Register() {
                 type="submit"
                 disabled={loading}
                 className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold
-                                       text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed
-                                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
-                                       transition"
+                           text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed
+                           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
+                           transition"
               >
                 {loading ? "Creating account…" : "Sign up"}
               </button>

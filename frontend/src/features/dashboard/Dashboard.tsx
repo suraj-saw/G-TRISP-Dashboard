@@ -1,3 +1,4 @@
+// frontend/src/features/dashboard/Dashboard.tsx
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -13,9 +14,8 @@ import {
   Layers,
   ChevronDown,
   RotateCcw,
-  AlertTriangle
+  AlertTriangle,
 } from "lucide-react";
-
 
 import { useDashboard } from "../../hooks/useDashboard";
 import type { DashboardFilters, FilterOptions } from "../../types/dashboard";
@@ -23,12 +23,14 @@ import { fetchFilterOptions } from "../../api/dashboardApi";
 import SuratBaseMap from "../../components/maps/SuratBaseMap";
 import { MAP_STYLES } from "../../components/maps/mapStyles";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
+import { ROUTES } from "../../config/constants";
 import {
   defaultFilters,
   getFilterConfig,
   VISUALIZATION_OPTIONS,
   type FilterId,
 } from "./filterConfig";
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
@@ -37,7 +39,6 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [filters, setFilters] = useState<DashboardFilters>(defaultFilters);
-
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(
     null
   );
@@ -55,14 +56,15 @@ export default function Dashboard() {
         if (!active) return;
 
         if (res.data.role === "admin") {
-          navigate("/admin/dashboard", { replace: true });
+          // Use the canonical ROUTES constant — not a hardcoded string
+          navigate(ROUTES.ADMIN, { replace: true });
           return;
         }
 
         setUser(res.data);
       })
       .catch(() => {
-        navigate("/login", { replace: true });
+        navigate(ROUTES.LOGIN, { replace: true });
       })
       .finally(() => {
         if (active) setSessionChecking(false);
@@ -83,28 +85,23 @@ export default function Dashboard() {
     } catch {
       // Continue to login even if logout request fails.
     }
-
-    navigate("/login", { replace: true });
+    navigate(ROUTES.LOGIN, { replace: true });
   };
 
   const years = useMemo(() => {
     if (!allData?.timeSeries) return ["all"];
-
     const unique = Array.from(
       new Set(allData.timeSeries.map((p) => String(p.year)))
     ).sort();
-
     return ["all", ...unique];
   }, [allData.timeSeries]);
 
   const severities = useMemo(() => {
     if (!allData?.severity) return ["all"];
-
     const labels = allData.severity
       .map((s) => s.severity)
       .filter(Boolean)
       .sort();
-
     return ["all", ...labels];
   }, [allData.severity]);
 
@@ -143,8 +140,14 @@ export default function Dashboard() {
     { value: "Night", label: "Night" },
   ];
 
-  const filterOptionsById: Record<FilterId, { value: string; label: string }[]> = {
-    baseMap: MAP_STYLES.map((style) => ({ value: style.id, label: style.label })),
+  const filterOptionsById: Record<
+    FilterId,
+    { value: string; label: string }[]
+  > = {
+    baseMap: MAP_STYLES.map((style) => ({
+      value: style.id,
+      label: style.label,
+    })),
     visualization_type: VISUALIZATION_OPTIONS,
     year: years.map((year) => ({
       value: year,
@@ -213,7 +216,6 @@ export default function Dashboard() {
             value={value}
             onChange={(e) => {
               const nextValue = e.target.value;
-
               setFilters((current) => {
                 if (filter.id === "visualization_type") {
                   return {
@@ -224,7 +226,6 @@ export default function Dashboard() {
                     time_period: "all",
                   };
                 }
-
                 return {
                   ...current,
                   [filter.id]: nextValue,
@@ -248,8 +249,6 @@ export default function Dashboard() {
     );
   };
 
-
-
   if (sessionChecking || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F1F4FB] text-sm font-semibold text-[#6B7299]">
@@ -272,7 +271,7 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* ── SIDEBAR — slides in/out below the TopBar ── */}
+      {/* ── SIDEBAR ── */}
       <aside
         className={`
           fixed left-0 top-[80px] z-40
@@ -306,7 +305,7 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      {/* ── MAIN CONTENT — shrinks/grows when sidebar toggles ── */}
+      {/* ── MAIN CONTENT ── */}
       <main
         className="min-w-0 pb-7 pt-[104px] transition-[padding-left] duration-300 ease-in-out"
         style={{
@@ -329,313 +328,6 @@ export default function Dashboard() {
           transition={{ duration: 0.2, ease: "easeInOut" }}
           style={{ pointerEvents: loading ? "none" : "auto" }}
         >
-          {/* <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <MetricCard
-              icon={<Activity size={17} />}
-              label="Total accidents"
-              value={data.summary.total_accidents}
-              variant="blue"
-              loading={loading}
-            />
-            <MetricCard
-              icon={<AlertTriangle size={17} />}
-              label="Fatalities"
-              value={data.summary.total_fatalities}
-              variant="red"
-              loading={loading}
-            />
-            <MetricCard
-              icon={<Users size={17} />}
-              label="Total injuries"
-              value={data.summary.total_grievous + data.summary.total_minor}
-              sub={`${fmt(data.summary.total_grievous)} grievous - ${fmt(data.summary.total_minor)} minor`}
-              variant="amber"
-              loading={loading}
-            />
-            <MetricCard
-              icon={<Car size={17} />}
-              label="Vehicles involved"
-              value={data.summary.total_vehicles}
-              variant="teal"
-              loading={loading}
-            />
-          </div> */}
-
-          {/* <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <MetricCard
-              icon={<ShieldAlert size={17} />}
-              label="Damage only"
-              value={data.summary.total_damage_only}
-              variant="purple"
-              loading={loading}
-            />
-            <MetricCard
-              icon={<Building2 size={17} />}
-              label="Districts covered"
-              value={data.summary.districts_covered}
-              variant="green"
-              loading={loading}
-            />
-            <MetricCard
-              icon={<RadioTower size={17} />}
-              label="Police stations"
-              value={data.summary.police_stations}
-              variant="blue"
-              loading={loading}
-            />
-            <MetricCard
-              icon={<MapPin size={17} />}
-              label="Mapped points"
-              value={data.heatmap.length}
-              variant="teal"
-              loading={loading}
-            />
-          </div> */}
-
-          {/* <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_380px]">
-            <Panel
-              title="Accident trend over time"
-              icon={<TrendingUp size={14} />}
-              delay={0.05}
-            >
-              <AccidentTrend data={data.timeSeries} />
-            </Panel>
-
-            <Panel
-              title="Severity distribution"
-              icon={<AlertTriangle size={14} />}
-              delay={0.1}
-            >
-              <SeverityChart data={data.severity} />
-            </Panel>
-          </div> */}
-
-          {/* <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <Panel
-              title="Accident Intensity by District"
-              icon={<MapPin size={14} />}
-              delay={0.12}
-            >
-              <GujaratMap data={data.districts} metric="accident_count" />
-            </Panel>
-
-            <Panel
-              title="Fatality Intensity by District"
-              icon={<AlertTriangle size={14} />}
-              delay={0.14}
-            >
-              <GujaratMap data={data.districts} metric="fatalities" />
-            </Panel>
-
-            <Panel
-              title="Fatal Accident Intensity"
-              icon={<ShieldAlert size={14} />}
-              delay={0.16}
-            >
-              <GujaratMap
-                data={dangerousAsDistricts}
-                metric="fatal_accidents"
-              />
-            </Panel>
-          </div> */}
-
-          {/* <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <Panel
-              title="Casualty breakdown"
-              icon={<Users size={14} />}
-              delay={0.15}
-            >
-              <div className="flex flex-col gap-4">
-                {data.casualty.map((c) => {
-                  const total = c.killed + c.grievous + c.minor || 1;
-                  const kPct = (c.killed / total) * 100;
-                  const gPct = (c.grievous / total) * 100;
-                  const mPct = (c.minor / total) * 100;
-
-                  return (
-                    <div key={c.category}>
-                      <p className="mb-1.5 text-[12px] font-semibold text-[#6B7299]">
-                        {c.category}
-                      </p>
-                      <div className="flex h-2.5 overflow-hidden rounded-full">
-                        <div
-                          style={{ width: `${kPct}%`, background: "#E85D4A" }}
-                        />
-                        <div
-                          style={{ width: `${gPct}%`, background: "#F5A623" }}
-                        />
-                        <div
-                          style={{ width: `${mPct}%`, background: "#2C6EF2" }}
-                        />
-                      </div>
-                      <div className="mt-1.5 flex gap-3 text-[11px]">
-                        <span className="text-[#E85D4A] font-medium">
-                          {fmt(c.killed)} killed
-                        </span>
-                        <span className="text-[#D4891A] font-medium">
-                          {fmt(c.grievous)} grievous
-                        </span>
-                        <span className="text-[#2C6EF2] font-medium">
-                          {fmt(c.minor)} minor
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Panel>
-
-            <Panel
-              title="Conditions"
-              icon={<CloudSun size={14} />}
-              delay={0.18}
-            >
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg bg-[#F7F9FD] p-3">
-                  <p className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[#2C6EF2]">
-                    <Sun size={12} /> Weather
-                  </p>
-                  {data.weather.slice(0, 4).map((w) => (
-                    <div
-                      key={w.name}
-                      className="flex items-center justify-between border-b border-[#E4E8F4] py-1.5 last:border-0 text-xs"
-                    >
-                      <span className="text-[#6B7299] truncate mr-1 max-w-[70%]">
-                        {w.name}
-                      </span>
-                      <b className="font-semibold text-[#1A1D2E] shrink-0">
-                        {fmt(w.count)}
-                      </b>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="rounded-lg bg-[#F7F9FD] p-3">
-                  <p className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[#2C6EF2]">
-                    <Moon size={12} /> Light
-                  </p>
-                  {data.light.slice(0, 4).map((l) => (
-                    <div
-                      key={l.name}
-                      className="flex items-center justify-between border-b border-[#E4E8F4] py-1.5 last:border-0 text-xs"
-                    >
-                      <span className="text-[#6B7299] truncate mr-1 max-w-[70%]">
-                        {l.name}
-                      </span>
-                      <b className="font-semibold text-[#1A1D2E] shrink-0">
-                        {fmt(l.count)}
-                      </b>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Panel>
-
-            <Panel
-              title="Most dangerous & road types"
-              icon={<ShieldAlert size={14} />}
-              delay={0.2}
-            >
-              {topDangerous && (
-                <div
-                  className="mb-4 rounded-xl p-4"
-                  style={{
-                    background:
-                      "linear-gradient(135deg,#1A1D2E 0%,#7C1D1D 100%)",
-                  }}
-                >
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-1">
-                    Highest fatal accident district
-                  </p>
-                  <p className="text-base font-bold text-white mb-0.5">
-                    {topDangerous.district}
-                  </p>
-                  <p
-                    className="text-[11px]"
-                    style={{ color: "rgba(255,160,140,0.9)" }}
-                  >
-                    {fmt(topDangerous.fatal_accidents)} fatal accidents -{" "}
-                    {fmt(topDangerous.total_killed)} killed
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <p className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[#6B7299]">
-                  <Route size={12} /> Road types
-                </p>
-                {topRoads.map((r, i) => (
-                  <div
-                    key={r.road_classification}
-                    className="flex items-center gap-2 py-1.5 border-b border-[#F1F4FB] last:border-0"
-                  >
-                    <span className="flex h-5 w-5 items-center justify-center rounded bg-[#F1F4FB] text-[10px] font-bold text-[#6B7299] shrink-0">
-                      {i + 1}
-                    </span>
-                    <span className="flex-1 text-xs text-[#1A1D2E] truncate">
-                      {r.road_classification || "Unknown"}
-                    </span>
-                    <span className="text-xs font-semibold text-[#2C6EF2] shrink-0">
-                      {fmt(r.accident_count)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Panel>
-          </div> */}
-
-          {/* {topViolations.length > 0 && (
-            <Panel
-              title="Traffic violations"
-              icon={<Route size={14} />}
-              className="mb-4"
-              delay={0.22}
-            >
-              <div style={{ width: "100%", height: 220 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={topViolations}
-                    margin={{ top: 4, right: 10, left: -20, bottom: 30 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke="#EDF0F8"
-                    />
-                    <XAxis
-                      dataKey="name"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 10, fill: "#9BA3C2" }}
-                      interval={0}
-                      angle={-30}
-                      textAnchor="end"
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: "#9BA3C2" }}
-                    />
-                    <Tooltip content={<ViolationTooltip />} />
-                    <Bar
-                      dataKey="count"
-                      name="Count"
-                      radius={[6, 6, 0, 0]}
-                      maxBarSize={48}
-                    >
-                      {topViolations.map((_, i) => (
-                        <Cell
-                          key={i}
-                          fill={`rgba(8,145,178,${1 - i * 0.08})`}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Panel>
-          )} */}
-
           {isTemporalAnalysis ? (
             <TemporalAnalysis filters={filters} />
           ) : (
