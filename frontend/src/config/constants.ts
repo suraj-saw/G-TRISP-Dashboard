@@ -59,6 +59,23 @@ export const GUJARAT_MAP_CENTER = {
 export const GUJARAT_DISTRICTS_GEOJSON_PATH = "/gujarat.json";
 
 // ---------------------------------------------------------------------------
+// Map style IDs — must match MAP_STYLES entries in mapStyles.ts
+// ---------------------------------------------------------------------------
+
+/** ID of the satellite base map style (used for mask color switching) */
+export const MAP_STYLE_ID_SATELLITE = "google-satellite";
+
+/** ID of the hybrid base map style */
+export const MAP_STYLE_ID_HYBRID = "google-hybrid";
+
+/** Set of base-map IDs that are satellite/aerial imagery */
+export const SATELLITE_BASE_MAP_IDS = new Set([
+  MAP_STYLE_ID_SATELLITE,
+  MAP_STYLE_ID_HYBRID,
+  "esri-satellite",
+]);
+
+// ---------------------------------------------------------------------------
 // Session / polling
 // ---------------------------------------------------------------------------
 
@@ -101,3 +118,46 @@ export const TOP_DANGEROUS_MAX_N = 50;
 
 /** Default batch size used by data seeders */
 export const SEED_BATCH_SIZE = 500;
+
+// ---------------------------------------------------------------------------
+// Heatmap / visualization
+// ---------------------------------------------------------------------------
+
+/**
+ * Ordered weekday names (Monday → Sunday) — mirrors backend WEEKDAY_ORDER.
+ * Used by the HourDayHeatmap component.
+ */
+export const WEEKDAY_ORDER = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+
+export type Weekday = (typeof WEEKDAY_ORDER)[number];
+
+// ---------------------------------------------------------------------------
+// Severity weights for heatmap intensity (mirrors VisualizationLayers logic)
+// ---------------------------------------------------------------------------
+
+export const SEVERITY_WEIGHTS: Record<string, number> = {
+  fatal: 1,
+  grievous: 0.85,
+  minor: 0.55,
+  damage: 0.3,
+} as const;
+
+export const SEVERITY_DEFAULT_WEIGHT = 0.5;
+
+// ---------------------------------------------------------------------------
+// Popup / marker sentinel values
+// ---------------------------------------------------------------------------
+
+/** Raw DB string indicating a null / missing text value */
+export const NULL_TEXT_SENTINEL = "nan";
+
+/** Safe display replacement for null / missing text */
+export const UNKNOWN_LABEL = "Unknown";

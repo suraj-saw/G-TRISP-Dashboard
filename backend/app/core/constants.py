@@ -96,6 +96,21 @@ ACCIDENT_DATETIME_FORMATS = [
 SURAT_DISTRICT_NAME = "Surat"
 
 # ---------------------------------------------------------------------------
+# Time-period bucket boundaries (hour ranges, inclusive lower bound)
+# ---------------------------------------------------------------------------
+
+# Maps time-period label → (start_hour_inclusive, end_hour_exclusive)
+TIME_PERIOD_RANGES = {
+    "Morning":   (5,  12),
+    "Afternoon": (12, 17),
+    "Evening":   (17, 21),
+    "Night":     (21, 24),   # 21-23 + 0-4 handled by fallback below
+}
+
+# Hour range treated as "Night" when hour < NIGHT_MORNING_CUTOFF
+NIGHT_MORNING_CUTOFF = 5
+
+# ---------------------------------------------------------------------------
 # API / pagination defaults
 # ---------------------------------------------------------------------------
 
@@ -116,3 +131,16 @@ DEFAULT_SEED_BATCH_SIZE = 500
 
 # How often (in rows) the batch validator logs progress.
 VALIDATION_LOG_INTERVAL = 500
+
+# ---------------------------------------------------------------------------
+# Coordinate validation
+# ---------------------------------------------------------------------------
+
+# Fallback label used when a coordinate cannot be matched to a district.
+NO_DISTRICT_LABEL = "Unknown"
+
+# ---------------------------------------------------------------------------
+# Hour-label formatting
+# ---------------------------------------------------------------------------
+
+HOURS_IN_DAY = 24

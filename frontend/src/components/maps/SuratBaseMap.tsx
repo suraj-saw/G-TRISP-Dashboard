@@ -14,7 +14,10 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2, AlertCircle } from "lucide-react";
 import { fetchSuratBoundary } from "../../api/geoApi";
 import { getMapStyleUrl } from "./mapStyles";
-import { SURAT_MAP_CENTER } from "../../config/constants";
+import {
+  SURAT_MAP_CENTER,
+  SATELLITE_BASE_MAP_IDS,
+} from "../../config/constants";
 import {
   MAP_BOUNDS_PAD_DEGREES,
   MAP_MIN_ZOOM,
@@ -73,6 +76,12 @@ function getBbox(
   return isFinite(minLng) ? [minLng, minLat, maxLng, maxLat] : null;
 }
 
+// Mask colours for satellite vs. normal base maps
+const MASK_COLOR_SATELLITE = "#000000";
+const MASK_OPACITY_SATELLITE = 0.65;
+const MASK_COLOR_DEFAULT = "#F1F4FB";
+const MASK_OPACITY_DEFAULT = 0.8;
+
 export interface SuratBaseMapHandle {
   resize: () => void;
 }
@@ -106,6 +115,8 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const bboxRef = useRef<[number, number, number, number] | null>(null);
+
+    const isSatelliteMap = SATELLITE_BASE_MAP_IDS.has(baseMap ?? "");
 
     useImperativeHandle(ref, () => ({
       resize: () => {
@@ -265,8 +276,12 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
                 id="surat-mask-fill"
                 type="fill"
                 paint={{
-                  "fill-color": baseMap === "satellite" ? "#000000" : "#F1F4FB",
-                  "fill-opacity": baseMap === "satellite" ? 0.65 : 0.8,
+                  "fill-color": isSatelliteMap
+                    ? MASK_COLOR_SATELLITE
+                    : MASK_COLOR_DEFAULT,
+                  "fill-opacity": isSatelliteMap
+                    ? MASK_OPACITY_SATELLITE
+                    : MASK_OPACITY_DEFAULT,
                 }}
               />
             </Source>

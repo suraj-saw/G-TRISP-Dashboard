@@ -27,7 +27,6 @@ from app.schemas.dashboard_schema import (
     CollisionCount,
     CollisionResponse,
     DangerousDistrict,
-    FilterOptions,
     HeatmapPoint,
     HeatmapResponse,
     LightCount,
@@ -76,10 +75,14 @@ from app.core.constants import (
     CASUALTY_TYPES,
     WEEKDAY_ORDER,
     UNKNOWN_LABEL,
+    SURAT_DASH_PREFIX,
+    TIME_PERIOD_RANGES,
+    NIGHT_MORNING_CUTOFF,
+    HOURS_IN_DAY,
 )
 
 router = APIRouter(
-    prefix="/api/surat/dashboard",
+    prefix=SURAT_DASH_PREFIX,
     tags=["Surat Dashboard"],
 )
 
@@ -89,13 +92,19 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 def _time_period_for_hour(hour: int) -> str:
-    if 5 <= hour < 12:
-        return "Morning"
-    if 12 <= hour < 17:
-        return "Afternoon"
-    if 17 <= hour < 21:
-        return "Evening"
-    return "Night"
+    """
+    Map a 0-23 hour integer to a named time period.
+    Boundaries are defined centrally in TIME_PERIOD_RANGES so the same
+    bucketing is used everywhere (routes, seeders, tests).
+    """
+    for period, (start, end) in TIME_PERIOD_RANGES.items():
+        if period == "Night":
+            # Night wraps: 21-23 and 0-4
+            if hour >= start or hour < NIGHT_MORNING_CUTOFF:
+                return period
+        elif start <= hour < end:
+            return period
+    return "Night"  # fallback (should never be reached)
 
 
 def _format_hour_label(hour: int) -> str:
@@ -435,7 +444,7 @@ def get_temporal_analysis(
 
     # Aggregation buckets
     hour_day_counts: dict = defaultdict(int)
-    hourly_counts   = {h: 0 for h in range(24)}
+    hourly_counts   = {h: 0 for h in range(HOURS_IN_DAY)}
     monthly_counts: dict  = defaultdict(int)
     day_counts: dict      = defaultdict(int)
     period_counts: dict   = defaultdict(int)
@@ -470,11 +479,11 @@ def get_temporal_analysis(
                 count=hour_day_counts[(hour, day_name)],
             )
             for day_name in WEEKDAY_ORDER
-            for hour in range(24)
+            for hour in range(HOURS_IN_DAY)
         ],
         hourly=[
             HourlyAccidentCount(hour=h, count=hourly_counts[h])
-            for h in range(24)
+            for h in range(HOURS_IN_DAY)
         ],
         monthly=[
             MonthlyAccidentCount(

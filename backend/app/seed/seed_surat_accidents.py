@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import json
 import os
 import sys
 from pathlib import Path
@@ -30,6 +29,12 @@ if str(_BACKEND) not in sys.path:
 from app.database import Base, engine, SessionLocal
 from app.models.surat_accident import SuratAccident
 from app.core.config import POSTGIS_SRID
+from app.core.constants import (
+    BOUNDARY_TOLERANCE_DEGREES,
+    DEFAULT_SEED_BATCH_SIZE,
+    NULL_TEXT_SENTINEL,
+)
+from app.utils.datetime_utils import parse_accident_datetime
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,44 +50,45 @@ _BACKEND_DIR = _APP_DIR.parent
 
 DEFAULT_DATA_FILE = _BACKEND_DIR / "data" / "Surat City 2023-2026 overall data.xlsx"
 DATA_FILE  = Path(os.getenv("SURAT_ACCIDENT_DATASET_PATH", str(DEFAULT_DATA_FILE))).resolve()
-CHUNK_SIZE = int(os.getenv("SEED_BATCH_SIZE", "500"))
+CHUNK_SIZE = int(os.getenv("SEED_BATCH_SIZE", str(DEFAULT_SEED_BATCH_SIZE)))
 
 # ── Column mapping ────────────────────────────────────────────────────────────
 COLUMN_MAP: dict[str, str] = {
-    "Accident ID": "accident_id",
-    "District": "district",
-    "Police Station": "police_station",
-    "Accident Date Time": "accident_date_time",
-    "Latitude": "latitude",
-    "Longitude": "longitude",
-    "Road Name": "road_name",
-    "Road Classification": "road_classification",
-    "Severity of the Accident": "severity",
-    "No of Vehicles Involved": "number_of_vehicles",
-    "Drivers Killed": "driver_killed",
-    "Drivers Grievous Injury": "driver_grievous_injury",
-    "Drivers Minor Injury": "driver_minor_injury",
-    "Passengers Killed": "passenger_killed",
-    "Passengers Grievous Injury": "passenger_grievous_injury",
-    "Passengers Minor Injury": "passenger_minor_injury",
-    "Pedestrian Killed": "pedestrian_killed",
-    "Pedestrian Grievous Injury": "pedestrian_grievous_injury",
-    "Pedestrian Minor Injury": "pedestrian_minor_injury",
-    "Collision Type": "type_of_collision",
-    "Collision Nature": "collision_feature",
-    "Weather Condition": "weather_condition",
-    "Light Condition": "light_condition",
-    "Visibility": "visibility",
-    "Traffic Violation": "traffic_violation",
+    "Accident ID":                  "accident_id",
+    "District":                     "district",
+    "Police Station":               "police_station",
+    "Accident Date Time":           "accident_date_time",
+    "Latitude":                     "latitude",
+    "Longitude":                    "longitude",
+    "Road Name":                    "road_name",
+    "Road Classification":          "road_classification",
+    "Severity of the Accident":     "severity",
+    "No of Vehicles Involved":      "number_of_vehicles",
+    "Drivers Killed":               "driver_killed",
+    "Drivers Grievous Injury":      "driver_grievous_injury",
+    "Drivers Minor Injury":         "driver_minor_injury",
+    "Passengers Killed":            "passenger_killed",
+    "Passengers Grievous Injury":   "passenger_grievous_injury",
+    "Passengers Minor Injury":      "passenger_minor_injury",
+    "Pedestrian Killed":            "pedestrian_killed",
+    "Pedestrian Grievous Injury":   "pedestrian_grievous_injury",
+    "Pedestrian Minor Injury":      "pedestrian_minor_injury",
+    "Collision Type":               "type_of_collision",
+    "Collision Nature":             "collision_feature",
+    "Weather Condition":            "weather_condition",
+    "Light Condition":              "light_condition",
+    "Visibility":                   "visibility",
+    "Traffic Violation":            "traffic_violation",
 }
 
 
 # ── Cleaners ──────────────────────────────────────────────────────────────────
+
 def _clean_text(value) -> str | None:
     if pd.isna(value):
         return None
     s = str(value).strip()
-    return None if s == "" or s.lower() == "nan" else s
+    return None if s == "" or s.lower() == NULL_TEXT_SENTINEL else s
 
 
 def _clean_int_zero(value) -> int:
@@ -113,57 +119,22 @@ def _make_point(lat: float | None, lon: float | None):
         return None
 
 
-def _parse_accident_datetime(value):
-    if pd.isna(value):
-        return None
-
-    if isinstance(value, pd.Timestamp):
-        return value.to_pydatetime()
-
-    # Excel serial date support, in case pandas reads the cell as a number.
-    if isinstance(value, (int, float)):
-        parsed = pd.to_datetime(value, unit="D", origin="1899-12-30", errors="coerce")
-        return None if pd.isna(parsed) else parsed.to_pydatetime()
-
-    text = str(value).strip()
-    if not text or text.lower() == "nan":
-        return None
-
-    # Normalize common separators from values like "17-Jan-2023 : 11:00 AM".
-    text = " ".join(text.replace("\u00a0", " ").split())
-
-    formats = [
-        "%d-%b-%Y : %I:%M %p",
-        "%d-%b-%Y: %I:%M %p",
-        "%d-%b-%Y %I:%M %p",
-        "%d/%m/%Y : %I:%M %p",
-        "%d/%m/%Y %I:%M %p",
-        "%d-%m-%Y : %I:%M %p",
-        "%d-%m-%Y %I:%M %p",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %I:%M:%S %p",
-    ]
-
-    for fmt in formats:
-        parsed = pd.to_datetime(text, format=fmt, errors="coerce")
-        if not pd.isna(parsed):
-            return parsed.to_pydatetime()
-
-    parsed = pd.to_datetime(text, errors="coerce", dayfirst=True)
-    if pd.isna(parsed):
-        return None
-
-    return parsed.to_pydatetime()
-
-
 # ── Spatial validation ────────────────────────────────────────────────────────
+
 def is_inside_surat(lat: float, lon: float, db: Session) -> bool:
     """
     Returns True if coordinates lie within the Surat Boundary.
     Checks the `surat_boundary` table first, falling back to `gujarat_districts`.
+
+    Tolerance value comes from BOUNDARY_TOLERANCE_DEGREES so there is a single
+    place to adjust the buffer if needed.
     """
-    srid = 4326
-    tol = 0.00001
+    params = {
+        "lat": lat,
+        "lon": lon,
+        "srid": POSTGIS_SRID,
+        "tol": BOUNDARY_TOLERANCE_DEGREES,
+    }
 
     # Option A: Check surat_boundary table
     try:
@@ -179,7 +150,7 @@ def is_inside_surat(lat: float, lon: float, db: Session) -> bool:
             )
             """
         )
-        row = db.execute(sql, {"lat": lat, "lon": lon, "srid": srid, "tol": tol}).fetchone()
+        row = db.execute(sql, params).fetchone()
         if row and row[0]:
             return True
     except Exception:
@@ -200,7 +171,7 @@ def is_inside_surat(lat: float, lon: float, db: Session) -> bool:
             )
             """
         )
-        row = db.execute(sql, {"lat": lat, "lon": lon, "srid": srid, "tol": tol}).fetchone()
+        row = db.execute(sql, params).fetchone()
         return bool(row[0]) if row else False
     except Exception:
         return False
@@ -209,21 +180,20 @@ def is_inside_surat(lat: float, lon: float, db: Session) -> bool:
 def _validate_coordinates(df: pd.DataFrame, db: Session) -> tuple[pd.DataFrame, int]:
     logger.info("Running coordinate validation against Surat boundaries…")
     valid_mask = []
-    
-    for idx, row in df.iterrows():
+
+    for _, row in df.iterrows():
         lat = _clean_float(row["latitude"])
         lon = _clean_float(row["longitude"])
-        
+
         if lat is None or lon is None:
             valid_mask.append(False)
             continue
-            
-        inside = is_inside_surat(lat, lon, db)
-        valid_mask.append(inside)
+
+        valid_mask.append(is_inside_surat(lat, lon, db))
 
     valid_df = df[valid_mask].copy()
     rejected = len(df) - len(valid_df)
-    
+
     logger.info(
         "Validation complete — valid: %d, rejected: %d (%.1f%%)",
         len(valid_df), rejected,
@@ -233,6 +203,7 @@ def _validate_coordinates(df: pd.DataFrame, db: Session) -> tuple[pd.DataFrame, 
 
 
 # ── Loader & Seeder ───────────────────────────────────────────────────────────
+
 def _load_dataset() -> pd.DataFrame:
     if not DATA_FILE.exists():
         raise FileNotFoundError(f"Dataset not found at:\n  {DATA_FILE}")
@@ -247,8 +218,10 @@ def _load_dataset() -> pd.DataFrame:
         )
 
     df = df.rename(columns=COLUMN_MAP)
+
+    # Use the shared datetime parser — no more duplicate format lists
     raw_datetime = df["accident_date_time"].copy()
-    df["accident_date_time"] = raw_datetime.apply(_parse_accident_datetime)
+    df["accident_date_time"] = raw_datetime.apply(parse_accident_datetime)
 
     parsed_count = int(df["accident_date_time"].notna().sum())
     logger.info(
@@ -261,7 +234,7 @@ def _load_dataset() -> pd.DataFrame:
             "No accident_date_time values parsed. Sample raw values: %s",
             raw_datetime.head(10).tolist(),
         )
-    
+
     logger.info("Loaded %d rows, %d columns.", len(df), len(df.columns))
     return df
 
@@ -283,17 +256,14 @@ def _build_accident(row) -> SuratAccident:
         severity            = _clean_text(row["severity"]),
         number_of_vehicles  = _clean_int_zero(row["number_of_vehicles"]),
 
-        # Driver casualties
         driver_killed          = _clean_int_zero(row["driver_killed"]),
         driver_grievous_injury = _clean_int_zero(row["driver_grievous_injury"]),
         driver_minor_injury    = _clean_int_zero(row["driver_minor_injury"]),
 
-        # Passenger casualties
         passenger_killed          = _clean_int_zero(row["passenger_killed"]),
         passenger_grievous_injury = _clean_int_zero(row["passenger_grievous_injury"]),
         passenger_minor_injury    = _clean_int_zero(row["passenger_minor_injury"]),
 
-        # Pedestrian casualties
         pedestrian_killed          = _clean_int_zero(row["pedestrian_killed"]),
         pedestrian_grievous_injury = _clean_int_zero(row["pedestrian_grievous_injury"]),
         pedestrian_minor_injury    = _clean_int_zero(row["pedestrian_minor_injury"]),

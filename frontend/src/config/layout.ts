@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 /** Height of the fixed top navigation bar in pixels */
-export const TOPBAR_HEIGHT_PX = 80;
+export const TOPBAR_HEIGHT_PX = 60;
 
 /** Tailwind class for the topbar height (h-20 = 80px) */
 export const TOPBAR_HEIGHT_CLASS = "h-20";

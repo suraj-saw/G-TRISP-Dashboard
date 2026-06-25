@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
 import type { HeatmapPoint } from "../../types/dashboard";
+import {
+  NULL_TEXT_SENTINEL,
+  UNKNOWN_LABEL,
+  SEVERITY_WEIGHTS,
+  SEVERITY_DEFAULT_WEIGHT,
+} from "../../config/constants";
 
 interface Props {
   data?: HeatmapPoint[];
@@ -22,17 +28,15 @@ type SelectedAccident = {
   accident_date_time?: string | null;
 };
 
-const safeText = (value?: string | null) => {
-  if (!value || value === "nan") return "Unknown";
+const safeText = (value?: string | null): string => {
+  if (!value || value === NULL_TEXT_SENTINEL) return UNKNOWN_LABEL;
   return value;
 };
 
-const formatDate = (value?: string | null) => {
-  if (!value) return "Unknown";
-
+const formatDate = (value?: string | null): string => {
+  if (!value) return UNKNOWN_LABEL;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Unknown";
-
+  if (Number.isNaN(date.getTime())) return UNKNOWN_LABEL;
   return date.toLocaleDateString("en-IN", {
     year: "numeric",
     month: "short",
@@ -40,17 +44,36 @@ const formatDate = (value?: string | null) => {
   });
 };
 
-// Add near safeText / formatDate helpers
-const getSeverityWeight = (severity?: string | null) => {
+const getSeverityWeight = (severity?: string | null): number => {
   const value = (severity || "").toLowerCase();
-
-  if (value.includes("fatal")) return 1;
-  if (value.includes("grievous")) return 0.85;
-  if (value.includes("minor")) return 0.55;
-  if (value.includes("damage")) return 0.3;
-
-  return 0.5;
+  for (const [key, weight] of Object.entries(SEVERITY_WEIGHTS)) {
+    if (value.includes(key)) return weight;
+  }
+  return SEVERITY_DEFAULT_WEIGHT;
 };
+
+// ---------------------------------------------------------------------------
+// Severity colour palette — single source of truth for all marker layers
+// ---------------------------------------------------------------------------
+const SEVERITY_COLORS = {
+  Fatal: "#dc2626",
+  "Grievous Injury": "#f97316",
+  "Minor Injury": "#2563eb",
+  "Damage Only": "#22c55e",
+  default: "#64748b",
+  all: "#E85D4A",
+} as const;
+
+type KnownSeverity = keyof typeof SEVERITY_COLORS;
+
+const severityColorExpression = [
+  "match",
+  ["get", "severity"],
+  ...Object.entries(SEVERITY_COLORS)
+    .filter(([k]) => k !== "all" && k !== "default")
+    .flatMap(([k, v]) => [k, v]),
+  SEVERITY_COLORS.default,
+] as const;
 
 export function VisualizationLayers({
   data,
@@ -101,13 +124,10 @@ export function VisualizationLayers({
 
     const handleClick = (event: any) => {
       if (!map.getLayer("accident-points")) return;
-
       const feature = map.queryRenderedFeatures(event.point, {
         layers: ["accident-points"],
       })[0];
-
       if (!feature) return;
-
       setSelected({
         longitude: event.lngLat.lng,
         latitude: event.lngLat.lat,
@@ -120,11 +140,9 @@ export function VisualizationLayers({
         map.getCanvas().style.cursor = "";
         return;
       }
-
       const features = map.queryRenderedFeatures(event.point, {
         layers: ["accident-points"],
       });
-
       map.getCanvas().style.cursor = features.length ? "pointer" : "";
     };
 
@@ -140,82 +158,82 @@ export function VisualizationLayers({
 
   if (!geojsonData.features.length) return null;
 
+  // ── Density heatmap ───────────────────────────────────────────────────────
   if (type === "density_heatmap") {
     return (
-      <>
-        <Source
-          id="accident-density-source"
-          type="geojson"
-          data={geojsonData as any}
-        >
-          <Layer
-            id="accident-density-heatmap"
-            type="heatmap"
-            paint={{
-              "heatmap-weight": [
-                "interpolate",
-                ["linear"],
-                ["coalesce", ["get", "severity_weight"], 0.5],
-                0,
-                0,
-                1,
-                1,
-              ],
-              "heatmap-intensity": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                9,
-                0.8,
-                12,
-                1.8,
-                15,
-                3,
-              ],
-              "heatmap-radius": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                9,
-                14,
-                12,
-                28,
-                15,
-                44,
-              ],
-              "heatmap-opacity": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                9,
-                0.85,
-                14,
-                0.75,
-              ],
-              "heatmap-color": [
-                "interpolate",
-                ["linear"],
-                ["heatmap-density"],
-                0,
-                "rgba(59,130,246,0)",
-                0.2,
-                "rgba(96,165,250,0.45)",
-                0.4,
-                "rgba(34,197,94,0.55)",
-                0.6,
-                "rgba(250,204,21,0.7)",
-                0.8,
-                "rgba(249,115,22,0.85)",
-                1,
-                "rgba(220,38,38,0.95)",
-              ],
-            }}
-          />
-        </Source>
-      </>
+      <Source
+        id="accident-density-source"
+        type="geojson"
+        data={geojsonData as any}
+      >
+        <Layer
+          id="accident-density-heatmap"
+          type="heatmap"
+          paint={{
+            "heatmap-weight": [
+              "interpolate",
+              ["linear"],
+              ["coalesce", ["get", "severity_weight"], SEVERITY_DEFAULT_WEIGHT],
+              0,
+              0,
+              1,
+              1,
+            ],
+            "heatmap-intensity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              0.8,
+              12,
+              1.8,
+              15,
+              3,
+            ],
+            "heatmap-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              14,
+              12,
+              28,
+              15,
+              44,
+            ],
+            "heatmap-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              0.85,
+              14,
+              0.75,
+            ],
+            "heatmap-color": [
+              "interpolate",
+              ["linear"],
+              ["heatmap-density"],
+              0,
+              "rgba(59,130,246,0)",
+              0.2,
+              "rgba(96,165,250,0.45)",
+              0.4,
+              "rgba(34,197,94,0.55)",
+              0.6,
+              "rgba(250,204,21,0.7)",
+              0.8,
+              "rgba(249,115,22,0.85)",
+              1,
+              "rgba(220,38,38,0.95)",
+            ],
+          }}
+        />
+      </Source>
     );
   }
 
+  // ── Blackspot cluster map ─────────────────────────────────────────────────
   if (type === "blackspot") {
     return (
       <Source
@@ -257,7 +275,6 @@ export function VisualizationLayers({
             "circle-opacity": 0.95,
           }}
         />
-
         <Layer
           id="blackspot-core"
           type="circle"
@@ -290,7 +307,6 @@ export function VisualizationLayers({
             "circle-stroke-color": "#FFFFFF",
           }}
         />
-
         <Layer
           id="blackspot-inner-shine"
           type="circle"
@@ -311,7 +327,6 @@ export function VisualizationLayers({
             "circle-translate": [-3, -3],
           }}
         />
-
         <Layer
           id="blackspot-count"
           type="symbol"
@@ -338,7 +353,6 @@ export function VisualizationLayers({
             "text-halo-width": 1,
           }}
         />
-
         <Layer
           id="blackspot-single-point-halo"
           type="circle"
@@ -357,7 +371,6 @@ export function VisualizationLayers({
             "circle-blur": 0.6,
           }}
         />
-
         <Layer
           id="blackspot-single-point"
           type="circle"
@@ -382,22 +395,11 @@ export function VisualizationLayers({
     );
   }
 
+  // ── Location markers ──────────────────────────────────────────────────────
   const markerColor =
     selectedSeverity === "all"
-      ? "#E85D4A"
-      : [
-          "match",
-          ["get", "severity"],
-          "Fatal",
-          "#dc2626",
-          "Grievous Injury",
-          "#f97316",
-          "Minor Injury",
-          "#2563eb",
-          "Damage Only",
-          "#22c55e",
-          "#64748b",
-        ];
+      ? SEVERITY_COLORS.all
+      : (severityColorExpression as any);
 
   return (
     <>
@@ -450,7 +452,6 @@ export function VisualizationLayers({
             <p className="mb-2 text-[13px] font-bold text-slate-900">
               Accident Details
             </p>
-
             <div className="space-y-1">
               <p>
                 <b>Severity:</b> {safeText(selected.severity)}

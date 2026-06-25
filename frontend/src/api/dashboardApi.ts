@@ -8,8 +8,23 @@ import type {
   TemporalAnalysisData,
 } from "../types/dashboard";
 
-const getParams = (filters: DashboardFilters) => {
+// ---------------------------------------------------------------------------
+// Parameter builders
+// ---------------------------------------------------------------------------
+
+/**
+ * Converts dashboard filter state into query-string parameters for the
+ * Surat dashboard endpoints.
+ *
+ * "all" / "Surat" are sentinel values meaning "no filter"; they are omitted
+ * from the request so the backend returns the full dataset.
+ */
+const getParams = (
+  filters: DashboardFilters
+): Record<string, string | number> => {
   const params: Record<string, string | number> = {};
+
+  // police_station replaces district for Surat-level granularity
   if (
     filters.district &&
     filters.district !== "all" &&
@@ -17,6 +32,7 @@ const getParams = (filters: DashboardFilters) => {
   ) {
     params.police_station = filters.district;
   }
+
   if (filters.year !== "all") params.year = filters.year;
   if (filters.severity !== "all") params.severity = filters.severity;
   if (filters.road_classification !== "all")
@@ -27,8 +43,16 @@ const getParams = (filters: DashboardFilters) => {
     params.light_condition = filters.light_condition;
   if (filters.collision_type !== "all")
     params.collision_type = filters.collision_type;
+
   return params;
 };
+
+const hasValue = (value?: string): boolean =>
+  value !== undefined && value !== "" && value !== "all";
+
+// ---------------------------------------------------------------------------
+// API calls
+// ---------------------------------------------------------------------------
 
 export const fetchFilterOptions = async (): Promise<FilterOptions> => {
   const { data } = await API.get(`${SURAT_API_BASE}/filter-options`);
@@ -63,6 +87,7 @@ export const fetchDashboardData = async (
     API.get(`${SURAT_API_BASE}/by-light`, { params }),
     API.get(`${SURAT_API_BASE}/top-dangerous`, { params }),
     API.get(`${SURAT_API_BASE}/by-road`, { params }),
+    // by-collision returns collision_type; by-violation returns traffic_violation
     API.get(`${SURAT_API_BASE}/by-collision`, { params }),
   ]);
 
@@ -73,13 +98,19 @@ export const fetchDashboardData = async (
     districts: [],
     heatmap: heatmap.data.data,
     casualty: casualty.data.data,
+    // Normalise weather: add a `name` alias expected by charts
     weather: weather.data.data.map((w: any) => ({
       ...w,
       name: w.weather_condition,
     })),
-    light: light.data.data.map((l: any) => ({ ...l, name: l.light_condition })),
+    // Normalise light: add a `name` alias expected by charts
+    light: light.data.data.map((l: any) => ({
+      ...l,
+      name: l.light_condition,
+    })),
     dangerous: dangerous.data.data,
     roads: roads.data.data,
+    // by-collision returns collision_type; alias it to `name` for charts
     violations: violations.data.data.map((v: any) => ({
       ...v,
       name: v.collision_type,
@@ -92,11 +123,8 @@ export const fetchTemporalAnalysis = async (
 ): Promise<TemporalAnalysisData> => {
   const params: Record<string, string | number> = {};
 
-  const hasValue = (value?: string) =>
-    value !== undefined && value !== "" && value !== "all";
-
   if (hasValue(filters.district) && filters.district !== "Surat") {
-    params.police_station = filters.district;
+    params.police_station = filters.district!;
   }
   if (hasValue(filters.year)) params.year = filters.year;
   if (hasValue(filters.month)) params.month = filters.month!;

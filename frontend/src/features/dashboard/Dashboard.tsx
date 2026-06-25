@@ -7,6 +7,7 @@ import type { User } from "../../types/user";
 
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import TopBar from "../../components/layout/TopBar";
+import FilterSelect from "../../components/layout/FilterSelect";
 
 import {
   MapPin,
@@ -51,6 +52,7 @@ export default function Dashboard() {
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(
     null
   );
+  const [openPanels, setOpenPanels] = useState({ map: true, data: true });
 
   const allDataFilters: DashboardFilters = defaultFilters;
 
@@ -211,48 +213,37 @@ export default function Dashboard() {
   const renderFilter = (filter: (typeof activeFilterConfig)[number]) => {
     const value = String(filters[filter.id] ?? "all");
 
+    const handleChange = (nextValue: string) => {
+      setFilters((current) => {
+        if (filter.id === "visualization_type") {
+          return {
+            ...current,
+            visualization_type: nextValue,
+            month: "all",
+            day: "all",
+            time_period: "all",
+          };
+        }
+        return {
+          ...current,
+          [filter.id]: nextValue,
+        };
+      });
+    };
+
     return (
-      <div key={filter.id} className="mb-3 flex flex-col gap-1.5">
-        <label className="px-1 flex items-center gap-1.5 text-[11px] font-semibold text-[#6B7299]">
+      <div key={filter.id} className="flex flex-col gap-1.5">
+        <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-[#6B7299]">
           {filter.icon === "layers" && (
-            <Layers size={12} className="text-[#2C6EF2]" />
+            <Layers size={12} className="text-[#1e3a8a]" />
           )}
           {filter.label}
         </label>
-        <div className="relative">
-          <select
-            value={value}
-            onChange={(e) => {
-              const nextValue = e.target.value;
-              setFilters((current) => {
-                if (filter.id === "visualization_type") {
-                  return {
-                    ...current,
-                    visualization_type: nextValue,
-                    month: "all",
-                    day: "all",
-                    time_period: "all",
-                  };
-                }
-                return {
-                  ...current,
-                  [filter.id]: nextValue,
-                };
-              });
-            }}
-            className="w-full appearance-none rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-3 py-2 pr-8 text-[13px] text-[#1A1D2E] font-medium outline-none focus:border-[#2C6EF2] focus:ring-2 focus:ring-[#2C6EF2]/10 cursor-pointer transition"
-          >
-            {filterOptionsById[filter.id].map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            size={14}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9BA3C2] pointer-events-none"
-          />
-        </div>
+        <FilterSelect
+          value={value}
+          options={filterOptionsById[filter.id]}
+          onChange={handleChange}
+        />
       </div>
     );
   };
@@ -281,32 +272,108 @@ export default function Dashboard() {
 
       {/* ── SIDEBAR ── */}
       <aside
-        style={{ top: `${TOPBAR_HEIGHT_PX}px`, width: `${SIDEBAR_WIDTH_PX}px` }}
+        style={{
+          top: `${TOPBAR_HEIGHT_PX}px`,
+          width: `${SIDEBAR_WIDTH_PX}px`,
+          height: `calc(100vh - ${TOPBAR_HEIGHT_PX}px)`,
+        }}
         className={`
           fixed left-0 ${SIDEBAR_Z_INDEX}
-          h-[calc(100vh-var(--topbar-h,80px))]
           flex flex-col
-          overflow-y-auto
-          border-r border-[#E4E8F4] bg-white
+          overflow-y-auto no-scrollbar
+          border-r border-[#E4E8F4] bg-[#F1F4FB]
           shadow-lg
           will-change-transform
           ${SIDEBAR_TRANSITION}
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        <div className="flex-1 px-4 py-5 flex flex-col gap-0">
-          <div className="flex items-center gap-2 mb-4 px-1">
-            <Filter size={13} className="text-[#9BA3C2]" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#9BA3C2]">
+        <div className="flex-1 px-3 py-4 flex flex-col gap-3">
+          {/* Sidebar heading */}
+          <div className="flex items-center gap-2 px-1">
+            <Filter size={13} className="text-[#1e3a8a]" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#1A1D2E]">
               Filters
             </span>
           </div>
 
-          {activeFilterConfig.map(renderFilter)}
+          {(() => {
+            const MAP_FILTER_IDS = ["baseMap", "visualization_type"];
+            const mapFilters = activeFilterConfig.filter((f) =>
+              MAP_FILTER_IDS.includes(f.id)
+            );
+            const dataFilters = activeFilterConfig.filter(
+              (f) => !MAP_FILTER_IDS.includes(f.id)
+            );
 
+            const togglePanel = (key: "map" | "data") =>
+              setOpenPanels((prev) => ({ ...prev, [key]: !prev[key] }));
+
+            return (
+              <>
+                {/* MAP SETTINGS PANEL */}
+                {mapFilters.length > 0 && (
+                  <section className="rounded-xl border border-[#E4E8F4] bg-white shadow-sm overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => togglePanel("map")}
+                      aria-expanded={openPanels.map}
+                      className="flex w-full items-center gap-2 bg-[#1e3a8a] px-3.5 py-2.5 transition hover:bg-[#1c346f]"
+                    >
+                      <Layers size={13} className="text-white/75" />
+                      <h2 className="flex-1 text-left text-[11px] font-bold uppercase tracking-wider text-white">
+                        Map Settings
+                      </h2>
+                      <ChevronDown
+                        size={15}
+                        className={`text-white/75 transition-transform duration-200 ${
+                          openPanels.map ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                    {openPanels.map && (
+                      <div className="flex flex-col gap-3 p-3">
+                        {mapFilters.map(renderFilter)}
+                      </div>
+                    )}
+                  </section>
+                )}
+
+                {/* DATA FILTERS PANEL */}
+                {dataFilters.length > 0 && (
+                  <section className="rounded-xl border border-[#E4E8F4] bg-white shadow-sm overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => togglePanel("data")}
+                      aria-expanded={openPanels.data}
+                      className="flex w-full items-center gap-2 bg-[#1e3a8a] px-3.5 py-2.5 transition hover:bg-[#1c346f]"
+                    >
+                      <Filter size={13} className="text-white/75" />
+                      <h2 className="flex-1 text-left text-[11px] font-bold uppercase tracking-wider text-white">
+                        Data Filters
+                      </h2>
+                      <ChevronDown
+                        size={15}
+                        className={`text-white/75 transition-transform duration-200 ${
+                          openPanels.data ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                    {openPanels.data && (
+                      <div className="flex flex-col gap-3 p-3">
+                        {dataFilters.map(renderFilter)}
+                      </div>
+                    )}
+                  </section>
+                )}
+              </>
+            );
+          })()}
+
+          {/* RESET */}
           <button
             onClick={() => setFilters(defaultFilters)}
-            className="flex items-center justify-center gap-2 rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-4 py-2 text-[12px] font-semibold text-[#6B7299] transition hover:border-[#C9CEDF] hover:bg-[#EDF0F8] hover:text-[#1A1D2E] active:scale-[0.98]"
+            className="flex items-center justify-center gap-2 rounded-lg border border-[#E4E8F4] bg-white px-4 py-2.5 text-[12px] font-semibold text-[#6B7299] shadow-sm transition hover:border-[#1e3a8a] hover:text-[#1e3a8a] active:scale-[0.98]"
           >
             <RotateCcw size={13} />
             Reset filters
@@ -316,61 +383,66 @@ export default function Dashboard() {
 
       {/* ── MAIN CONTENT ── */}
       <main
-        className="min-w-0 pb-7 transition-[padding-left] duration-300 ease-in-out"
+        className="min-w-0 transition-[padding-left] duration-300 ease-in-out"
         style={{
-          paddingTop: `${MAIN_CONTENT_TOP_PADDING_PX}px`,
-          paddingLeft: sidebarOpen ? `${SIDEBAR_WIDTH_PX + 24}px` : `1.5rem`,
-          paddingRight: `1.5rem`,
+          paddingTop: `${TOPBAR_HEIGHT_PX}px`,
+          paddingLeft: sidebarOpen ? `${SIDEBAR_WIDTH_PX}px` : "0px",
         }}
       >
-        {error && (
-          <div className="mb-5 flex items-start gap-3 rounded-xl border border-[#FECACA] bg-[#FFF5F5] px-4 py-3 text-sm text-[#B91C1C]">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-            <div>
-              <p className="font-semibold">Failed to load data</p>
-              <p className="mt-0.5 text-xs text-[#DC2626]">{error}</p>
-            </div>
-          </div>
-        )}
-
-        <motion.div
-          animate={{ opacity: loading ? 0.6 : 1 }}
-          transition={{ duration: 0.2, ease: "easeInOut" }}
-          style={{ pointerEvents: loading ? "none" : "auto" }}
+        <div
+          className="flex flex-col gap-4 p-4"
+          style={{ height: `calc(100vh - ${TOPBAR_HEIGHT_PX}px)` }}
         >
-          {isTemporalAnalysis ? (
-            <TemporalAnalysis filters={filters} />
-          ) : (
-            <div className="mb-6 w-full rounded-2xl overflow-hidden shadow-xl border border-[#E4E8F4] relative">
-              <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 backdrop-blur-sm border border-white/50 rounded-xl px-4 py-2.5 shadow-lg">
-                <div className="h-7 w-7 rounded-lg bg-[radial-gradient(circle_at_top_left,#2C6EF2,#1e3a8a)] flex items-center justify-center shrink-0">
-                  <MapPin size={13} className="text-white" />
-                </div>
-                <div>
-                  <p className="text-[13px] font-bold text-slate-800 leading-none">
-                    Surat District
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    Road Safety Dashboard
-                  </p>
-                </div>
+          {error && (
+            <div className="flex items-start gap-3 rounded-xl border border-[#FECACA] bg-[#FFF5F5] px-4 py-3 text-sm text-[#B91C1C]">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">Failed to load data</p>
+                <p className="mt-0.5 text-xs text-[#DC2626]">{error}</p>
               </div>
-
-              <SuratBaseMap
-                height={MAP_DEFAULT_HEIGHT}
-                sidebarOpen={sidebarOpen}
-                baseMap={filters.baseMap || "osm"}
-              >
-                <VisualizationLayers
-                  key={filters.visualization_type || "location_markers"}
-                  data={data?.heatmap}
-                  type={filters.visualization_type || "location_markers"}
-                  selectedSeverity={filters.severity}
-                />
-              </SuratBaseMap>
             </div>
           )}
-        </motion.div>
+
+          <motion.div
+            className="flex-1 min-h-0"
+            animate={{ opacity: loading ? 0.6 : 1 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            style={{ pointerEvents: loading ? "none" : "auto" }}
+          >
+            {isTemporalAnalysis ? (
+              <TemporalAnalysis filters={filters} />
+            ) : (
+              <div className="h-full w-full rounded-2xl overflow-hidden shadow-xl border border-[#E4E8F4] relative">
+                {/* <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 backdrop-blur-sm border border-white/50 rounded-xl px-4 py-2.5 shadow-lg">
+                  <div className="h-7 w-7 rounded-lg bg-[radial-gradient(circle_at_top_left,#2C6EF2,#1e3a8a)] flex items-center justify-center shrink-0">
+                    <MapPin size={13} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-bold text-slate-800 leading-none">
+                      Surat District
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Road Safety Dashboard
+                    </p>
+                  </div>
+                </div> */}
+
+                <SuratBaseMap
+                  height="100%"
+                  sidebarOpen={sidebarOpen}
+                  baseMap={filters.baseMap || "osm"}
+                >
+                  <VisualizationLayers
+                    key={filters.visualization_type || "location_markers"}
+                    data={data?.heatmap}
+                    type={filters.visualization_type || "location_markers"}
+                    selectedSeverity={filters.severity}
+                  />
+                </SuratBaseMap>
+              </div>
+            )}
+          </motion.div>
+        </div>
       </main>
     </div>
   );
