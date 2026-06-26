@@ -1,6 +1,7 @@
 // frontend/src/components/layout/TopBar.tsx
 
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ChevronDown,
   LogOut,
@@ -21,6 +22,8 @@ interface Props {
   onLogout: () => void;
   sidebarOpen?: boolean;
   onToggleSidebar?: () => void;
+  showNotificationBell?: boolean;
+  adminPanelPath?: string;
 }
 
 function TopBar({
@@ -30,7 +33,10 @@ function TopBar({
   onLogout,
   sidebarOpen,
   onToggleSidebar,
+  showNotificationBell = true,
+  adminPanelPath,
 }: Props) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -97,7 +103,19 @@ function TopBar({
 
       {/* RIGHT SIDE */}
       <div className="flex items-center gap-2 sm:gap-3">
-        <NotificationBell count={notificationCount} />
+        {adminPanelPath && (
+          <button
+            onClick={() => navigate(adminPanelPath)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+          >
+            {/* <ShieldCheck size={16} className="text-[#1e3a8a]" /> */}
+            <span className="hidden sm:inline">Admin Panel</span>
+          </button>
+        )}
+
+        {showNotificationBell && (
+          <NotificationBell count={notificationCount} />
+        )}
 
         <span className="hidden sm:block h-6 w-px bg-slate-200" aria-hidden />
 

@@ -263,7 +263,7 @@ export default function Dashboard() {
         <TopBar
           appName="G-TRISP"
           user={user}
-          notificationCount={0}
+          showNotificationBell={false}
           onLogout={logout}
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}

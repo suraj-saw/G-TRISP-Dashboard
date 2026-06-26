@@ -1,452 +1,444 @@
 // frontend/src/features/dashboard/AdminDashboard.tsx
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
+import { motion } from "framer-motion";
 import API from "../../api/axios";
-import TopBar from "../../components/layout/TopBar";
-
 import type { User } from "../../types/user";
 import type { Notification } from "../../types/notification";
 
-const SESSION_POLL_INTERVAL_MS = 5000;
+import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
+import TopBar from "../../components/layout/TopBar";
+import FilterSelect from "../../components/layout/FilterSelect";
 
-type SessionStatus = "checking" | "active" | "kicked";
-type ActiveTab = "pending" | "all";
+import {
+  MapPin,
+  Filter,
+  Layers,
+  ChevronDown,
+  RotateCcw,
+  AlertTriangle,
+} from "lucide-react";
 
-function StatusBadge({ status }: { status: User["status"] }) {
-  const styles: Record<User["status"], string> = {
-    approved: "bg-green-100 text-green-700 border border-green-200",
-    rejected: "bg-red-100 text-red-600 border border-red-200",
-    pending: "bg-amber-100 text-amber-700 border border-amber-200",
-  };
-  return (
-    <span
-      className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${styles[status]}`}
-    >
-      {status}
-    </span>
-  );
-}
+import { useDashboard } from "../../hooks/useDashboard";
+import type { DashboardFilters, FilterOptions } from "../../types/dashboard";
+import { fetchFilterOptions } from "../../api/dashboardApi";
+import SuratBaseMap from "../../components/maps/SuratBaseMap";
+import { MAP_STYLES } from "../../components/maps/mapStyles";
+import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
+import { ROUTES } from "../../config/constants";
+import {
+  SIDEBAR_WIDTH_PX,
+  TOPBAR_HEIGHT_PX,
+  MAIN_CONTENT_TOP_PADDING_PX,
+  SIDEBAR_Z_INDEX,
+  TOPBAR_Z_INDEX,
+  SIDEBAR_TRANSITION,
+  MAP_DEFAULT_HEIGHT,
+} from "../../config/layout";
+import {
+  defaultFilters,
+  getFilterConfig,
+  VISUALIZATION_OPTIONS,
+  type FilterId,
+} from "./filterConfig";
 
-function AdminDashboard() {
+export default function AdminDashboard() {
   const navigate = useNavigate();
 
   const [user, setUser] = useState<User | null>(null);
-  const [adminData, setAdminData] = useState<any>(null);
-  const [pendingUsers, setPendingUsers] = useState<User[]>([]);
-  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [sessionChecking, setSessionChecking] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
-  const [activeTab, setActiveTab] = useState<ActiveTab>("pending");
 
-  const loaded = useRef(false);
+  const [filters, setFilters] = useState<DashboardFilters>(defaultFilters);
+  const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(
+    null
+  );
+  const [openPanels, setOpenPanels] = useState({ map: true, data: true });
 
-  // ── data loaders ────────────────────────────────────────────────────────────
+  const allDataFilters: DashboardFilters = defaultFilters;
 
-  const loadPendingUsers = useCallback(async () => {
-    try {
-      const res = await API.get<User[]>("/admin/users/pending");
-      setPendingUsers(res.data);
-    } catch {
-      /* 401 handled by polling loop */
-    }
-  }, []);
-
-  const loadAllUsers = useCallback(async () => {
-    try {
-      const res = await API.get<User[]>("/admin/users");
-      // exclude admins from the management table
-      setAllUsers(res.data.filter((u) => u.role !== "admin"));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const loadNotifications = useCallback(async () => {
-    try {
-      const res = await API.get<Notification[]>("/admin/notifications");
-      setNotifications(res.data);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  // ── session polling ──────────────────────────────────────────────────────────
+  const { data: allData } = useDashboard(allDataFilters);
+  const { data, loading, error } = useDashboard(filters);
 
   useEffect(() => {
     let active = true;
-    let timer: ReturnType<typeof setTimeout>;
 
-    const poll = async () => {
-      try {
-        const userRes = await API.get<User>("/auth/me");
-
+    API.get<User>("/auth/me")
+      .then((res) => {
         if (!active) return;
-        if (userRes.data.role !== "admin") {
-          navigate("/dashboard", { replace: true });
+
+        if (res.data.role !== "admin") {
+          navigate(ROUTES.DASHBOARD, { replace: true });
           return;
         }
 
-        setUser(userRes.data);
+        setUser(res.data);
+      })
+      .catch(() => {
+        navigate(ROUTES.LOGIN, { replace: true });
+      })
+      .finally(() => {
+        if (active) setSessionChecking(false);
+      });
 
-        if (!loaded.current) {
-          const adminRes = await API.get("/admin/dashboard");
-          setAdminData(adminRes.data);
-        }
-
-        await Promise.all([
-          loadPendingUsers(),
-          loadAllUsers(),
-          loadNotifications(),
-        ]);
-
-        loaded.current = true;
-        setSessionStatus("active");
-
-        timer = setTimeout(poll, SESSION_POLL_INTERVAL_MS);
-      } catch (error: any) {
-        if (error?.response?.status === 401) {
-          navigate("/login", { replace: true });
-        }
-      }
-    };
-
-    poll();
     return () => {
       active = false;
-      clearTimeout(timer);
     };
-  }, [navigate, loadPendingUsers, loadAllUsers, loadNotifications]);
+  }, [navigate]);
 
-  // ── action handlers ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    fetchFilterOptions().then(setFilterOptions);
+    API.get<Notification[]>("/admin/notifications")
+      .then((res) => setNotifications(res.data))
+      .catch(() => {});
+  }, []);
 
   const logout = async () => {
     try {
       await API.post("/auth/logout");
-    } catch {}
-    navigate("/login", { replace: true });
-  };
-
-  /** First-time decision on a pending user */
-  const handleDecision = async (
-    userId: number,
-    decision: "approve" | "reject"
-  ) => {
-    setActionLoadingId(userId);
-    setActionError(null);
-    try {
-      await API.post(`/admin/users/${userId}/${decision}`);
-      await Promise.all([
-        loadPendingUsers(),
-        loadAllUsers(),
-        loadNotifications(),
-      ]);
-    } catch (err: any) {
-      setActionError(
-        err?.response?.data?.detail || "Could not update the user. Try again."
-      );
-    } finally {
-      setActionLoadingId(null);
+    } catch {
+      // Continue to login even if logout request fails.
     }
+    navigate(ROUTES.LOGIN, { replace: true });
   };
 
-  /** Re-decision on an already approved / rejected user */
-  const handleStatusChange = async (
-    userId: number,
-    newStatus: "approved" | "rejected"
-  ) => {
-    setActionLoadingId(userId);
-    setActionError(null);
-    try {
-      await API.post(`/admin/users/${userId}/set-status`, {
-        status: newStatus,
+  const years = useMemo(() => {
+    if (!allData?.timeSeries) return ["all"];
+    const unique = Array.from(
+      new Set(allData.timeSeries.map((p) => String(p.year)))
+    ).sort();
+    return ["all", ...unique];
+  }, [allData.timeSeries]);
+
+  const severities = useMemo(() => {
+    if (!allData?.severity) return ["all"];
+    const labels = allData.severity
+      .map((s) => s.severity)
+      .filter(Boolean)
+      .sort();
+    return ["all", ...labels];
+  }, [allData.severity]);
+
+  const monthOptions = [
+    { value: "all", label: "All months" },
+    { value: "1", label: "January" },
+    { value: "2", label: "February" },
+    { value: "3", label: "March" },
+    { value: "4", label: "April" },
+    { value: "5", label: "May" },
+    { value: "6", label: "June" },
+    { value: "7", label: "July" },
+    { value: "8", label: "August" },
+    { value: "9", label: "September" },
+    { value: "10", label: "October" },
+    { value: "11", label: "November" },
+    { value: "12", label: "December" },
+  ];
+
+  const dayOptions = [
+    { value: "all", label: "All days" },
+    { value: "Monday", label: "Monday" },
+    { value: "Tuesday", label: "Tuesday" },
+    { value: "Wednesday", label: "Wednesday" },
+    { value: "Thursday", label: "Thursday" },
+    { value: "Friday", label: "Friday" },
+    { value: "Saturday", label: "Saturday" },
+    { value: "Sunday", label: "Sunday" },
+  ];
+
+  const timePeriodOptions = [
+    { value: "all", label: "All periods" },
+    { value: "Morning", label: "Morning" },
+    { value: "Afternoon", label: "Afternoon" },
+    { value: "Evening", label: "Evening" },
+    { value: "Night", label: "Night" },
+  ];
+
+  const filterOptionsById: Record<
+    FilterId,
+    { value: string; label: string }[]
+  > = {
+    baseMap: MAP_STYLES.map((style) => ({
+      value: style.id,
+      label: style.label,
+    })),
+    visualization_type: VISUALIZATION_OPTIONS,
+    year: years.map((year) => ({
+      value: year,
+      label: year === "all" ? "All years" : year,
+    })),
+    month: monthOptions,
+    day: dayOptions,
+    time_period: timePeriodOptions,
+    district: [
+      { value: "all", label: "All police stations" },
+      ...(filterOptions?.police_stations || []).map((station) => ({
+        value: station,
+        label: station,
+      })),
+    ],
+    severity: severities.map((severity) => ({
+      value: severity,
+      label: severity === "all" ? "All severity" : severity,
+    })),
+    road_classification: [
+      { value: "all", label: "All road types" },
+      ...(filterOptions?.road_classifications || []).map((road) => ({
+        value: road,
+        label: road,
+      })),
+    ],
+    weather_condition: [
+      { value: "all", label: "All weather" },
+      ...(filterOptions?.weather_conditions || []).map((weather) => ({
+        value: weather,
+        label: weather,
+      })),
+    ],
+    light_condition: [
+      { value: "all", label: "All conditions" },
+      ...(filterOptions?.light_conditions || []).map((light) => ({
+        value: light,
+        label: light,
+      })),
+    ],
+    collision_type: [
+      { value: "all", label: "All types" },
+      ...(filterOptions?.collision_types || []).map((collision) => ({
+        value: collision,
+        label: collision,
+      })),
+    ],
+  };
+
+  const activeFilterConfig = getFilterConfig(filters.visualization_type);
+  const isTemporalAnalysis = filters.visualization_type === "temporal_analysis";
+
+  const renderFilter = (filter: (typeof activeFilterConfig)[number]) => {
+    const value = String(filters[filter.id] ?? "all");
+
+    const handleChange = (nextValue: string) => {
+      setFilters((current) => {
+        if (filter.id === "visualization_type") {
+          return {
+            ...current,
+            visualization_type: nextValue,
+            month: "all",
+            day: "all",
+            time_period: "all",
+          };
+        }
+        return {
+          ...current,
+          [filter.id]: nextValue,
+        };
       });
-      await Promise.all([loadAllUsers(), loadNotifications()]);
-    } catch (err: any) {
-      setActionError(
-        err?.response?.data?.detail || "Could not update the user. Try again."
-      );
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
+    };
 
-  // ── guards ───────────────────────────────────────────────────────────────────
-
-  if (sessionStatus === "checking") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        Checking admin session...
+      <div key={filter.id} className="flex flex-col gap-1.5">
+        <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-[#6B7299]">
+          {filter.icon === "layers" && (
+            <Layers size={12} className="text-[#1e3a8a]" />
+          )}
+          {filter.label}
+        </label>
+        <FilterSelect
+          value={value}
+          options={filterOptionsById[filter.id]}
+          onChange={handleChange}
+        />
       </div>
     );
-  }
-  if (sessionStatus === "kicked") {
+  };
+
+  if (sessionChecking || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        Session expired
+      <div className="flex min-h-screen items-center justify-center bg-[#F1F4FB] text-sm font-semibold text-[#6B7299]">
+        Checking session...
       </div>
     );
   }
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
-  // ── derived lists ─────────────────────────────────────────────────────────────
-
-  const decidedUsers = allUsers.filter((u) => u.status !== "pending");
-
-  // ── render ────────────────────────────────────────────────────────────────────
-
   return (
-    <div className="min-h-screen bg-gray-100">
-      <TopBar
-        appName="G-TRISP"
-        user={user!}
-        notificationCount={unreadCount}
-        onLogout={logout}
-      />
+    <div className="min-h-screen bg-[#F1F4FB]">
+      {/* ── TOPBAR — always full viewport width ── */}
+      <div className={`fixed left-0 right-0 top-0 ${TOPBAR_Z_INDEX}`}>
+        <TopBar
+          appName="G-TRISP"
+          user={user}
+          showNotificationBell={true}
+          notificationCount={unreadCount}
+          adminPanelPath={ROUTES.ADMIN_PANEL}
+          onLogout={logout}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen((v) => !v)}
+        />
+      </div>
 
-      <main className="p-8">
-        <div className="max-w-6xl mx-auto bg-white rounded-xl shadow p-6 border-t-4 border-amber-500">
-          {/* ── header ── */}
-          <div className="flex justify-between mb-6">
-            <h1 className="text-3xl font-bold text-blue-900">
-              Admin Control Panel
-            </h1>
+      {/* ── SIDEBAR ── */}
+      <aside
+        style={{
+          top: `${TOPBAR_HEIGHT_PX}px`,
+          width: `${SIDEBAR_WIDTH_PX}px`,
+          height: `calc(100vh - ${TOPBAR_HEIGHT_PX}px)`,
+        }}
+        className={`
+          fixed left-0 ${SIDEBAR_Z_INDEX}
+          flex flex-col
+          overflow-y-auto no-scrollbar
+          border-r border-[#E4E8F4] bg-[#F1F4FB]
+          shadow-lg
+          will-change-transform
+          ${SIDEBAR_TRANSITION}
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
+      >
+        <div className="flex-1 px-3 py-4 flex flex-col gap-3">
+          {/* Sidebar heading */}
+          <div className="flex items-center gap-2 px-1">
+            <Filter size={13} className="text-[#1e3a8a]" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#1A1D2E]">
+              Filters
+            </span>
           </div>
 
-          {/* ── welcome banner ── */}
-          <div className="bg-green-50 border border-green-200 rounded-xl p-5 mb-6">
-            <h2 className="text-xl font-semibold">Welcome {user?.username}</h2>
-            <p>Role : {user?.role}</p>
-          </div>
+          {(() => {
+            const MAP_FILTER_IDS = ["baseMap", "visualization_type"];
+            const mapFilters = activeFilterConfig.filter((f) =>
+              MAP_FILTER_IDS.includes(f.id)
+            );
+            const dataFilters = activeFilterConfig.filter(
+              (f) => !MAP_FILTER_IDS.includes(f.id)
+            );
 
-          {/* ── info grid ── */}
-          <div className="grid md:grid-cols-2 gap-6 mb-6">
-            <div className="border rounded-xl p-6">
-              <h3 className="font-bold">System Status</h3>
-              <p>{adminData?.message}</p>
-            </div>
+            const togglePanel = (key: "map" | "data") =>
+              setOpenPanels((prev) => ({ ...prev, [key]: !prev[key] }));
 
-            <div className="border rounded-xl p-6">
-              <h3 className="font-bold">Recent Notifications</h3>
-              {notifications.length === 0 ? (
-                <p className="text-sm text-gray-500">No notifications yet.</p>
-              ) : (
-                <ul className="mt-2 space-y-2 max-h-48 overflow-y-auto">
-                  {notifications.slice(0, 5).map((n) => (
-                    <li
-                      key={n.id}
-                      className={
-                        n.is_read
-                          ? "text-sm rounded-lg p-2 bg-gray-50 text-gray-500"
-                          : "text-sm rounded-lg p-2 bg-amber-50 text-gray-800"
-                      }
+            return (
+              <>
+                {/* MAP SETTINGS PANEL */}
+                {mapFilters.length > 0 && (
+                  <section className="rounded-xl border border-[#E4E8F4] bg-white shadow-sm overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => togglePanel("map")}
+                      aria-expanded={openPanels.map}
+                      className="flex w-full items-center gap-2 bg-[#1e3a8a] px-3.5 py-2.5 transition hover:bg-[#1c346f]"
                     >
-                      {n.message}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
+                      <Layers size={13} className="text-white/75" />
+                      <h2 className="flex-1 text-left text-[11px] font-bold uppercase tracking-wider text-white">
+                        Map Settings
+                      </h2>
+                      <ChevronDown
+                        size={15}
+                        className={`text-white/75 transition-transform duration-200 ${
+                          openPanels.map ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                    {openPanels.map && (
+                      <div className="flex flex-col gap-3 p-3">
+                        {mapFilters.map(renderFilter)}
+                      </div>
+                    )}
+                  </section>
+                )}
 
-          {/* ── shared error banner ── */}
-          {actionError && (
-            <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-700">
-              {actionError}
+                {/* DATA FILTERS PANEL */}
+                {dataFilters.length > 0 && (
+                  <section className="rounded-xl border border-[#E4E8F4] bg-white shadow-sm overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => togglePanel("data")}
+                      aria-expanded={openPanels.data}
+                      className="flex w-full items-center gap-2 bg-[#1e3a8a] px-3.5 py-2.5 transition hover:bg-[#1c346f]"
+                    >
+                      <Filter size={13} className="text-white/75" />
+                      <h2 className="flex-1 text-left text-[11px] font-bold uppercase tracking-wider text-white">
+                        Data Filters
+                      </h2>
+                      <ChevronDown
+                        size={15}
+                        className={`text-white/75 transition-transform duration-200 ${
+                          openPanels.data ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                    {openPanels.data && (
+                      <div className="flex flex-col gap-3 p-3">
+                        {dataFilters.map(renderFilter)}
+                      </div>
+                    )}
+                  </section>
+                )}
+              </>
+            );
+          })()}
+
+          {/* RESET */}
+          <button
+            onClick={() => setFilters(defaultFilters)}
+            className="flex items-center justify-center gap-2 rounded-lg border border-[#E4E8F4] bg-white px-4 py-2.5 text-[12px] font-semibold text-[#6B7299] shadow-sm transition hover:border-[#1e3a8a] hover:text-[#1e3a8a] active:scale-[0.98]"
+          >
+            <RotateCcw size={13} />
+            Reset filters
+          </button>
+        </div>
+      </aside>
+
+      {/* ── MAIN CONTENT ── */}
+      <main
+        className="min-w-0 transition-[padding-left] duration-300 ease-in-out"
+        style={{
+          paddingTop: `${TOPBAR_HEIGHT_PX}px`,
+          paddingLeft: sidebarOpen ? `${SIDEBAR_WIDTH_PX}px` : "0px",
+        }}
+      >
+        <div
+          className="flex flex-col gap-4 p-4"
+          style={{ height: `calc(100vh - ${TOPBAR_HEIGHT_PX}px)` }}
+        >
+          {error && (
+            <div className="flex items-start gap-3 rounded-xl border border-[#FECACA] bg-[#FFF5F5] px-4 py-3 text-sm text-[#B91C1C]">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">Failed to load data</p>
+                <p className="mt-0.5 text-xs text-[#DC2626]">{error}</p>
+              </div>
             </div>
           )}
 
-          {/* ── tab bar ── */}
-          <div className="flex gap-1 mb-4 border-b border-gray-200">
-            <button
-              onClick={() => setActiveTab("pending")}
-              className={`px-4 py-2 text-sm font-semibold rounded-t-lg transition ${
-                activeTab === "pending"
-                  ? "bg-white border border-b-white border-gray-200 text-blue-900 -mb-px"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Pending Approvals
-              {pendingUsers.length > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center h-5 w-5 rounded-full bg-amber-500 text-white text-xs">
-                  {pendingUsers.length}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab("all")}
-              className={`px-4 py-2 text-sm font-semibold rounded-t-lg transition ${
-                activeTab === "all"
-                  ? "bg-white border border-b-white border-gray-200 text-blue-900 -mb-px"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              All Users
-              <span className="ml-2 text-xs text-gray-400 font-normal">
-                ({allUsers.length})
-              </span>
-            </button>
-          </div>
-
-          {/* ══ TAB: PENDING ══════════════════════════════════════════════════ */}
-          {activeTab === "pending" && (
-            <div className="border rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-lg">Pending User Approvals</h3>
-                <span className="text-sm text-gray-500">
-                  {pendingUsers.length} awaiting review
-                </span>
-              </div>
-
-              {pendingUsers.length === 0 ? (
-                <p className="text-sm text-gray-500">
-                  No users waiting for approval.
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead>
-                      <tr className="border-b text-gray-500">
-                        <th className="py-2 pr-4">Username</th>
-                        <th className="py-2 pr-4">Email</th>
-                        <th className="py-2 pr-4">Registered</th>
-                        <th className="py-2 pr-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pendingUsers.map((pu) => (
-                        <tr key={pu.id} className="border-b last:border-0">
-                          <td className="py-3 pr-4 font-medium">
-                            {pu.username}
-                          </td>
-                          <td className="py-3 pr-4 text-gray-600">
-                            {pu.email}
-                          </td>
-                          <td className="py-3 pr-4 text-gray-500">
-                            {pu.created_at
-                              ? new Date(pu.created_at).toLocaleString()
-                              : "—"}
-                          </td>
-                          <td className="py-3 pr-4">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                disabled={actionLoadingId === pu.id}
-                                onClick={() => handleDecision(pu.id, "approve")}
-                                className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold disabled:opacity-50"
-                              >
-                                Approve
-                              </button>
-                              <button
-                                disabled={actionLoadingId === pu.id}
-                                onClick={() => handleDecision(pu.id, "reject")}
-                                className="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-semibold disabled:opacity-50"
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ══ TAB: ALL USERS ════════════════════════════════════════════════ */}
-          {activeTab === "all" && (
-            <div className="border rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-lg">User Management</h3>
-                <span className="text-sm text-gray-500">
-                  {decidedUsers.length} decided user
-                  {decidedUsers.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-
-              <p className="text-xs text-gray-400 mb-4">
-                You can revoke or reinstate access for any non-admin user below.
-                Pending users must be approved or rejected from the{" "}
-                <button
-                  className="underline text-blue-600"
-                  onClick={() => setActiveTab("pending")}
+          <motion.div
+            className="flex-1 min-h-0"
+            animate={{ opacity: loading ? 0.6 : 1 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            style={{ pointerEvents: loading ? "none" : "auto" }}
+          >
+            {isTemporalAnalysis ? (
+              <TemporalAnalysis filters={filters} />
+            ) : (
+              <div className="h-full w-full rounded-2xl overflow-hidden shadow-xl border border-[#E4E8F4] relative">
+                <SuratBaseMap
+                  height="100%"
+                  sidebarOpen={sidebarOpen}
+                  baseMap={filters.baseMap || "osm"}
                 >
-                  Pending Approvals
-                </button>{" "}
-                tab.
-              </p>
-
-              {decidedUsers.length === 0 ? (
-                <p className="text-sm text-gray-500">No decided users yet.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead>
-                      <tr className="border-b text-gray-500">
-                        <th className="py-2 pr-4">Username</th>
-                        <th className="py-2 pr-4">Email</th>
-                        <th className="py-2 pr-4">Registered</th>
-                        <th className="py-2 pr-4">Status</th>
-                        <th className="py-2 pr-4 text-right">Change Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {decidedUsers.map((u) => (
-                        <tr key={u.id} className="border-b last:border-0">
-                          <td className="py-3 pr-4 font-medium">
-                            {u.username}
-                          </td>
-                          <td className="py-3 pr-4 text-gray-600">{u.email}</td>
-                          <td className="py-3 pr-4 text-gray-500">
-                            {u.created_at
-                              ? new Date(u.created_at).toLocaleString()
-                              : "—"}
-                          </td>
-                          <td className="py-3 pr-4">
-                            <StatusBadge status={u.status} />
-                          </td>
-                          <td className="py-3 pr-4">
-                            <div className="flex justify-end gap-2">
-                              {u.status === "approved" ? (
-                                <button
-                                  disabled={actionLoadingId === u.id}
-                                  onClick={() =>
-                                    handleStatusChange(u.id, "rejected")
-                                  }
-                                  className="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-semibold disabled:opacity-50"
-                                >
-                                  Revoke Access
-                                </button>
-                              ) : (
-                                <button
-                                  disabled={actionLoadingId === u.id}
-                                  onClick={() =>
-                                    handleStatusChange(u.id, "approved")
-                                  }
-                                  className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold disabled:opacity-50"
-                                >
-                                  Reinstate Access
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
+                  <VisualizationLayers
+                    key={filters.visualization_type || "location_markers"}
+                    data={data?.heatmap}
+                    type={filters.visualization_type || "location_markers"}
+                    selectedSeverity={filters.severity}
+                  />
+                </SuratBaseMap>
+              </div>
+            )}
+          </motion.div>
         </div>
       </main>
     </div>
   );
 }
-
-export default AdminDashboard;

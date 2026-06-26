@@ -92,6 +92,7 @@ export const ROUTES = {
   SIGNUP: "/signup",
   DASHBOARD: "/dashboard",
   ADMIN: "/admin",
+  ADMIN_PANEL: "/admin/panel",
 } as const;
 
 export const DASHBOARD_MODE = (import.meta.env.VITE_DASHBOARD_MODE ||

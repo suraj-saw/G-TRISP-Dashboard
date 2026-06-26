@@ -14,6 +14,7 @@ import Signup from "./features/auth/Register";
 import Login from "./features/auth/Login";
 import Dashboard from "./features/dashboard/Dashboard";
 import AdminDashboard from "./features/dashboard/AdminDashboard";
+import AdminPanel from "./features/dashboard/AdminPanel";
 
 function RootHandler() {
   const navigate = useNavigate();
@@ -60,6 +61,7 @@ function App() {
         <Route path={ROUTES.LOGIN} element={<Login />} />
         <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
         <Route path={ROUTES.ADMIN} element={<AdminDashboard />} />
+        <Route path={ROUTES.ADMIN_PANEL} element={<AdminPanel />} />
         <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />
       </Routes>
     </BrowserRouter>
