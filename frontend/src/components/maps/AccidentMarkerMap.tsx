@@ -36,9 +36,14 @@ export default function AccidentMarkerMap({ baseMap }: Props) {
           type="geojson"
           data={geojsonData as any}
           cluster={true}
-          clusterMaxZoom={14}
-          clusterRadius={50}
+          // Dissolve clusters at zoom 15 so individual accidents are always
+          // visible when the user is zoomed to street level.
+          clusterMaxZoom={15}
+          // Wider grouping radius reduces bubble count at overview zoom,
+          // making the map far easier to read at the Gujarat district scale.
+          clusterRadius={65}
         >
+          {/* ── Cluster bubbles — dashboard blue palette ── */}
           <Layer
             id="clusters"
             type="circle"
@@ -47,42 +52,81 @@ export default function AccidentMarkerMap({ baseMap }: Props) {
               "circle-color": [
                 "step",
                 ["get", "point_count"],
-                "#51bbd6",
+                "#2C6EF2", // 1–99   medium blue
                 100,
-                "#f1f075",
+                "#1D5BD4", // 100–749  deeper blue
                 750,
-                "#f28cb1",
+                "#0A3490", // 750+    deep navy
               ],
               "circle-radius": [
                 "step",
                 ["get", "point_count"],
-                15,
+                14, // 1–99
                 100,
-                20,
+                19, // 100–749
                 750,
-                25,
+                24, // 750+
               ],
+              "circle-stroke-width": 1.5,
+              "circle-stroke-color": "#FFFFFF",
+              "circle-opacity": 0.92,
             }}
           />
+
+          {/* ── Cluster count labels ── */}
           <Layer
             id="cluster-count"
             type="symbol"
             filter={["has", "point_count"]}
             layout={{
               "text-field": "{point_count_abbreviated}",
-              "text-size": 12,
+              "text-size": 11,
             }}
-            paint={{ "text-color": "#000" }}
+            paint={{
+              "text-color": "#FFFFFF",
+              "text-halo-color": "rgba(0,0,0,0.18)",
+              "text-halo-width": 0.5,
+            }}
           />
+
+          {/* ── Individual accident points (unclustered) ── */}
           <Layer
             id="unclustered-point"
             type="circle"
             filter={["!", ["has", "point_count"]]}
             paint={{
-              "circle-color": "#E85D4A",
-              "circle-radius": 5,
-              "circle-stroke-width": 1,
-              "circle-stroke-color": "#fff",
+              // Softer warm orange-red — less visually aggressive than a
+              // saturated primary red, still clearly distinguishable on all
+              // supported basemaps including Esri Light Gray.
+              "circle-color": "#E8603A",
+              // Zoom-responsive radius: compact at overview, larger at street
+              // level so individual incidents are easy to tap/click.
+              "circle-radius": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                6,
+                2.5,
+                9,
+                3.5,
+                12,
+                5,
+                15,
+                7,
+              ],
+              "circle-opacity": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                6,
+                0.55,
+                10,
+                0.72,
+                14,
+                0.9,
+              ],
+              "circle-stroke-width": 0.8,
+              "circle-stroke-color": "#FFFFFF",
             }}
           />
         </Source>

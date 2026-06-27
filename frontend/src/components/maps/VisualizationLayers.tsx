@@ -63,10 +63,9 @@ const SEVERITY_COLORS = {
   "Minor Injury": "#2563eb",
   "Damage Only": "#22c55e",
   default: "#64748b",
-  all: "#E85D4A",
+  // Softer warm orange-red for the "all severities" view
+  all: "#E8603A",
 } as const;
-
-type KnownSeverity = keyof typeof SEVERITY_COLORS;
 
 const severityColorExpression = [
   "match",
@@ -398,6 +397,19 @@ export function VisualizationLayers({
   }
 
   // ── Location markers ──────────────────────────────────────────────────────
+  //
+  // No clustering. Every accident is rendered as its own individual marker.
+  // Zoom-dependent radius and opacity keep the view readable at all levels:
+  //   • Zoomed out  → small, semi-transparent dots that hint at density
+  //                   without collapsing into blobs
+  //   • Zoomed in   → larger, fully opaque markers with clear outlines,
+  //                   easy to identify and click
+  //
+  // When a specific severity filter is active the per-severity palette is
+  // used; otherwise all markers share a single soft orange-red so the
+  // "where did accidents happen?" question is answered without introducing
+  // a second categorical dimension on top of location.
+
   const markerColor =
     selectedSeverity === "all"
       ? SEVERITY_COLORS.all
@@ -405,38 +417,70 @@ export function VisualizationLayers({
 
   return (
     <>
+      {/*
+       * cluster={false} is explicit so that switching between visualization
+       * types never accidentally inherits a cached clustered source.
+       */}
       <Source
         id="accident-marker-source"
         type="geojson"
         data={geojsonData as any}
+        cluster={false}
       >
         <Layer
           id="accident-points"
           type="circle"
           paint={{
+            // Radius scales up smoothly as the user zooms in.
+            // At district overview (zoom 9-10) dots are 3 px — present but
+            // unobtrusive. At street level (zoom 15+) they grow to 7 px so
+            // individual incidents are easy to distinguish and click.
             "circle-radius": [
               "interpolate",
               ["linear"],
               ["zoom"],
               9,
               3,
-              12,
-              4.5,
+              11,
+              4,
+              13,
+              5.5,
               15,
-              6,
+              7,
             ],
             "circle-color": markerColor as any,
+            // Opacity rises with zoom so dense regions at overview look like
+            // a natural heat distribution rather than a solid smear. Full
+            // opacity at street level makes individual markers unambiguous.
             "circle-opacity": [
               "interpolate",
               ["linear"],
               ["zoom"],
               9,
-              0.65,
+              0.45,
+              11,
+              0.6,
               13,
+              0.78,
+              15,
+              0.92,
+            ],
+            // Thin white ring separates overlapping markers. The ring itself
+            // fades in with zoom so it doesn't add visual noise when dozens
+            // of markers are stacked at low zoom.
+            "circle-stroke-width": 1,
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              0.25,
+              12,
+              0.65,
+              14,
               0.9,
             ],
-            "circle-stroke-width": 1,
-            "circle-stroke-color": "#ffffff",
           }}
         />
       </Source>
