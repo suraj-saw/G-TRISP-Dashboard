@@ -7,8 +7,6 @@ import {
   LogOut,
   PanelLeft,
   Mail,
-  ShieldCheck,
-  UserCircle,
 } from "lucide-react";
 
 import NotificationBell from "./NotificationBell";

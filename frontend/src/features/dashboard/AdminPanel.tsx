@@ -81,7 +81,7 @@ function AdminPanel() {
   const navigate = useNavigate();
 
   const [user, setUser] = useState<User | null>(null);
-  const [adminData, setAdminData] = useState<any>(null);
+  const [, setAdminData] = useState<any>(null);
   const [pendingUsers, setPendingUsers] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
