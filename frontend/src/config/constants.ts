@@ -100,7 +100,17 @@ export const ROUTES = {
 export const DASHBOARD_MODE = (import.meta.env.VITE_DASHBOARD_MODE ||
   "surat") as "surat" | "gujarat";
 
-export const DEFAULT_BASE_MAP = "google-streets";
+/**
+ * ID of the default base map style.
+ * Must match one of the `id` values in MAP_STYLES (mapStyles.ts).
+ * Used as the initial value in filterConfig.ts and as the fallback in
+ * Dashboard / AdminDashboard when filters.baseMap is not yet set.
+ *
+ * Previously this was "google-streets" (a commented-out style) while the
+ * actual fallback strings in Dashboard.tsx used "carto-light".  Both now
+ * agree on "carto-light".
+ */
+export const DEFAULT_BASE_MAP = "carto-light";
 
 export const GEO_FILTER_LABEL =
   DASHBOARD_MODE === "surat" ? "Police Station" : "District";

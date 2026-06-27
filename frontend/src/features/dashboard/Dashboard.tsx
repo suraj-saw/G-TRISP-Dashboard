@@ -26,7 +26,7 @@ import SuratBaseMap from "../../components/maps/SuratBaseMap";
 import { MAP_STYLES } from "../../components/maps/mapStyles";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
 import LocationMarkersInsights from "../../components/charts/LocationMarkersInsights";
-import { ROUTES } from "../../config/constants";
+import { ROUTES, DEFAULT_BASE_MAP } from "../../config/constants";
 import {
   SIDEBAR_WIDTH_PX,
   TOPBAR_HEIGHT_PX,
@@ -200,9 +200,11 @@ export default function Dashboard() {
   };
 
   const activeFilterConfig = getFilterConfig(filters.visualization_type);
-  const isTemporalAnalysis   = filters.visualization_type === "temporal_analysis";
-  const isDensityHeatmap     = filters.visualization_type === "density_heatmap";
-  const isLocationMarkers    = filters.visualization_type === "location_markers" || !filters.visualization_type;
+  const isTemporalAnalysis = filters.visualization_type === "temporal_analysis";
+  const isDensityHeatmap = filters.visualization_type === "density_heatmap";
+  const isLocationMarkers =
+    filters.visualization_type === "location_markers" ||
+    !filters.visualization_type;
 
   // Build a human-readable subtitle for the overlay
   const overlaySubtitle = useMemo(() => {
@@ -405,7 +407,7 @@ export default function Dashboard() {
                 <SuratBaseMap
                   height="100%"
                   sidebarOpen={sidebarOpen}
-                  baseMap={filters.baseMap || "carto-light"}
+                  baseMap={filters.baseMap || DEFAULT_BASE_MAP}
                   overlays={
                     isDensityHeatmap ? (
                       <DensityMapOverlays

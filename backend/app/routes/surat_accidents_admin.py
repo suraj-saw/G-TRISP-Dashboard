@@ -17,9 +17,10 @@ from app.models.surat_accident import SuratAccident
 from app.routes.auth import get_current_admin_user
 from app.models.user import User
 from app.core.config import POSTGIS_SRID
+from app.core.constants import ADMIN_SURAT_PREFIX
 
 router = APIRouter(
-    prefix="/api/admin/surat",
+    prefix=ADMIN_SURAT_PREFIX,
     tags=["Admin - Surat Accidents"],
 )
 

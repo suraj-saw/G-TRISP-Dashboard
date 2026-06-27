@@ -34,11 +34,42 @@ ACCESS_TOKEN_COOKIE  = "access_token"
 REFRESH_TOKEN_COOKIE = "refresh_token"
 
 # ---------------------------------------------------------------------------
+# Auth / token lifetime defaults
+# These mirror the environment-variable defaults in auth_service.py so there
+# is a single source of truth for the magic numbers.
+# ---------------------------------------------------------------------------
+
+# Short-lived access token (minutes).  Override via ACCESS_TOKEN_EXPIRE_MINUTES env var.
+DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 20
+
+# Refresh token lifetime (hours).  Override via REFRESH_TOKEN_EXPIRE_HOURS env var.
+DEFAULT_REFRESH_TOKEN_EXPIRE_HOURS: int = 8
+
+# Idle-session timeout (minutes).  Override via IDLE_TIMEOUT_MINUTES env var.
+# After this period of inactivity the Redis session key expires and the user
+# must log in again even if the access token is still technically valid.
+DEFAULT_IDLE_TIMEOUT_MINUTES: int = 30
+
+# ---------------------------------------------------------------------------
+# Password-reset constants
+# ---------------------------------------------------------------------------
+
+# How long a password-reset token remains valid (seconds).
+PASSWORD_RESET_TOKEN_TTL_SECONDS: int = 900  # 15 minutes
+
+# Sliding window (seconds) used by the forgot-password rate limiter.
+FORGOT_PASSWORD_RATE_WINDOW_SECONDS: int = 3_600  # 1 hour
+
+# Maximum forgot-password requests allowed within the sliding window.
+FORGOT_PASSWORD_MAX_REQUESTS: int = 3
+
+# ---------------------------------------------------------------------------
 # API route prefixes
 # ---------------------------------------------------------------------------
 
 AUTH_PREFIX          = "/api/auth"
 ADMIN_PREFIX         = "/api/admin"
+ADMIN_SURAT_PREFIX   = "/api/admin/surat"   # admin endpoints specific to Surat data
 DASHBOARD_PREFIX     = "/api/dashboard"
 SURAT_DASH_PREFIX    = "/api/surat/dashboard"
 GEO_PREFIX           = "/api/geo"

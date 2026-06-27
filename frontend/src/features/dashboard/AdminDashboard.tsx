@@ -26,7 +26,7 @@ import { fetchFilterOptions } from "../../api/dashboardApi";
 import SuratBaseMap from "../../components/maps/SuratBaseMap";
 import { MAP_STYLES } from "../../components/maps/mapStyles";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
-import { ROUTES } from "../../config/constants";
+import { ROUTES, DEFAULT_BASE_MAP } from "../../config/constants";
 import {
   SIDEBAR_WIDTH_PX,
   TOPBAR_HEIGHT_PX,
@@ -411,7 +411,7 @@ export default function AdminDashboard() {
                 <SuratBaseMap
                   height="100%"
                   sidebarOpen={sidebarOpen}
-                  baseMap={filters.baseMap || "carto-light"}
+                  baseMap={filters.baseMap || DEFAULT_BASE_MAP}
                   overlays={
                     isDensityHeatmap ? (
                       <DensityMapOverlays
