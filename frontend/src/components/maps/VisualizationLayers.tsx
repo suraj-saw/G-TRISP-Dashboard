@@ -1,3 +1,5 @@
+// frontend/src/components/maps/VisualizationLayers.tsx
+
 import { useEffect, useMemo, useState } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
 import type { HeatmapPoint } from "../../types/dashboard";
