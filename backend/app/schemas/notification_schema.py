@@ -12,5 +12,6 @@ class NotificationResponse(BaseModel):
     type: str
     message: str
     related_user_id: Optional[int]
+    acted_by_admin_id: Optional[int]
     is_read: bool
     created_at: datetime

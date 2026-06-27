@@ -14,6 +14,7 @@ import {
 import NotificationBell from "./NotificationBell";
 import type { User } from "../../types/user";
 import { TOPBAR_HEIGHT_PX, TOPBAR_Z_INDEX } from "../../config/layout";
+import ConfirmDialog from "../common/ConfirmDialog";
 
 interface Props {
   appName: string;
@@ -38,6 +39,7 @@ function TopBar({
 }: Props) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,6 +55,15 @@ function TopBar({
     return () => document.removeEventListener("mousedown", closeDropdown);
   }, []);
 
+  const handleLogoutConfirm = () => {
+    setLogoutDialogOpen(false);
+    setOpen(false);
+    onLogout();
+  };
+
+  const handleLogoutCancel = () => {
+    setLogoutDialogOpen(false);
+  };
   return (
     <header
       style={{ height: `${TOPBAR_HEIGHT_PX}px` }}
@@ -113,9 +124,7 @@ function TopBar({
           </button>
         )}
 
-        {showNotificationBell && (
-          <NotificationBell count={notificationCount} />
-        )}
+        {showNotificationBell && <NotificationBell count={notificationCount} />}
 
         <span className="hidden sm:block h-6 w-px bg-slate-200" aria-hidden />
 
@@ -230,14 +239,14 @@ function TopBar({
 
                 {/* LOGOUT */}
                 <button
-                  onClick={onLogout}
+                  onClick={() => setLogoutDialogOpen(true)}
                   className="
                     mt-1 w-full
                     flex items-center gap-3
                     rounded-lg
                     px-3 py-2.5
                     text-sm font-semibold text-red-600
-                    hover:bg-red-50
+                    hover:bg-red-50 
                     transition
                   "
                 >
@@ -251,6 +260,16 @@ function TopBar({
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={logoutDialogOpen}
+        title="Sign out"
+        message="Are you sure you want to sign out of your account?"
+        confirmText="Sign out"
+        cancelText="Cancel"
+        danger
+        onConfirm={handleLogoutConfirm}
+        onCancel={handleLogoutCancel}
+      />
     </header>
   );
 }

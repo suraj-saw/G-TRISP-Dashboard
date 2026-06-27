@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from typing import Literal
+from typing import Literal, List
 
 from app.database import get_db
 from app.models.user import User
@@ -13,6 +13,20 @@ from app.schemas.notification_schema import NotificationResponse
 from app.core.constants import ADMIN_PREFIX
 
 router = APIRouter(prefix=ADMIN_PREFIX, tags=["Admin"])
+
+
+class NotificationPerAdminResponse(BaseModel):
+    """Notification DTO with is_read computed per-admin."""
+    id: int
+    type: str
+    message: str
+    related_user_id: int | None
+    acted_by_admin_id: int | None
+    is_read: bool
+    created_at: str
+
+    class Config:
+        from_attributes = True
 
 
 class StatusChangeRequest(BaseModel):
@@ -123,7 +137,6 @@ def _force_set_user_status(
     old_status = target.status
     target.status = new_status
 
-    verb = "approved" if new_status == "approved" else "rejected"
     db.add(Notification(
         type="status_change",
         message=(
@@ -131,6 +144,9 @@ def _force_set_user_status(
             f"from {old_status} to {new_status} by {decided_by.username}."
         ),
         related_user_id=target.id,
+        # Track which admin performed this action so the notifications
+        # endpoint can mark it as already-read for them specifically.
+        acted_by_admin_id=decided_by.id,
         is_read=False,
     ))
 
@@ -168,17 +184,66 @@ def change_user_status(
     return _force_set_user_status(user_id, payload.status, db, decided_by=current_user)
 
 
-@router.get("/notifications", response_model=list[NotificationResponse])
+@router.get("/notifications")
 def list_notifications(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
-    return (
+    """Return notifications with is_read computed per-admin.
+
+    A status_change notification created by the requesting admin is
+    returned with is_read=True so it does not inflate their own badge.
+    All other admins see it as is_read=False (unread) until they
+    explicitly mark it read.
+    """
+    rows = (
         db.query(Notification)
         .order_by(Notification.created_at.desc())
         .limit(50)
         .all()
     )
+
+    result = []
+    for n in rows:
+        # For status_change: the admin who acted sees it as read.
+        effective_is_read = n.is_read
+        if (
+            n.type == "status_change"
+            and n.acted_by_admin_id is not None
+            and n.acted_by_admin_id == current_user.id
+        ):
+            effective_is_read = True
+
+        result.append({
+            "id": n.id,
+            "type": n.type,
+            "message": n.message,
+            "related_user_id": n.related_user_id,
+            "acted_by_admin_id": n.acted_by_admin_id,
+            "is_read": effective_is_read,
+            "created_at": n.created_at.isoformat(),
+        })
+
+    return result
+
+@router.post("/notifications/read-all")
+def mark_all_notifications_read(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Mark every unread notification as read.
+
+    Called when an admin opens the Admin Control Panel so their badge
+    immediately resets to zero and the activity log shows no 'NEW' items.
+    This must be registered BEFORE the parameterised /notifications/{id}/read
+    route so FastAPI does not try to coerce the literal string 'read-all'
+    into an integer.
+    """
+    db.query(Notification).filter(Notification.is_read == False).update(
+        {"is_read": True}, synchronize_session=False
+    )
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("/notifications/{notification_id}/read", response_model=NotificationResponse)

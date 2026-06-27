@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 import {
   ArrowLeft,
   Shield,
@@ -90,6 +91,23 @@ function AdminPanel() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("pending");
 
   const loaded = useRef(false);
+  // Tracks whether we have already fired the mark-all-read call for this
+  // AdminPanel session. We only want it to run once on first mount, not on
+  // every subsequent 5-second poll tick.
+  const markedAllRead = useRef(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+
+  const [pendingAction, setPendingAction] = useState<
+    (() => Promise<void>) | null
+  >(null);
+
+  const [confirmTitle, setConfirmTitle] = useState("");
+
+  const [confirmMessage, setConfirmMessage] = useState("");
+
+  const [confirmButtonText, setConfirmButtonText] = useState("Confirm");
+
+  const [confirmDanger, setConfirmDanger] = useState(false);
 
   // ── data loaders ────────────────────────────────────────────────────────────
 
@@ -150,6 +168,20 @@ function AdminPanel() {
           loadNotifications(),
         ]);
 
+        // ── Mark all notifications as read on first panel visit ───────────
+        // Only fire once per AdminPanel mount so the 5-second polling loop
+        // doesn't keep re-marking on every tick.
+        if (!markedAllRead.current) {
+          markedAllRead.current = true;
+          try {
+            await API.post("/admin/notifications/read-all");
+            // Reload so the UI immediately shows zero unread / no 'NEW' tags.
+            await loadNotifications();
+          } catch {
+            /* non-critical – the badge will self-correct on the next poll */
+          }
+        }
+
         loaded.current = true;
         setSessionStatus("active");
 
@@ -175,6 +207,27 @@ function AdminPanel() {
       await API.post("/auth/logout");
     } catch {}
     navigate(ROUTES.LOGIN, { replace: true });
+  };
+
+  const openConfirmation = ({
+    title,
+    message,
+    buttonText,
+    danger = false,
+    action,
+  }: {
+    title: string;
+    message: string;
+    buttonText: string;
+    danger?: boolean;
+    action: () => Promise<void>;
+  }) => {
+    setConfirmTitle(title);
+    setConfirmMessage(message);
+    setConfirmButtonText(buttonText);
+    setConfirmDanger(danger);
+    setPendingAction(() => action);
+    setConfirmDialogOpen(true);
   };
 
   const handleDecision = async (
@@ -322,8 +375,12 @@ function AdminPanel() {
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full filter blur-3xl -translate-y-1/2 translate-x-1/2" />
               <div className="relative z-10 flex flex-row items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-indigo-300 text-xs font-semibold uppercase tracking-widest mb-1">Signed in as</p>
-                  <h2 className="text-xl font-bold truncate">{user?.username}</h2>
+                  <p className="text-indigo-300 text-xs font-semibold uppercase tracking-widest mb-1">
+                    Signed in as
+                  </p>
+                  <h2 className="text-xl font-bold truncate">
+                    {user?.username}
+                  </h2>
                   <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/10 text-xs font-semibold text-indigo-100">
                     <Shield className="w-3 h-3 text-indigo-300" />
                     {user?.role.toUpperCase()}
@@ -388,13 +445,21 @@ function AdminPanel() {
                   transition={{ type: "spring", stiffness: 400, damping: 20 }}
                   className={`bg-white border ${stat.border} rounded-2xl p-4 flex items-center gap-3 shadow-sm cursor-default`}
                 >
-                  <div className={`p-2.5 ${stat.bg} ${stat.color} rounded-xl shrink-0`}>
+                  <div
+                    className={`p-2.5 ${stat.bg} ${stat.color} rounded-xl shrink-0`}
+                  >
                     {stat.icon}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-3xl font-black text-slate-800 leading-none tracking-tight">{stat.value}</p>
-                    <p className="text-xs font-semibold text-slate-600 mt-1">{stat.label}</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5 truncate">{stat.sub}</p>
+                    <p className="text-3xl font-black text-slate-800 leading-none tracking-tight">
+                      {stat.value}
+                    </p>
+                    <p className="text-xs font-semibold text-slate-600 mt-1">
+                      {stat.label}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                      {stat.sub}
+                    </p>
                   </div>
                 </motion.div>
               ))}
@@ -435,11 +500,13 @@ function AdminPanel() {
                   <Clock className="w-4 h-4 shrink-0" />
                   Pending Approvals
                   {pendingUsers.length > 0 && (
-                    <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-xs font-bold shrink-0 ${
-                      activeTab === "pending"
-                        ? "bg-white/20 text-white"
-                        : "bg-amber-500 text-white shadow-sm"
-                    }`}>
+                    <span
+                      className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-xs font-bold shrink-0 ${
+                        activeTab === "pending"
+                          ? "bg-white/20 text-white"
+                          : "bg-amber-500 text-white shadow-sm"
+                      }`}
+                    >
                       {pendingUsers.length}
                     </span>
                   )}
@@ -455,11 +522,13 @@ function AdminPanel() {
                 >
                   <Users className="w-4 h-4 shrink-0" />
                   User Management
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                    activeTab === "all"
-                      ? "bg-white/20 text-white"
-                      : "bg-slate-200 text-slate-500"
-                  }`}>
+                  <span
+                    className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                      activeTab === "all"
+                        ? "bg-white/20 text-white"
+                        : "bg-slate-200 text-slate-500"
+                    }`}
+                  >
                     {allUsers.length}
                   </span>
                 </button>
@@ -492,13 +561,20 @@ function AdminPanel() {
                           <div className="w-12 h-12 rounded-full bg-emerald-50 border-2 border-emerald-100 flex items-center justify-center mb-3 shadow-inner">
                             <CheckCircle className="w-6 h-6 text-emerald-500" />
                           </div>
-                          <h4 className="text-sm font-bold text-slate-700 mb-1">No Pending Approvals</h4>
+                          <h4 className="text-sm font-bold text-slate-700 mb-1">
+                            No Pending Approvals
+                          </h4>
                           <p className="text-xs text-slate-400 text-center max-w-xs">
-                            All registrations reviewed. New requests will appear here.
+                            All registrations reviewed. New requests will appear
+                            here.
                           </p>
                           <div className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-400 bg-slate-50 border border-slate-100 rounded-full px-3 py-1">
                             <Clock className="w-3 h-3" />
-                            Last checked: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            Last checked:{" "}
+                            {new Date().toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </div>
                         </div>
                       ) : (
@@ -546,7 +622,17 @@ function AdminPanel() {
                                       <button
                                         disabled={actionLoadingId === pu.id}
                                         onClick={() =>
-                                          handleDecision(pu.id, "reject")
+                                          openConfirmation({
+                                            title: "Reject Registration",
+                                            message: `Reject registration for ${user!.username}?`,
+                                            buttonText: "Reject",
+                                            danger: true,
+                                            action: () =>
+                                              handleDecision(
+                                                user!.id,
+                                                "reject"
+                                              ),
+                                          })
                                         }
                                         className="p-2 rounded-xl text-rose-600 bg-rose-50 hover:bg-rose-100 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 transition-all focus:ring-2 focus:ring-rose-500/20 cursor-pointer"
                                         title="Reject"
@@ -556,7 +642,16 @@ function AdminPanel() {
                                       <button
                                         disabled={actionLoadingId === pu.id}
                                         onClick={() =>
-                                          handleDecision(pu.id, "approve")
+                                          openConfirmation({
+                                            title: "Approve Registration",
+                                            message: `Approve registration for ${user!.username}?`,
+                                            buttonText: "Approve",
+                                            action: () =>
+                                              handleDecision(
+                                                user!.id,
+                                                "approve"
+                                              ),
+                                          })
                                         }
                                         className="p-2 rounded-xl text-emerald-600 bg-emerald-50 hover:bg-emerald-100 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 transition-all shadow-sm focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
                                         title="Approve"
@@ -638,7 +733,17 @@ function AdminPanel() {
                                         <button
                                           disabled={actionLoadingId === u.id}
                                           onClick={() =>
-                                            handleStatusChange(u.id, "rejected")
+                                            openConfirmation({
+                                              title: "Reject User",
+                                              message: `Reject ${u.username}'s account?`,
+                                              buttonText: "Reject",
+                                              danger: true,
+                                              action: () =>
+                                                handleStatusChange(
+                                                  u.id,
+                                                  "rejected"
+                                                ),
+                                            })
                                           }
                                           className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-rose-600 bg-rose-50 hover:bg-rose-100 text-xs font-semibold disabled:opacity-50 transition-all border border-rose-200/50 cursor-pointer"
                                         >
@@ -649,7 +754,16 @@ function AdminPanel() {
                                         <button
                                           disabled={actionLoadingId === u.id}
                                           onClick={() =>
-                                            handleStatusChange(u.id, "approved")
+                                            openConfirmation({
+                                              title: "Approve User",
+                                              message: `Approve ${u.username}'s account?`,
+                                              buttonText: "Approve",
+                                              action: () =>
+                                                handleStatusChange(
+                                                  u.id,
+                                                  "approved"
+                                                ),
+                                            })
                                           }
                                           className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 text-xs font-semibold disabled:opacity-50 transition-all border border-emerald-200/50 cursor-pointer"
                                         >
@@ -760,11 +874,18 @@ function AdminPanel() {
                           <p className="text-[10px] text-slate-400 mt-0.5">
                             {(() => {
                               const now = new Date();
-                              const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                              const today = new Date(
+                                now.getFullYear(),
+                                now.getMonth(),
+                                now.getDate()
+                              );
                               const yesterday = new Date(today);
                               yesterday.setDate(yesterday.getDate() - 1);
                               // Notifications don't have a real timestamp in the type, so show current time as placeholder
-                              const t = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                              const t = now.toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              });
                               return `Today · ${t}`;
                             })()}
                           </p>
@@ -802,6 +923,27 @@ function AdminPanel() {
           background-color: #cbd5e1;
         }
       `,
+        }}
+      />
+      <ConfirmDialog
+        open={confirmDialogOpen}
+        title={confirmTitle}
+        message={confirmMessage}
+        confirmText={confirmButtonText}
+        cancelText="Cancel"
+        danger={confirmDanger}
+        onCancel={() => {
+          setConfirmDialogOpen(false);
+          setPendingAction(null);
+        }}
+        onConfirm={async () => {
+          setConfirmDialogOpen(false);
+
+          if (pendingAction) {
+            await pendingAction();
+          }
+
+          setPendingAction(null);
         }}
       />
     </div>
