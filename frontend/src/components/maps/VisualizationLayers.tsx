@@ -9,6 +9,18 @@ import {
   SEVERITY_WEIGHTS,
   SEVERITY_DEFAULT_WEIGHT,
 } from "../../config/constants";
+import {
+  HEATMAP_RADIUS,
+  HEATMAP_INTENSITY,
+  HEATMAP_OPACITY,
+  POINT_OPACITY,
+  POINT_STROKE_OPACITY,
+  SEVERITY_HEATMAP_WEIGHTS,
+  SEVERITY_WEIGHT_DEFAULT,
+  zoomInterpolate,
+  buildHeatmapColorExpression,
+  buildPointRadiusExpression,
+} from "../../config/Heapmapconfig";
 
 interface Props {
   data?: HeatmapPoint[];
@@ -30,6 +42,10 @@ type SelectedAccident = {
   accident_date_time?: string | null;
 };
 
+// ---------------------------------------------------------------------------
+// Utility helpers
+// ---------------------------------------------------------------------------
+
 const safeText = (value?: string | null): string => {
   if (!value || value === NULL_TEXT_SENTINEL) return UNKNOWN_LABEL;
   return value;
@@ -46,24 +62,32 @@ const formatDate = (value?: string | null): string => {
   });
 };
 
-const getSeverityWeight = (severity?: string | null): number => {
-  const value = (severity || "").toLowerCase();
+const getSeverityHeatmapWeight = (severity?: string | null): number => {
+  const v = (severity || "").toLowerCase();
+  for (const [key, weight] of Object.entries(SEVERITY_HEATMAP_WEIGHTS)) {
+    if (v.includes(key)) return weight;
+  }
+  return SEVERITY_WEIGHT_DEFAULT;
+};
+
+const getSeverityMarkerWeight = (severity?: string | null): number => {
+  const v = (severity || "").toLowerCase();
   for (const [key, weight] of Object.entries(SEVERITY_WEIGHTS)) {
-    if (value.includes(key)) return weight;
+    if (v.includes(key)) return weight;
   }
   return SEVERITY_DEFAULT_WEIGHT;
 };
 
 // ---------------------------------------------------------------------------
-// Severity colour palette — single source of truth for all marker layers
+// Colour palette for severity
 // ---------------------------------------------------------------------------
+
 const SEVERITY_COLORS = {
   Fatal: "#dc2626",
   "Grievous Injury": "#f97316",
   "Minor Injury": "#2563eb",
   "Damage Only": "#22c55e",
   default: "#64748b",
-  // Softer warm orange-red for the "all severities" view
   all: "#E8603A",
 } as const;
 
@@ -76,6 +100,123 @@ const severityColorExpression = [
   SEVERITY_COLORS.default,
 ] as const;
 
+// ---------------------------------------------------------------------------
+// Shared GeoJSON builder
+// ---------------------------------------------------------------------------
+
+function buildGeojson(data?: HeatmapPoint[]): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features:
+      data
+        ?.filter(
+          (p) => Number.isFinite(p.longitude) && Number.isFinite(p.latitude)
+        )
+        .map((p) => ({
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [p.longitude, p.latitude],
+          },
+          properties: {
+            accident_id: p.accident_id,
+            severity: p.severity,
+            heatmap_weight: getSeverityHeatmapWeight(p.severity),
+            severity_weight: getSeverityMarkerWeight(p.severity),
+            police_station: p.police_station ?? p.district,
+            road_name: p.road_name,
+            road_classification: p.road_classification,
+            weather_condition: p.weather_condition,
+            light_condition: p.light_condition,
+            collision_type: p.collision_type,
+            accident_date_time: p.accident_date_time,
+          },
+        })) || [],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Density heatmap sub-component
+//
+// Two layers, bottom to top:
+//   1. density-heatmap  — kernel density field, dominant at low/mid zoom.
+//   2. density-points   — crisp, severity-colored graduated points that fade
+//                         in from zoom ~12 so street level shows real incidents
+//                         (clickable) instead of fading to faint dots.
+//
+// Both share one GeoJSON source. No glow/core circle layers — those read as a
+// demo effect rather than analytics.
+// ---------------------------------------------------------------------------
+
+function DensityHeatmapLayers({
+  geojsonData,
+}: {
+  geojsonData: GeoJSON.FeatureCollection;
+}) {
+  // Per-point severity contribution (fatal accidents weigh more)
+  const heatmapWeightExpr: any[] = [
+    "interpolate",
+    ["linear"],
+    ["coalesce", ["get", "heatmap_weight"], SEVERITY_WEIGHT_DEFAULT],
+    0,
+    0,
+    1,
+    1,
+  ];
+
+  const heatmapRadiusExpr = zoomInterpolate(HEATMAP_RADIUS);
+  const heatmapIntensityExpr = zoomInterpolate(HEATMAP_INTENSITY);
+  const heatmapOpacityExpr = zoomInterpolate(HEATMAP_OPACITY);
+  const heatmapColorExpr = buildHeatmapColorExpression();
+
+  const pointRadiusExpr = buildPointRadiusExpression();
+  const pointOpacityExpr = zoomInterpolate(POINT_OPACITY);
+  const pointStrokeOpacityExpr = zoomInterpolate(POINT_STROKE_OPACITY);
+
+  return (
+    <Source id="density-source" type="geojson" data={geojsonData as any}>
+      {/*
+        Layer 1 — Heatmap kernel density field.
+        Cool lead-in + compressed warm band means you read density structure
+        (corridors, clusters, hotspots) instead of a single filled shape.
+      */}
+      <Layer
+        id="density-heatmap"
+        type="heatmap"
+        paint={{
+          "heatmap-weight": heatmapWeightExpr as any,
+          "heatmap-radius": heatmapRadiusExpr as any,
+          "heatmap-intensity": heatmapIntensityExpr as any,
+          "heatmap-opacity": heatmapOpacityExpr as any,
+          "heatmap-color": heatmapColorExpr as any,
+        }}
+      />
+
+      {/*
+        Layer 2 — Graduated incident points (zoom 12+).
+        Severity-colored, radius graduated by severity, white halo for contrast
+        on the light Carto Positron basemap. Clickable for details.
+      */}
+      <Layer
+        id="density-points"
+        type="circle"
+        paint={{
+          "circle-color": severityColorExpression as any,
+          "circle-radius": pointRadiusExpr as any,
+          "circle-opacity": pointOpacityExpr as any,
+          "circle-stroke-width": 1.25,
+          "circle-stroke-color": "#FFFFFF",
+          "circle-stroke-opacity": pointStrokeOpacityExpr as any,
+        }}
+      />
+    </Source>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main exported component
+// ---------------------------------------------------------------------------
+
 export function VisualizationLayers({
   data,
   type,
@@ -84,38 +225,22 @@ export function VisualizationLayers({
   const { current: mapRef } = useMap();
   const [selected, setSelected] = useState<SelectedAccident | null>(null);
 
-  const geojsonData = useMemo<GeoJSON.FeatureCollection>(() => {
-    return {
-      type: "FeatureCollection",
-      features:
-        data
-          ?.filter(
-            (p) => Number.isFinite(p.longitude) && Number.isFinite(p.latitude)
-          )
-          .map((p) => ({
-            type: "Feature",
-            geometry: {
-              type: "Point",
-              coordinates: [p.longitude, p.latitude],
-            },
-            properties: {
-              accident_id: p.accident_id,
-              severity: p.severity,
-              severity_weight: getSeverityWeight(p.severity),
-              police_station: p.police_station ?? p.district,
-              road_name: p.road_name,
-              road_classification: p.road_classification,
-              weather_condition: p.weather_condition,
-              light_condition: p.light_condition,
-              collision_type: p.collision_type,
-              accident_date_time: p.accident_date_time,
-            },
-          })) || [],
-    };
-  }, [data]);
+  const geojsonData = useMemo<GeoJSON.FeatureCollection>(
+    () => buildGeojson(data),
+    [data]
+  );
 
+  // Click / hover handler — active for clickable point layers in both
+  // location-marker mode and density mode (graduated points).
   useEffect(() => {
-    if (type !== "location_markers") {
+    const interactiveLayers =
+      type === "location_markers"
+        ? ["accident-points"]
+        : type === "density_heatmap"
+          ? ["density-points"]
+          : [];
+
+    if (!interactiveLayers.length) {
       setSelected(null);
       return;
     }
@@ -123,11 +248,13 @@ export function VisualizationLayers({
     const map = mapRef?.getMap();
     if (!map) return;
 
+    const presentLayers = () =>
+      interactiveLayers.filter((id) => map.getLayer(id));
+
     const handleClick = (event: any) => {
-      if (!map.getLayer("accident-points")) return;
-      const feature = map.queryRenderedFeatures(event.point, {
-        layers: ["accident-points"],
-      })[0];
+      const layers = presentLayers();
+      if (!layers.length) return;
+      const feature = map.queryRenderedFeatures(event.point, { layers })[0];
       if (!feature) return;
       setSelected({
         longitude: event.lngLat.lng,
@@ -137,13 +264,12 @@ export function VisualizationLayers({
     };
 
     const handleMouseMove = (event: any) => {
-      if (!map.getLayer("accident-points")) {
+      const layers = presentLayers();
+      if (!layers.length) {
         map.getCanvas().style.cursor = "";
         return;
       }
-      const features = map.queryRenderedFeatures(event.point, {
-        layers: ["accident-points"],
-      });
+      const features = map.queryRenderedFeatures(event.point, { layers });
       map.getCanvas().style.cursor = features.length ? "pointer" : "";
     };
 
@@ -159,82 +285,28 @@ export function VisualizationLayers({
 
   if (!geojsonData.features.length) return null;
 
-  // ── Density heatmap ───────────────────────────────────────────────────────
+  // ── Density heatmap ──────────────────────────────────────────────────────
   if (type === "density_heatmap") {
     return (
-      <Source
-        id="accident-density-source"
-        type="geojson"
-        data={geojsonData as any}
-      >
-        <Layer
-          id="accident-density-heatmap"
-          type="heatmap"
-          paint={{
-            "heatmap-weight": [
-              "interpolate",
-              ["linear"],
-              ["coalesce", ["get", "severity_weight"], SEVERITY_DEFAULT_WEIGHT],
-              0,
-              0,
-              1,
-              1,
-            ],
-            "heatmap-intensity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              9,
-              0.8,
-              12,
-              1.8,
-              15,
-              3,
-            ],
-            "heatmap-radius": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              9,
-              14,
-              12,
-              28,
-              15,
-              44,
-            ],
-            "heatmap-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              9,
-              0.85,
-              14,
-              0.75,
-            ],
-            "heatmap-color": [
-              "interpolate",
-              ["linear"],
-              ["heatmap-density"],
-              0,
-              "rgba(59,130,246,0)",
-              0.2,
-              "rgba(96,165,250,0.45)",
-              0.4,
-              "rgba(34,197,94,0.55)",
-              0.6,
-              "rgba(250,204,21,0.7)",
-              0.8,
-              "rgba(249,115,22,0.85)",
-              1,
-              "rgba(220,38,38,0.95)",
-            ],
-          }}
-        />
-      </Source>
+      <>
+        <DensityHeatmapLayers geojsonData={geojsonData} />
+        {selected && (
+          <Popup
+            longitude={selected.longitude}
+            latitude={selected.latitude}
+            anchor="top"
+            closeButton
+            closeOnClick={false}
+            onClose={() => setSelected(null)}
+          >
+            <AccidentPopupBody selected={selected} />
+          </Popup>
+        )}
+      </>
     );
   }
 
-  // ── Blackspot cluster map ─────────────────────────────────────────────────
+  // ── Blackspot cluster ────────────────────────────────────────────────────
   if (type === "blackspot") {
     return (
       <Source
@@ -396,20 +468,7 @@ export function VisualizationLayers({
     );
   }
 
-  // ── Location markers ──────────────────────────────────────────────────────
-  //
-  // No clustering. Every accident is rendered as its own individual marker.
-  // Zoom-dependent radius and opacity keep the view readable at all levels:
-  //   • Zoomed out  → small, semi-transparent dots that hint at density
-  //                   without collapsing into blobs
-  //   • Zoomed in   → larger, fully opaque markers with clear outlines,
-  //                   easy to identify and click
-  //
-  // When a specific severity filter is active the per-severity palette is
-  // used; otherwise all markers share a single soft orange-red so the
-  // "where did accidents happen?" question is answered without introducing
-  // a second categorical dimension on top of location.
-
+  // ── Location markers ─────────────────────────────────────────────────────
   const markerColor =
     selectedSeverity === "all"
       ? SEVERITY_COLORS.all
@@ -417,10 +476,6 @@ export function VisualizationLayers({
 
   return (
     <>
-      {/*
-       * cluster={false} is explicit so that switching between visualization
-       * types never accidentally inherits a cached clustered source.
-       */}
       <Source
         id="accident-marker-source"
         type="geojson"
@@ -431,10 +486,6 @@ export function VisualizationLayers({
           id="accident-points"
           type="circle"
           paint={{
-            // Radius scales up smoothly as the user zooms in.
-            // At district overview (zoom 9-10) dots are 3 px — present but
-            // unobtrusive. At street level (zoom 15+) they grow to 7 px so
-            // individual incidents are easy to distinguish and click.
             "circle-radius": [
               "interpolate",
               ["linear"],
@@ -449,9 +500,6 @@ export function VisualizationLayers({
               7,
             ],
             "circle-color": markerColor as any,
-            // Opacity rises with zoom so dense regions at overview look like
-            // a natural heat distribution rather than a solid smear. Full
-            // opacity at street level makes individual markers unambiguous.
             "circle-opacity": [
               "interpolate",
               ["linear"],
@@ -465,9 +513,6 @@ export function VisualizationLayers({
               15,
               0.92,
             ],
-            // Thin white ring separates overlapping markers. The ring itself
-            // fades in with zoom so it doesn't add visual noise when dozens
-            // of markers are stacked at low zoom.
             "circle-stroke-width": 1,
             "circle-stroke-color": "#FFFFFF",
             "circle-stroke-opacity": [
@@ -494,39 +539,49 @@ export function VisualizationLayers({
           closeOnClick={false}
           onClose={() => setSelected(null)}
         >
-          <div className="min-w-[210px] text-[12px] text-slate-700">
-            <p className="mb-2 text-[13px] font-bold text-slate-900">
-              Accident Details
-            </p>
-            <div className="space-y-1">
-              <p>
-                <b>Severity:</b> {safeText(selected.severity)}
-              </p>
-              <p>
-                <b>Police station:</b> {safeText(selected.police_station)}
-              </p>
-              <p>
-                <b>Road:</b> {safeText(selected.road_name)}
-              </p>
-              <p>
-                <b>Road type:</b> {safeText(selected.road_classification)}
-              </p>
-              <p>
-                <b>Weather:</b> {safeText(selected.weather_condition)}
-              </p>
-              <p>
-                <b>Light:</b> {safeText(selected.light_condition)}
-              </p>
-              <p>
-                <b>Collision:</b> {safeText(selected.collision_type)}
-              </p>
-              <p>
-                <b>Date:</b> {formatDate(selected.accident_date_time)}
-              </p>
-            </div>
-          </div>
+          <AccidentPopupBody selected={selected} />
         </Popup>
       )}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shared popup body
+// ---------------------------------------------------------------------------
+
+function AccidentPopupBody({ selected }: { selected: SelectedAccident }) {
+  return (
+    <div className="min-w-[210px] text-[12px] text-slate-700">
+      <p className="mb-2 text-[13px] font-bold text-slate-900">
+        Accident Details
+      </p>
+      <div className="space-y-1">
+        <p>
+          <b>Severity:</b> {safeText(selected.severity)}
+        </p>
+        <p>
+          <b>Police station:</b> {safeText(selected.police_station)}
+        </p>
+        <p>
+          <b>Road:</b> {safeText(selected.road_name)}
+        </p>
+        <p>
+          <b>Road type:</b> {safeText(selected.road_classification)}
+        </p>
+        <p>
+          <b>Weather:</b> {safeText(selected.weather_condition)}
+        </p>
+        <p>
+          <b>Light:</b> {safeText(selected.light_condition)}
+        </p>
+        <p>
+          <b>Collision:</b> {safeText(selected.collision_type)}
+        </p>
+        <p>
+          <b>Date:</b> {formatDate(selected.accident_date_time)}
+        </p>
+      </div>
+    </div>
   );
 }
