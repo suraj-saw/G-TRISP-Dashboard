@@ -12,6 +12,8 @@ import { ROUTES } from "./config/constants";
 
 import Signup from "./features/auth/Register";
 import Login from "./features/auth/Login";
+import ForgotPassword from "./features/auth/ForgotPassword";
+import ResetPassword from "./features/auth/ResetPassword";
 import Dashboard from "./features/dashboard/Dashboard";
 import AdminDashboard from "./features/dashboard/AdminDashboard";
 import AdminPanel from "./features/dashboard/AdminPanel";
@@ -59,6 +61,8 @@ function App() {
         <Route path={ROUTES.HOME} element={<RootHandler />} />
         <Route path={ROUTES.SIGNUP} element={<Signup />} />
         <Route path={ROUTES.LOGIN} element={<Login />} />
+        <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPassword />} />
+        <Route path={ROUTES.RESET_PASSWORD} element={<ResetPassword />} />
         <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
         <Route path={ROUTES.ADMIN} element={<AdminDashboard />} />
         <Route path={ROUTES.ADMIN_PANEL} element={<AdminPanel />} />

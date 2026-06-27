@@ -1,10 +1,14 @@
 # backend/app/routes/auth.py
 
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 ENVIRONMENT     = os.getenv("ENVIRONMENT", "development")
 COOKIE_SECURE   = ENVIRONMENT == "production"
 COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "strict")
+FRONTEND_URL    = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
@@ -12,7 +16,7 @@ from jose import JWTError
 
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user_schema import UserCreate, UserLogin, UserResponse
+from app.schemas.user_schema import UserCreate, UserLogin, UserResponse, ForgotPasswordRequest, ResetPasswordRequest
 from app.services.auth_service import (
     hash_password,
     verify_password,
@@ -21,9 +25,14 @@ from app.services.auth_service import (
     blacklist_refresh_token,
     is_token_blacklisted,
     is_session_valid,
+    check_forgot_password_rate_limit,
+    create_password_reset_token,
+    verify_password_reset_token,
+    check_password_reset_token_validity,
     ACCESS_TOKEN_EXPIRE_MINUTES,
     REFRESH_TOKEN_EXPIRE_HOURS,
 )
+from app.utils.email import send_reset_password_email
 from app.models.notification import Notification
 from app.core.constants import (
     ACCESS_TOKEN_COOKIE,
@@ -242,3 +251,103 @@ def logout(request: Request, response: Response):
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+# ---------------------------------------------------------------------------
+# Password Reset Routes
+# ---------------------------------------------------------------------------
+
+@router.post("/forgot-password")
+def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    email = req.email
+    
+    if not check_forgot_password_rate_limit(email):
+        logger.warning(f"Rate limit exceeded for forgot password request: {email}")
+        raise HTTPException(
+            status_code=429, 
+            detail="Too many requests. Please try again later."
+        )
+
+    user = db.query(User).filter(User.email == email).first()
+    
+    if not user:
+        logger.info(f"Password reset requested for non-existent email: {email}")
+        raise HTTPException(
+            status_code=404,
+            detail="The email is not registered."
+        )
+
+    if user.role != "admin":
+        if user.status == "rejected":
+            logger.warning(f"Password reset requested for rejected user: {email}")
+            raise HTTPException(
+                status_code=403,
+                detail="Your access has been revoked by the administrators, try contact them."
+            )
+        elif user.status == "pending":
+            logger.warning(f"Password reset requested for pending user: {email}")
+            raise HTTPException(
+                status_code=403,
+                detail="Your account is pending admin approval."
+            )
+
+    logger.info(f"Password reset requested for user: {email}")
+    
+    # Generate token and store hash in Redis
+    raw_token = create_password_reset_token(user.id)
+    
+    # Construct link and send email
+    reset_link = f"{FRONTEND_URL}/reset-password?token={raw_token}"
+    send_reset_password_email(user.email, reset_link)
+    
+    return {
+        "message": "If an account exists for this email, a password reset link has been sent.",
+        "reset_link": reset_link
+    }
+
+
+@router.get("/reset-password/verify")
+def verify_reset_token(token: str):
+    """
+    Check if a reset token is valid without consuming it.
+    Used by the frontend to conditionally render the reset form.
+    """
+    if check_password_reset_token_validity(token):
+        return {"valid": True}
+    
+    # Return 400 so the frontend can catch the error and display an invalid state
+    raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
+
+
+@router.post("/reset-password")
+def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+    raw_token = req.token
+    new_password = req.new_password
+    
+    # Verify token and get user ID
+    user_id = verify_password_reset_token(raw_token)
+    
+    if not user_id:
+        logger.warning("Attempted password reset with invalid or expired token")
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
+        
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        logger.error(f"Valid reset token found for non-existent user_id: {user_id}")
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
+
+    # Hash new password and save
+    user.hashed_password = hash_password(new_password)
+    db.commit()
+    
+    logger.info(f"Password successfully reset for user: {user.email}")
+    
+    # Since password changed, we optionally want to invalidate existing sessions.
+    # The current auth_service handles this primarily via login/logout, but we can't easily 
+    # find the session_id to delete without changing how sessions are stored (currently stored 
+    # as `session:{user_id} -> session_id`). We can just delete the session key.
+    import redis
+    redis_client = redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
+    redis_client.delete(f"session:{user.id}")
+    
+    return {"message": "Password reset successful. You can now log in with your new password."}

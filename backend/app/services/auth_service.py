@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 import os
 import uuid
 import redis
+import secrets
+import hashlib
 
 from dotenv import load_dotenv
 
@@ -176,3 +178,83 @@ def blacklist_refresh_token(token: str, revoke_session: bool = False) -> None:
 
 def is_token_blacklisted(token: str) -> bool:
     return redis_client.exists(_blacklist_key(token)) == 1
+
+# ---------------------------------------------------------------------------
+# Password Reset
+# ---------------------------------------------------------------------------
+
+def check_forgot_password_rate_limit(email: str) -> bool:
+    """
+    Check if the user has requested a password reset too many times recently.
+    Returns True if allowed, False if rate limited.
+    Allows 3 requests per hour.
+    """
+    key = f"rate_limit:forgot_pwd:{email}"
+    requests = redis_client.incr(key)
+    if requests == 1:
+        # First request, set expiry to 1 hour (3600 seconds)
+        redis_client.expire(key, 3600)
+    
+    if requests > 3:
+        return False
+    return True
+
+
+def create_password_reset_token(user_id: int) -> str:
+    """
+    Generates a secure random token, hashes it, invalidates any existing token for the user,
+    and stores the hashed token in Redis. Returns the raw token to be sent to the user.
+    """
+    # Generate raw token
+    raw_token = secrets.token_urlsafe(32)
+    # Hash token
+    hashed_token = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+    
+    user_token_key = f"user_reset_token:{user_id}"
+    
+    # Invalidate previous token if exists
+    previous_hashed_token = redis_client.get(user_token_key)
+    pipe = redis_client.pipeline()
+    
+    if previous_hashed_token:
+        pipe.delete(f"password_reset_token:{previous_hashed_token}")
+        
+    # Store new hashed token mapping to user_id, valid for 15 mins (900 seconds)
+    pipe.setex(f"password_reset_token:{hashed_token}", 900, user_id)
+    # Track which token belongs to this user so we can invalidate it next time
+    pipe.setex(user_token_key, 900, hashed_token)
+    
+    pipe.execute()
+    
+    return raw_token
+
+
+def verify_password_reset_token(raw_token: str) -> int | None:
+    """
+    Hashes the raw token and looks it up in Redis.
+    If valid, returns the user_id and deletes the token to ensure single use.
+    If invalid or expired, returns None.
+    """
+    hashed_token = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+    key = f"password_reset_token:{hashed_token}"
+    
+    user_id_str = redis_client.get(key)
+    
+    if user_id_str:
+        # Valid token found, delete it to ensure single use
+        redis_client.delete(key)
+        # Also clean up the user_reset_token tracker
+        redis_client.delete(f"user_reset_token:{user_id_str}")
+        return int(user_id_str)
+        
+    return None
+
+# Also add a verify without consuming
+def check_password_reset_token_validity(raw_token: str) -> bool:
+    """
+    Check if the token is valid without consuming it.
+    Useful for pre-validation on the frontend.
+    """
+    hashed_token = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+    key = f"password_reset_token:{hashed_token}"
+    return redis_client.exists(key) == 1
