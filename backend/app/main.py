@@ -18,6 +18,7 @@ from app.routes import admin
 from app.routes import dashboard              
 from app.routes import surat_dashboard         
 from app.routes import geo
+from app.routes import surat_accidents_admin 
 
 load_dotenv()
 
@@ -64,6 +65,7 @@ app.include_router(admin.router)
 app.include_router(dashboard.router)         # ← /api/dashboard/*
 app.include_router(surat_dashboard.router)   # ← /api/surat/dashboard/*
 app.include_router(geo.router)               # ← /api/geo/*
+app.include_router(surat_accidents_admin.router)
 
 # CORS
 allowed_origins = [
