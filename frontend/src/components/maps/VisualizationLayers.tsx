@@ -21,6 +21,16 @@ import {
   buildHeatmapColorExpression,
   buildPointRadiusExpression,
 } from "../../config/Heapmapconfig";
+import {
+  BS_COLOR_EXPR,
+  BS_HALO_COLOR_EXPR,
+  BS_CORE_RADIUS_EXPR,
+  BS_HALO_RADIUS_EXPR,
+  BS_TEXT_SIZE_EXPR,
+  BS_SINGLE_COLOR_EXPR,
+  getRiskLabel,
+  getRiskColor,
+} from "../../config/blackspotConfig";
 
 interface Props {
   data?: HeatmapPoint[];
@@ -40,6 +50,9 @@ type SelectedAccident = {
   light_condition?: string | null;
   collision_type?: string | null;
   accident_date_time?: string | null;
+  // cluster fields
+  point_count?: number;
+  isCluster?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -214,6 +227,204 @@ function DensityHeatmapLayers({
 }
 
 // ---------------------------------------------------------------------------
+// Blackspot sub-component — professional GIS risk bubble visualization
+// ---------------------------------------------------------------------------
+
+type HoverState = {
+  longitude: number;
+  latitude: number;
+  point_count?: number;
+  severity?: string;
+  police_station?: string | null;
+  road_name?: string | null;
+} | null;
+
+function BlackspotLayers({ geojsonData }: { geojsonData: GeoJSON.FeatureCollection }) {
+  const { current: mapRef } = useMap();
+  const [hovered, setHovered] = useState<HoverState>(null);
+
+  useEffect(() => {
+    const map = mapRef?.getMap();
+    if (!map) return;
+
+    const clusterLayers  = ["blackspot-core", "blackspot-halo"];
+    const pointLayers    = ["blackspot-single-point"];
+
+    const onMove = (e: any) => {
+      const clusters = map.queryRenderedFeatures(e.point, { layers: clusterLayers });
+      if (clusters.length) {
+        map.getCanvas().style.cursor = "pointer";
+        const f = clusters[0];
+        setHovered({
+          longitude: e.lngLat.lng,
+          latitude:  e.lngLat.lat,
+          point_count: f.properties?.point_count,
+        });
+        return;
+      }
+      const points = map.queryRenderedFeatures(e.point, { layers: pointLayers });
+      if (points.length) {
+        map.getCanvas().style.cursor = "pointer";
+        const f = points[0];
+        setHovered({
+          longitude:     e.lngLat.lng,
+          latitude:      e.lngLat.lat,
+          severity:      f.properties?.severity,
+          police_station: f.properties?.police_station,
+          road_name:     f.properties?.road_name,
+        });
+        return;
+      }
+      map.getCanvas().style.cursor = "";
+      setHovered(null);
+    };
+
+    const onLeave = () => {
+      map.getCanvas().style.cursor = "";
+      setHovered(null);
+    };
+
+    map.on("mousemove", onMove);
+    map.on("mouseout",  onLeave);
+    return () => {
+      map.off("mousemove", onMove);
+      map.off("mouseout",  onLeave);
+      map.getCanvas().style.cursor = "";
+    };
+  }, [mapRef]);
+
+  return (
+    <>
+      <Source
+        id="blackspot-source"
+        type="geojson"
+        data={geojsonData as any}
+        cluster
+        clusterMaxZoom={15}
+        clusterRadius={30}
+      >
+        {/* ── Outer soft halo ─────────────────────────────────────────── */}
+        <Layer
+          id="blackspot-halo"
+          type="circle"
+          filter={["has", "point_count"]}
+          paint={{
+            "circle-color":   BS_HALO_COLOR_EXPR as any,
+            "circle-radius":  BS_HALO_RADIUS_EXPR as any,
+            "circle-blur":    0.7,
+            "circle-opacity": 1,
+          }}
+        />
+
+        {/* ── Core risk bubble ────────────────────────────────────────── */}
+        <Layer
+          id="blackspot-core"
+          type="circle"
+          filter={["has", "point_count"]}
+          paint={{
+            "circle-color":        BS_COLOR_EXPR as any,
+            "circle-radius":       BS_CORE_RADIUS_EXPR as any,
+            "circle-opacity":      0.93,
+            "circle-stroke-width": 1.5,
+            "circle-stroke-color": "#FFFFFF",
+          }}
+        />
+
+        {/* ── Count label ─────────────────────────────────────────────── */}
+        <Layer
+          id="blackspot-count"
+          type="symbol"
+          filter={["has", "point_count"]}
+          layout={{
+            "text-field":         "{point_count_abbreviated}",
+            "text-size":          BS_TEXT_SIZE_EXPR as any,
+            "text-font":          ["Open Sans Bold", "Arial Unicode MS Bold"],
+            "text-allow-overlap": true,
+          }}
+          paint={{
+            "text-color":      "#FFFFFF",
+            "text-halo-color": "rgba(0,0,0,0.40)",
+            "text-halo-width": 1.2,
+          }}
+        />
+
+        {/* ── Unclustered point halo (zoom 15+) ───────────────────────── */}
+        <Layer
+          id="blackspot-single-halo"
+          type="circle"
+          filter={["!", ["has", "point_count"]]}
+          paint={{
+            "circle-color":  "rgba(220,38,38,0.18)",
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 7, 17, 14],
+            "circle-blur":   0.65,
+          }}
+        />
+
+        {/* ── Unclustered point core (severity-colored) ───────────────── */}
+        <Layer
+          id="blackspot-single-point"
+          type="circle"
+          filter={["!", ["has", "point_count"]]}
+          paint={{
+            "circle-color":        BS_SINGLE_COLOR_EXPR as any,
+            "circle-radius":       ["interpolate", ["linear"], ["zoom"], 13, 4, 17, 7],
+            "circle-opacity":      0.9,
+            "circle-stroke-width": 1.2,
+            "circle-stroke-color": "#FFFFFF",
+          }}
+        />
+      </Source>
+
+      {/* ── Hover tooltip ───────────────────────────────────────────────── */}
+      {hovered && (
+        <Popup
+          longitude={hovered.longitude}
+          latitude={hovered.latitude}
+          anchor="bottom"
+          closeButton={false}
+          closeOnClick={false}
+          offset={12}
+        >
+          <BlackspotPopup hovered={hovered} />
+        </Popup>
+      )}
+    </>
+  );
+}
+
+function BlackspotPopup({ hovered }: { hovered: NonNullable<HoverState> }) {
+  if (hovered.point_count !== undefined) {
+    const count = hovered.point_count;
+    const risk  = getRiskLabel(count);
+    const color = getRiskColor(count);
+    return (
+      <div style={{ minWidth: 170, fontFamily: "inherit" }}>
+        <div style={{
+          background: color, color: "#fff",
+          padding: "6px 10px", borderRadius: "6px 6px 0 0",
+          fontSize: 11, fontWeight: 700, letterSpacing: "0.04em",
+          textTransform: "uppercase",
+        }}>
+          {risk}
+        </div>
+        <div style={{ padding: "8px 10px 6px", fontSize: 12, color: "#1e293b" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>{count.toLocaleString()}</div>
+          <div style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>Accidents in cluster</div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ minWidth: 170, padding: "8px 10px", fontSize: 12, color: "#1e293b", fontFamily: "inherit" }}>
+      <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}>Accident Site</div>
+      {hovered.severity      && <div><b>Severity:</b> {hovered.severity}</div>}
+      {hovered.police_station && <div><b>Station:</b> {safeText(hovered.police_station)}</div>}
+      {hovered.road_name      && <div><b>Road:</b> {safeText(hovered.road_name)}</div>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main exported component
 // ---------------------------------------------------------------------------
 
@@ -308,164 +519,7 @@ export function VisualizationLayers({
 
   // ── Blackspot cluster ────────────────────────────────────────────────────
   if (type === "blackspot") {
-    return (
-      <Source
-        id="blackspot-source"
-        type="geojson"
-        data={geojsonData as any}
-        cluster
-        clusterMaxZoom={15}
-        clusterRadius={34}
-      >
-        <Layer
-          id="blackspot-halo"
-          type="circle"
-          filter={["has", "point_count"]}
-          paint={{
-            "circle-color": [
-              "step",
-              ["get", "point_count"],
-              "rgba(245, 158, 11, 0.35)",
-              50,
-              "rgba(249, 115, 22, 0.38)",
-              150,
-              "rgba(220, 38, 38, 0.42)",
-              300,
-              "rgba(127, 29, 29, 0.48)",
-            ],
-            "circle-radius": [
-              "step",
-              ["get", "point_count"],
-              22,
-              50,
-              30,
-              150,
-              40,
-              300,
-              52,
-            ],
-            "circle-blur": 0.65,
-            "circle-opacity": 0.95,
-          }}
-        />
-        <Layer
-          id="blackspot-core"
-          type="circle"
-          filter={["has", "point_count"]}
-          paint={{
-            "circle-color": [
-              "step",
-              ["get", "point_count"],
-              "#F59E0B",
-              50,
-              "#F97316",
-              150,
-              "#DC2626",
-              300,
-              "#7F1D1D",
-            ],
-            "circle-radius": [
-              "step",
-              ["get", "point_count"],
-              12,
-              50,
-              17,
-              150,
-              23,
-              300,
-              30,
-            ],
-            "circle-opacity": 0.92,
-            "circle-stroke-width": 2.5,
-            "circle-stroke-color": "#FFFFFF",
-          }}
-        />
-        <Layer
-          id="blackspot-inner-shine"
-          type="circle"
-          filter={["has", "point_count"]}
-          paint={{
-            "circle-color": "rgba(255,255,255,0.26)",
-            "circle-radius": [
-              "step",
-              ["get", "point_count"],
-              5,
-              50,
-              7,
-              150,
-              9,
-              300,
-              12,
-            ],
-            "circle-translate": [-3, -3],
-          }}
-        />
-        <Layer
-          id="blackspot-count"
-          type="symbol"
-          filter={["has", "point_count"]}
-          layout={{
-            "text-field": "{point_count_abbreviated}",
-            "text-size": [
-              "step",
-              ["get", "point_count"],
-              11,
-              50,
-              12,
-              150,
-              13,
-              300,
-              14,
-            ],
-            "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-            "text-allow-overlap": true,
-          }}
-          paint={{
-            "text-color": "#FFFFFF",
-            "text-halo-color": "rgba(0,0,0,0.28)",
-            "text-halo-width": 1,
-          }}
-        />
-        <Layer
-          id="blackspot-single-point-halo"
-          type="circle"
-          filter={["!", ["has", "point_count"]]}
-          paint={{
-            "circle-color": "rgba(239, 68, 68, 0.22)",
-            "circle-radius": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              10,
-              5,
-              15,
-              10,
-            ],
-            "circle-blur": 0.6,
-          }}
-        />
-        <Layer
-          id="blackspot-single-point"
-          type="circle"
-          filter={["!", ["has", "point_count"]]}
-          paint={{
-            "circle-color": "#EF4444",
-            "circle-radius": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              10,
-              2.5,
-              15,
-              4.5,
-            ],
-            "circle-opacity": 0.75,
-            "circle-stroke-width": 1,
-            "circle-stroke-color": "#FFFFFF",
-          }}
-        />
-      </Source>
-    );
+    return <BlackspotLayers geojsonData={geojsonData} />;
   }
 
   // ── Location markers ─────────────────────────────────────────────────────

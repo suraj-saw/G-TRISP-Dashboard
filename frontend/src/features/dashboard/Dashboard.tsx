@@ -6,11 +6,11 @@ import API from "../../api/axios";
 import type { User } from "../../types/user";
 
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
+import { DensityMapOverlays } from "../../components/maps/MapOverlays";
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
 
 import {
-  MapPin,
   Filter,
   Layers,
   ChevronDown,
@@ -24,15 +24,14 @@ import { fetchFilterOptions } from "../../api/dashboardApi";
 import SuratBaseMap from "../../components/maps/SuratBaseMap";
 import { MAP_STYLES } from "../../components/maps/mapStyles";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
+import LocationMarkersInsights from "../../components/charts/LocationMarkersInsights";
 import { ROUTES } from "../../config/constants";
 import {
   SIDEBAR_WIDTH_PX,
   TOPBAR_HEIGHT_PX,
-  MAIN_CONTENT_TOP_PADDING_PX,
   SIDEBAR_Z_INDEX,
   TOPBAR_Z_INDEX,
   SIDEBAR_TRANSITION,
-  MAP_DEFAULT_HEIGHT,
 } from "../../config/layout";
 import {
   defaultFilters,
@@ -55,31 +54,24 @@ export default function Dashboard() {
   const [openPanels, setOpenPanels] = useState({ map: true, data: true });
 
   const allDataFilters: DashboardFilters = defaultFilters;
-
   const { data: allData } = useDashboard(allDataFilters);
   const { data, loading, error } = useDashboard(filters);
 
   useEffect(() => {
     let active = true;
-
     API.get<User>("/auth/me")
       .then((res) => {
         if (!active) return;
-
         if (res.data.role === "admin") {
           navigate(ROUTES.ADMIN, { replace: true });
           return;
         }
-
         setUser(res.data);
       })
-      .catch(() => {
-        navigate(ROUTES.LOGIN, { replace: true });
-      })
+      .catch(() => navigate(ROUTES.LOGIN, { replace: true }))
       .finally(() => {
         if (active) setSessionChecking(false);
       });
-
     return () => {
       active = false;
     };
@@ -93,7 +85,7 @@ export default function Dashboard() {
     try {
       await API.post("/auth/logout");
     } catch {
-      // Continue to login even if logout request fails.
+      /* continue */
     }
     navigate(ROUTES.LOGIN, { replace: true });
   };
@@ -108,11 +100,13 @@ export default function Dashboard() {
 
   const severities = useMemo(() => {
     if (!allData?.severity) return ["all"];
-    const labels = allData.severity
-      .map((s) => s.severity)
-      .filter(Boolean)
-      .sort();
-    return ["all", ...labels];
+    return [
+      "all",
+      ...allData.severity
+        .map((s) => s.severity)
+        .filter(Boolean)
+        .sort(),
+    ];
   }, [allData.severity]);
 
   const monthOptions = [
@@ -154,65 +148,74 @@ export default function Dashboard() {
     FilterId,
     { value: string; label: string }[]
   > = {
-    baseMap: MAP_STYLES.map((style) => ({
-      value: style.id,
-      label: style.label,
-    })),
+    baseMap: MAP_STYLES.map((s) => ({ value: s.id, label: s.label })),
     visualization_type: VISUALIZATION_OPTIONS,
-    year: years.map((year) => ({
-      value: year,
-      label: year === "all" ? "All years" : year,
+    year: years.map((y) => ({
+      value: y,
+      label: y === "all" ? "All years" : y,
     })),
     month: monthOptions,
     day: dayOptions,
     time_period: timePeriodOptions,
     district: [
       { value: "all", label: "All police stations" },
-      ...(filterOptions?.police_stations || []).map((station) => ({
-        value: station,
-        label: station,
+      ...(filterOptions?.police_stations || []).map((s) => ({
+        value: s,
+        label: s,
       })),
     ],
-    severity: severities.map((severity) => ({
-      value: severity,
-      label: severity === "all" ? "All severity" : severity,
+    severity: severities.map((s) => ({
+      value: s,
+      label: s === "all" ? "All severity" : s,
     })),
     road_classification: [
       { value: "all", label: "All road types" },
-      ...(filterOptions?.road_classifications || []).map((road) => ({
-        value: road,
-        label: road,
+      ...(filterOptions?.road_classifications || []).map((r) => ({
+        value: r,
+        label: r,
       })),
     ],
     weather_condition: [
       { value: "all", label: "All weather" },
-      ...(filterOptions?.weather_conditions || []).map((weather) => ({
-        value: weather,
-        label: weather,
+      ...(filterOptions?.weather_conditions || []).map((w) => ({
+        value: w,
+        label: w,
       })),
     ],
     light_condition: [
       { value: "all", label: "All conditions" },
-      ...(filterOptions?.light_conditions || []).map((light) => ({
-        value: light,
-        label: light,
+      ...(filterOptions?.light_conditions || []).map((l) => ({
+        value: l,
+        label: l,
       })),
     ],
     collision_type: [
       { value: "all", label: "All types" },
-      ...(filterOptions?.collision_types || []).map((collision) => ({
-        value: collision,
-        label: collision,
+      ...(filterOptions?.collision_types || []).map((c) => ({
+        value: c,
+        label: c,
       })),
     ],
   };
 
   const activeFilterConfig = getFilterConfig(filters.visualization_type);
-  const isTemporalAnalysis = filters.visualization_type === "temporal_analysis";
+  const isTemporalAnalysis   = filters.visualization_type === "temporal_analysis";
+  const isDensityHeatmap     = filters.visualization_type === "density_heatmap";
+  const isLocationMarkers    = filters.visualization_type === "location_markers" || !filters.visualization_type;
+
+  // Build a human-readable subtitle for the overlay
+  const overlaySubtitle = useMemo(() => {
+    const parts: string[] = ["Surat"];
+    if (filters.district && filters.district !== "all")
+      parts.push(filters.district);
+    if (filters.year && filters.year !== "all") parts.push(filters.year);
+    if (filters.severity && filters.severity !== "all")
+      parts.push(filters.severity);
+    return parts.join(" · ");
+  }, [filters.district, filters.year, filters.severity]);
 
   const renderFilter = (filter: (typeof activeFilterConfig)[number]) => {
     const value = String(filters[filter.id] ?? "all");
-
     const handleChange = (nextValue: string) => {
       setFilters((current) => {
         if (filter.id === "visualization_type") {
@@ -224,13 +227,9 @@ export default function Dashboard() {
             time_period: "all",
           };
         }
-        return {
-          ...current,
-          [filter.id]: nextValue,
-        };
+        return { ...current, [filter.id]: nextValue };
       });
     };
-
     return (
       <div key={filter.id} className="flex flex-col gap-1.5">
         <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-[#6B7299]">
@@ -258,7 +257,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#F1F4FB]">
-      {/* ── TOPBAR — always full viewport width ── */}
+      {/* TOPBAR */}
       <div className={`fixed left-0 right-0 top-0 ${TOPBAR_Z_INDEX}`}>
         <TopBar
           appName="G-TRISP"
@@ -270,7 +269,7 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* ── SIDEBAR ── */}
+      {/* SIDEBAR */}
       <aside
         style={{
           top: `${TOPBAR_HEIGHT_PX}px`,
@@ -279,17 +278,13 @@ export default function Dashboard() {
         }}
         className={`
           fixed left-0 ${SIDEBAR_Z_INDEX}
-          flex flex-col
-          overflow-y-auto no-scrollbar
-          border-r border-[#E4E8F4] bg-[#F1F4FB]
-          shadow-lg
-          will-change-transform
-          ${SIDEBAR_TRANSITION}
+          flex flex-col overflow-y-auto no-scrollbar
+          border-r border-[#E4E8F4] bg-[#F1F4FB] shadow-lg
+          will-change-transform ${SIDEBAR_TRANSITION}
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
         <div className="flex-1 px-3 py-4 flex flex-col gap-3">
-          {/* Sidebar heading */}
           <div className="flex items-center gap-2 px-1">
             <Filter size={13} className="text-[#1e3a8a]" />
             <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#1A1D2E]">
@@ -305,13 +300,11 @@ export default function Dashboard() {
             const dataFilters = activeFilterConfig.filter(
               (f) => !MAP_FILTER_IDS.includes(f.id)
             );
-
             const togglePanel = (key: "map" | "data") =>
               setOpenPanels((prev) => ({ ...prev, [key]: !prev[key] }));
 
             return (
               <>
-                {/* MAP SETTINGS PANEL */}
                 {mapFilters.length > 0 && (
                   <section className="rounded-xl border border-[#E4E8F4] bg-white shadow-sm overflow-hidden">
                     <button
@@ -326,9 +319,7 @@ export default function Dashboard() {
                       </h2>
                       <ChevronDown
                         size={15}
-                        className={`text-white/75 transition-transform duration-200 ${
-                          openPanels.map ? "rotate-180" : ""
-                        }`}
+                        className={`text-white/75 transition-transform duration-200 ${openPanels.map ? "rotate-180" : ""}`}
                       />
                     </button>
                     {openPanels.map && (
@@ -339,7 +330,6 @@ export default function Dashboard() {
                   </section>
                 )}
 
-                {/* DATA FILTERS PANEL */}
                 {dataFilters.length > 0 && (
                   <section className="rounded-xl border border-[#E4E8F4] bg-white shadow-sm overflow-hidden">
                     <button
@@ -354,9 +344,7 @@ export default function Dashboard() {
                       </h2>
                       <ChevronDown
                         size={15}
-                        className={`text-white/75 transition-transform duration-200 ${
-                          openPanels.data ? "rotate-180" : ""
-                        }`}
+                        className={`text-white/75 transition-transform duration-200 ${openPanels.data ? "rotate-180" : ""}`}
                       />
                     </button>
                     {openPanels.data && (
@@ -370,7 +358,6 @@ export default function Dashboard() {
             );
           })()}
 
-          {/* RESET */}
           <button
             onClick={() => setFilters(defaultFilters)}
             className="flex items-center justify-center gap-2 rounded-lg border border-[#E4E8F4] bg-white px-4 py-2.5 text-[12px] font-semibold text-[#6B7299] shadow-sm transition hover:border-[#1e3a8a] hover:text-[#1e3a8a] active:scale-[0.98]"
@@ -381,18 +368,16 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      {/* ── MAIN CONTENT ── */}
+      {/* MAIN CONTENT */}
       <main
-        className="min-w-0 transition-[padding-left] duration-300 ease-in-out"
+        className="min-w-0 transition-[padding-left] duration-300 ease-in-out overflow-y-auto"
         style={{
           paddingTop: `${TOPBAR_HEIGHT_PX}px`,
           paddingLeft: sidebarOpen ? `${SIDEBAR_WIDTH_PX}px` : "0px",
+          minHeight: "100vh",
         }}
       >
-        <div
-          className="flex flex-col gap-4 p-4"
-          style={{ height: `calc(100vh - ${TOPBAR_HEIGHT_PX}px)` }}
-        >
+        <div className="flex flex-col gap-4 p-4">
           {error && (
             <div className="flex items-start gap-3 rounded-xl border border-[#FECACA] bg-[#FFF5F5] px-4 py-3 text-sm text-[#B91C1C]">
               <AlertTriangle size={16} className="mt-0.5 shrink-0" />
@@ -403,34 +388,29 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Map / Temporal area — always viewport height */}
           <motion.div
-            className="flex-1 min-h-0"
+            className="w-full"
+            style={{ height: `calc(100vh - ${TOPBAR_HEIGHT_PX}px - 2rem)` }}
             animate={{ opacity: loading ? 0.6 : 1 }}
             transition={{ duration: 0.2, ease: "easeInOut" }}
-            style={{ pointerEvents: loading ? "none" : "auto" }}
           >
             {isTemporalAnalysis ? (
               <TemporalAnalysis filters={filters} />
             ) : (
               <div className="h-full w-full rounded-2xl overflow-hidden shadow-xl border border-[#E4E8F4] relative">
-                {/* <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 backdrop-blur-sm border border-white/50 rounded-xl px-4 py-2.5 shadow-lg">
-                  <div className="h-7 w-7 rounded-lg bg-[radial-gradient(circle_at_top_left,#2C6EF2,#1e3a8a)] flex items-center justify-center shrink-0">
-                    <MapPin size={13} className="text-white" />
-                  </div>
-                  <div>
-                    <p className="text-[13px] font-bold text-slate-800 leading-none">
-                      Surat District
-                    </p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">
-                      Road Safety Dashboard
-                    </p>
-                  </div>
-                </div> */}
-
                 <SuratBaseMap
                   height="100%"
                   sidebarOpen={sidebarOpen}
-                  baseMap={filters.baseMap || "osm"}
+                  baseMap={filters.baseMap || "carto-light"}
+                  overlays={
+                    isDensityHeatmap ? (
+                      <DensityMapOverlays
+                        data={data?.heatmap}
+                        subtitle={overlaySubtitle}
+                      />
+                    ) : undefined
+                  }
                 >
                   <VisualizationLayers
                     key={filters.visualization_type || "location_markers"}
@@ -442,6 +422,18 @@ export default function Dashboard() {
               </div>
             )}
           </motion.div>
+
+          {/* Charts panel — shown below map only for Location Markers */}
+          {isLocationMarkers && data && !loading && (
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="pb-6"
+            >
+              <LocationMarkersInsights data={data} />
+            </motion.div>
+          )}
         </div>
       </main>
     </div>

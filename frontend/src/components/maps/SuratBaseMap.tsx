@@ -76,7 +76,6 @@ function getBbox(
   return isFinite(minLng) ? [minLng, minLat, maxLng, maxLat] : null;
 }
 
-// Mask colours for satellite vs. normal base maps
 const MASK_COLOR_SATELLITE = "#000000";
 const MASK_OPACITY_SATELLITE = 0.65;
 const MASK_COLOR_DEFAULT = "#F1F4FB";
@@ -90,7 +89,10 @@ interface Props {
   height?: string;
   sidebarOpen?: boolean;
   baseMap?: string;
+  /** MapLibre Source/Layer/Popup children rendered INSIDE <Map> */
   children?: ReactNode;
+  /** Overlay UI rendered OUTSIDE <Map> but inside the relative wrapper (e.g. legend, stats badge) */
+  overlays?: ReactNode;
 }
 
 const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
@@ -100,6 +102,7 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
       sidebarOpen,
       baseMap = "positron",
       children,
+      overlays,
     },
     ref
   ) => {
@@ -118,10 +121,6 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
 
     const isSatelliteMap = SATELLITE_BASE_MAP_IDS.has(baseMap ?? "");
 
-    // Re-fit the map to the district bounding box for the *current* container
-    // size. Used on initial load, on the imperative `resize()` handle, and after
-    // the sidebar open/close animation so the district always stays fully
-    // contained instead of shifting.
     const fitToBounds = useCallback((duration: number) => {
       if (!bboxRef.current) return;
       const [w, s, e, n] = bboxRef.current;
@@ -169,10 +168,6 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
       fitToBounds(900);
     }, [mapLoaded, boundary, fitToBounds]);
 
-    // When the sidebar opens/closes the map container changes width. Keep the
-    // canvas in sync during the CSS transition via repeated resize() calls, then
-    // re-fit the district bounds once the animation settles so the map zooms to
-    // contain the district instead of just shifting its center.
     useEffect(() => {
       if (!mapLoaded) return;
       const start = performance.now();
@@ -183,7 +178,6 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
         if (now - start < MAP_RESIZE_LOOP_MS) {
           frameId = requestAnimationFrame(loop);
         } else {
-          // Final refit against the settled container size.
           fitToBounds(MAP_FIT_DURATION_MS);
         }
       };
@@ -286,8 +280,13 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
               />
             </Source>
           )}
+          {/* MapLibre children: Source / Layer / Popup etc. */}
           {children}
         </Map>
+
+        {/* Overlay UI: legend, stats badge, title chip — rendered OUTSIDE <Map> */}
+        {overlays}
+
         <div
           className="absolute bottom-1 right-2 z-10 text-[10px] text-slate-400"
           style={{ pointerEvents: "none" }}
