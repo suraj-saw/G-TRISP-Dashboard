@@ -10,6 +10,7 @@ import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import { DensityMapOverlays } from "../../components/maps/MapOverlays";
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
+import ExportButton from "../../components/layout/ExportButton";
 
 import {
   Filter,
@@ -364,6 +365,7 @@ export default function AdminDashboard() {
             );
           })()}
 
+          <ExportButton filters={filters} />
           <button
             onClick={() => setFilters(defaultFilters)}
             className="flex items-center justify-center gap-2 rounded-lg border border-[#E4E8F4] bg-white px-4 py-2.5 text-[12px] font-semibold text-[#6B7299] shadow-sm transition hover:border-[#1e3a8a] hover:text-[#1e3a8a] active:scale-[0.98]"

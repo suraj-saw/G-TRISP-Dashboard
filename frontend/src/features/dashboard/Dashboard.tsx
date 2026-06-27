@@ -9,6 +9,7 @@ import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import { DensityMapOverlays } from "../../components/maps/MapOverlays";
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
+import ExportButton from "../../components/layout/ExportButton";
 
 import {
   Filter,
@@ -357,6 +358,8 @@ export default function Dashboard() {
               </>
             );
           })()}
+
+          <ExportButton filters={filters} />
 
           <button
             onClick={() => setFilters(defaultFilters)}
