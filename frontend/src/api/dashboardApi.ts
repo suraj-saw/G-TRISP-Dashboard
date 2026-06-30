@@ -141,3 +141,21 @@ export const fetchTemporalAnalysis = async (
   });
   return data;
 };
+
+export interface BlackspotData {
+  total_crashes: number;
+  total_blackspots: number;
+  isolated_crashes: number;
+  radius_m: number;
+  min_crashes: number;
+  circles: GeoJSON.FeatureCollection;
+  centroids: GeoJSON.FeatureCollection;
+}
+
+export const fetchBlackspots = async (
+  filters: DashboardFilters
+): Promise<BlackspotData> => {
+  const params = getParams(filters);
+  const { data } = await API.get(`${SURAT_API_BASE}/blackspots`, { params });
+  return data;
+};

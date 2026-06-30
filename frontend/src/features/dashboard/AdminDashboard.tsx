@@ -7,6 +7,7 @@ import type { User } from "../../types/user";
 import type { Notification } from "../../types/notification";
 
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
+import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
 import { DensityMapOverlays } from "../../components/maps/MapOverlays";
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
@@ -206,6 +207,7 @@ export default function AdminDashboard() {
   const activeFilterConfig = getFilterConfig(filters.visualization_type);
   const isTemporalAnalysis = filters.visualization_type === "temporal_analysis";
   const isDensityHeatmap = filters.visualization_type === "density_heatmap";
+  const isBlackspotDetection = filters.visualization_type === "blackspot";
 
   const overlaySubtitle = useMemo(() => {
     const parts: string[] = ["Surat"];
@@ -421,12 +423,16 @@ export default function AdminDashboard() {
                     ) : undefined
                   }
                 >
-                  <VisualizationLayers
-                    key={filters.visualization_type || "location_markers"}
-                    data={data?.heatmap}
-                    type={filters.visualization_type || "location_markers"}
-                    selectedSeverity={filters.severity}
-                  />
+                  {isBlackspotDetection ? (
+                    <BlackspotDetectionLayers filters={filters} />
+                  ) : (
+                    <VisualizationLayers
+                      key={filters.visualization_type || "location_markers"}
+                      data={data?.heatmap}
+                      type={filters.visualization_type || "location_markers"}
+                      selectedSeverity={filters.severity}
+                    />
+                  )}
                 </SuratBaseMap>
               </div>
             )}

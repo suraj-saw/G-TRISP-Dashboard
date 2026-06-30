@@ -68,6 +68,8 @@ from app.utils.surat_accident_utils import (
 )
 from app.utils.text_utils import safe_text
 from app.utils.datetime_utils import parse_accident_datetime_from_str
+from app.utils.blackspot_utils import CrashPoint, greedy_blackspots, blackspots_to_geojson
+from app.core.constants import BLACKSPOT_RADIUS_METERS, BLACKSPOT_MIN_CRASHES
 
 from app.core.constants import (
     SEVERITY_FATAL,
@@ -796,3 +798,51 @@ def get_yearly_comparison(
             for yr, v in sorted(years.items())
         ]
     )
+
+
+@router.get("/blackspots")
+def get_blackspots(
+    police_station: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    year: Optional[int] = Query(None),
+    road_classification: Optional[str] = Query(None),
+    weather_condition: Optional[str] = Query(None),
+    light_condition: Optional[str] = Query(None),
+    collision_type: Optional[str] = Query(None),
+    radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
+    min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
+    db: Session = Depends(get_db),
+):
+    """
+    Greedy blackspot detection (same algorithm as the offline notebook
+    pipeline). Returns 250 m blackspot circles + their anchor centroids
+    as GeoJSON, respecting the active dashboard filters.
+    """
+    query = apply_surat_filters(
+        db.query(SuratAccident),
+        police_station, year, road_classification,
+        weather_condition, light_condition, collision_type,
+    )
+    if severity and severity != "all":
+        query = query.filter(SuratAccident.severity == severity)
+
+    accidents = query.all()
+
+    points = [
+        CrashPoint(index=idx, accident_id=a.accident_id, lat=a.latitude, lon=a.longitude)
+        for idx, a in enumerate(accidents)
+        if a.latitude is not None and a.longitude is not None
+    ]
+
+    blackspots = greedy_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
+    geojson = blackspots_to_geojson(blackspots, radius_m=radius_m)
+
+    return {
+        "total_crashes": len(points),
+        "total_blackspots": len(blackspots),
+        "isolated_crashes": len(points) - sum(b.crash_count for b in blackspots),
+        "radius_m": radius_m,
+        "min_crashes": min_crashes,
+        "circles": geojson["circles"],
+        "centroids": geojson["centroids"],
+    }
