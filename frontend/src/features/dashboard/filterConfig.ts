@@ -6,6 +6,7 @@ export type VisualizationType =
   | "location_markers"
   | "density_heatmap"
   | "blackspot"
+  | "dbscan_blackspot"
   | "temporal_analysis";
 
 export type FilterId =
@@ -32,6 +33,7 @@ export const VISUALIZATION_OPTIONS = [
   { value: "location_markers", label: "Location Markers" },
   { value: "density_heatmap", label: "Density Heatmap" },
   { value: "blackspot", label: "Blackspot Detection" },
+  { value: "dbscan_blackspot", label: "DBSCAN Blackspot Detection" },
   { value: "temporal_analysis", label: "Temporal Analysis" },
 ];
 

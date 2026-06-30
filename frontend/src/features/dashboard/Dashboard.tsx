@@ -11,6 +11,7 @@ import { DensityMapOverlays } from "../../components/maps/MapOverlays";
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
 import ExportButton from "../../components/layout/ExportButton";
+import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
 
 import {
   Filter,
@@ -204,6 +205,7 @@ export default function Dashboard() {
   const isTemporalAnalysis = filters.visualization_type === "temporal_analysis";
   const isDensityHeatmap = filters.visualization_type === "density_heatmap";
   const isBlackspotDetection = filters.visualization_type === "blackspot";
+  const isDbscanBlackspot = filters.visualization_type === "dbscan_blackspot";
   const isLocationMarkers =
     filters.visualization_type === "location_markers" ||
     !filters.visualization_type;
@@ -421,6 +423,8 @@ export default function Dashboard() {
                 >
                   {isBlackspotDetection ? (
                     <BlackspotDetectionLayers filters={filters} />
+                  ) : isDbscanBlackspot ? (
+                    <DbscanBlackspotDetectionLayers filters={filters} />
                   ) : (
                     <VisualizationLayers
                       key={filters.visualization_type || "location_markers"}
