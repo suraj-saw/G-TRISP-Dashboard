@@ -13,6 +13,7 @@ import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
 import ExportButton from "../../components/layout/ExportButton";
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
+import AccidentDensityHeatmapLayers from "../../components/maps/AccidentDensityHeatmapLayers";
 
 import {
   Filter,
@@ -210,6 +211,8 @@ export default function AdminDashboard() {
   const isDensityHeatmap = filters.visualization_type === "density_heatmap";
   const isBlackspotDetection = filters.visualization_type === "blackspot";
   const isDbscanBlackspot = filters.visualization_type === "dbscan_blackspot";
+  const isKdeDensityHeatmap =
+    filters.visualization_type === "kde_density_heatmap";
 
   const overlaySubtitle = useMemo(() => {
     const parts: string[] = ["Surat"];
@@ -429,6 +432,8 @@ export default function AdminDashboard() {
                     <BlackspotDetectionLayers filters={filters} />
                   ) : isDbscanBlackspot ? (
                     <DbscanBlackspotDetectionLayers filters={filters} />
+                  ) : isKdeDensityHeatmap ? (
+                    <AccidentDensityHeatmapLayers filters={filters} />
                   ) : (
                     <VisualizationLayers
                       key={filters.visualization_type || "location_markers"}

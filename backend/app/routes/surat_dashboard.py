@@ -20,6 +20,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.surat_accident import SuratAccident
+import base64
+from app.utils.kde_utils import compute_kde_heatmap
+from app.core.constants import KDE_RADIUS_METERS, KDE_PIXEL_METERS
 
 from app.schemas.dashboard_schema import (
     CasualtyBreakdown,
@@ -893,4 +896,61 @@ def get_dbscan_blackspots(
         "min_crashes": min_crashes,
         "circles": geojson["circles"],
         "centroids": geojson["centroids"],
+    }
+
+
+@router.get("/kde-heatmap")
+def get_kde_heatmap(
+    police_station: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    year: Optional[int] = Query(None),
+    road_classification: Optional[str] = Query(None),
+    weather_condition: Optional[str] = Query(None),
+    light_condition: Optional[str] = Query(None),
+    collision_type: Optional[str] = Query(None),
+    radius_m: float = Query(KDE_RADIUS_METERS, ge=100, le=2000),
+    pixel_m: float = Query(KDE_PIXEL_METERS, ge=10, le=200),
+    db: Session = Depends(get_db),
+):
+    """
+    Continuous accident-density surface using a quartic kernel — identical
+    formula to QGIS's built-in Heatmap tool and the offline notebook's
+    build_kde_raster(). Returns a georeferenced PNG (base64 data URL) plus
+    the four corner coordinates needed for a MapLibre ImageSource overlay.
+    """
+    query = apply_surat_filters(
+        db.query(SuratAccident),
+        police_station, year, road_classification,
+        weather_condition, light_condition, collision_type,
+    )
+    if severity and severity != "all":
+        query = query.filter(SuratAccident.severity == severity)
+
+    accidents = query.all()
+    lats = [a.latitude for a in accidents if a.latitude is not None and a.longitude is not None]
+    lons = [a.longitude for a in accidents if a.latitude is not None and a.longitude is not None]
+
+    result = compute_kde_heatmap(lats, lons, radius_m=radius_m, pixel_m=pixel_m)
+
+    if result is None:
+        return {
+            "total_crashes": 0,
+            "radius_m": radius_m,
+            "pixel_m": pixel_m,
+            "image": None,
+            "coordinates": None,
+        }
+
+    image_data_url = (
+        "data:image/png;base64," + base64.b64encode(result["png_bytes"]).decode("ascii")
+    )
+
+    return {
+        "total_crashes": len(lats),
+        "radius_m": radius_m,
+        "pixel_m": pixel_m,
+        "image": image_data_url,
+        "coordinates": result["coordinates"],
+        "width": result["width"],
+        "height": result["height"],
     }

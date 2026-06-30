@@ -7,6 +7,7 @@ export type VisualizationType =
   | "density_heatmap"
   | "blackspot"
   | "dbscan_blackspot"
+  | "kde_density_heatmap"
   | "temporal_analysis";
 
 export type FilterId =
@@ -34,6 +35,7 @@ export const VISUALIZATION_OPTIONS = [
   { value: "density_heatmap", label: "Density Heatmap" },
   { value: "blackspot", label: "Blackspot Detection" },
   { value: "dbscan_blackspot", label: "DBSCAN Blackspot Detection" },
+  { value: "kde_density_heatmap", label: "Accident Density Heatmap (KDE)" },
   { value: "temporal_analysis", label: "Temporal Analysis" },
 ];
 

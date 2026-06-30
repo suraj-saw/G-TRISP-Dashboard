@@ -169,3 +169,21 @@ export const fetchDbscanBlackspots = async (
   });
   return data;
 };
+
+export interface KdeHeatmapData {
+  total_crashes: number;
+  radius_m: number;
+  pixel_m?: number;
+  image: string | null;
+  coordinates: [number, number][] | null;
+  width?: number;
+  height?: number;
+}
+
+export const fetchKdeHeatmap = async (
+  filters: DashboardFilters
+): Promise<KdeHeatmapData> => {
+  const params = getParams(filters);
+  const { data } = await API.get(`${SURAT_API_BASE}/kde-heatmap`, { params });
+  return data;
+};
