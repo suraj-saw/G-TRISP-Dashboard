@@ -1,0 +1,6 @@
+# Ignore everything by default
+*
+
+# Only include what nginx needs
+!nginx/nginx.conf
+!frontend/dist/
