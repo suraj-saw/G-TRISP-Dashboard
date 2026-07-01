@@ -9,7 +9,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 
-class AccidentBase(BaseModel):
+class GujaratAccidentBase(BaseModel):
     accident_id:    Optional[str] = None
     district:       Optional[str] = None
     police_station: Optional[str] = None
@@ -52,13 +52,17 @@ class AccidentBase(BaseModel):
     traffic_violation: Optional[str] = None
 
 
-class AccidentResponse(AccidentBase):
+class GujaratAccidentCreate(GujaratAccidentBase):
+    pass
+
+
+class GujaratAccidentResponse(GujaratAccidentBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
 
 
-class AccidentListResponse(BaseModel):
+class GujaratAccidentListResponse(BaseModel):
     """Paginated accident list."""
     total: int
-    items: list[AccidentResponse]
+    items: list[GujaratAccidentResponse]
