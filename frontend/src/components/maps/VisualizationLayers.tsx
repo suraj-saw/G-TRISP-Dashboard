@@ -35,7 +35,7 @@ import {
 interface Props {
   data?: HeatmapPoint[];
   type: string;
-  selectedSeverity?: string;
+  selectedSeverity?: string[];
 }
 
 type SelectedAccident = {
@@ -431,7 +431,7 @@ function BlackspotPopup({ hovered }: { hovered: NonNullable<HoverState> }) {
 export function VisualizationLayers({
   data,
   type,
-  selectedSeverity = "all",
+  selectedSeverity = [],
 }: Props) {
   const { current: mapRef } = useMap();
   const [selected, setSelected] = useState<SelectedAccident | null>(null);
@@ -524,7 +524,7 @@ export function VisualizationLayers({
 
   // ── Location markers ─────────────────────────────────────────────────────
   const markerColor =
-    selectedSeverity === "all"
+    selectedSeverity.length === 0
       ? SEVERITY_COLORS.all
       : (severityColorExpression as any);
 

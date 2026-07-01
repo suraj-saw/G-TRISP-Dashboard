@@ -12,7 +12,7 @@ from app.core.config import POSTGIS_SRID
 
 
 class SuratAccident(Base):
-    __tablename__ = "surat_accidents"
+    __tablename__ = "surat_city"
 
     id = Column(Integer, primary_key=True, index=True)
 

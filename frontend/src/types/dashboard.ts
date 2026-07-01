@@ -1,14 +1,14 @@
 export interface DashboardFilters {
-  district: string;
-  year: string;
-  month?: string;
-  day?: string;
-  time_period?: string;
-  severity: string;
-  road_classification: string;
-  weather_condition: string;
-  light_condition: string;
-  collision_type: string;
+  district: string[];
+  year: string[];
+  month?: string[];
+  day?: string[];
+  time_period?: string[];
+  severity: string[];
+  road_classification: string[];
+  weather_condition: string[];
+  light_condition: string[];
+  collision_type: string[];
   baseMap?: string;
   visualization_type?: string;
 }

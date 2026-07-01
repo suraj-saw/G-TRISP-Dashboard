@@ -95,42 +95,34 @@ export default function Dashboard() {
   };
 
   const years = useMemo(() => {
-    if (!allData?.timeSeries) return ["all"];
+    if (!allData?.timeSeries) return [];
     const unique = Array.from(
-      new Set(allData.timeSeries.map((p) => String(p.year)))
-    ).sort();
-    return ["all", ...unique];
-  }, [allData.timeSeries]);
+      new Set(allData.timeSeries.map((t) => t.year))
+    ).sort((a, b) => b - a);
+    return unique;
+  }, [allData]);
 
   const severities = useMemo(() => {
-    if (!allData?.severity) return ["all"];
-    return [
-      "all",
-      ...allData.severity
-        .map((s) => s.severity)
-        .filter(Boolean)
-        .sort(),
-    ];
-  }, [allData.severity]);
+    if (!allData?.severity) return [];
+    return allData.severity.map((s) => s.severity);
+  }, [allData]);
 
   const monthOptions = [
-    { value: "all", label: "All months" },
-    { value: "1", label: "January" },
-    { value: "2", label: "February" },
-    { value: "3", label: "March" },
-    { value: "4", label: "April" },
-    { value: "5", label: "May" },
-    { value: "6", label: "June" },
-    { value: "7", label: "July" },
-    { value: "8", label: "August" },
-    { value: "9", label: "September" },
+    { value: "01", label: "January" },
+    { value: "02", label: "February" },
+    { value: "03", label: "March" },
+    { value: "04", label: "April" },
+    { value: "05", label: "May" },
+    { value: "06", label: "June" },
+    { value: "07", label: "July" },
+    { value: "08", label: "August" },
+    { value: "09", label: "September" },
     { value: "10", label: "October" },
     { value: "11", label: "November" },
     { value: "12", label: "December" },
   ];
 
   const dayOptions = [
-    { value: "all", label: "All days" },
     { value: "Monday", label: "Monday" },
     { value: "Tuesday", label: "Tuesday" },
     { value: "Wednesday", label: "Wednesday" },
@@ -141,7 +133,6 @@ export default function Dashboard() {
   ];
 
   const timePeriodOptions = [
-    { value: "all", label: "All periods" },
     { value: "Morning", label: "Morning" },
     { value: "Afternoon", label: "Afternoon" },
     { value: "Evening", label: "Evening" },
@@ -155,51 +146,38 @@ export default function Dashboard() {
     baseMap: MAP_STYLES.map((s) => ({ value: s.id, label: s.label })),
     visualization_type: VISUALIZATION_OPTIONS,
     year: years.map((y) => ({
-      value: y,
-      label: y === "all" ? "All years" : y,
+      value: String(y),
+      label: String(y),
     })),
     month: monthOptions,
     day: dayOptions,
     time_period: timePeriodOptions,
-    district: [
-      { value: "all", label: "All police stations" },
-      ...(filterOptions?.police_stations || []).map((s) => ({
-        value: s,
-        label: s,
-      })),
-    ],
+    district: (filterOptions?.police_stations || []).map((s) => ({
+      value: s,
+      label: s,
+    })),
     severity: severities.map((s) => ({
       value: s,
-      label: s === "all" ? "All severity" : s,
+      label: s,
     })),
-    road_classification: [
-      { value: "all", label: "All road types" },
-      ...(filterOptions?.road_classifications || []).map((r) => ({
+    road_classification: (filterOptions?.road_classifications || []).map(
+      (r) => ({
         value: r,
         label: r,
-      })),
-    ],
-    weather_condition: [
-      { value: "all", label: "All weather" },
-      ...(filterOptions?.weather_conditions || []).map((w) => ({
-        value: w,
-        label: w,
-      })),
-    ],
-    light_condition: [
-      { value: "all", label: "All conditions" },
-      ...(filterOptions?.light_conditions || []).map((l) => ({
-        value: l,
-        label: l,
-      })),
-    ],
-    collision_type: [
-      { value: "all", label: "All types" },
-      ...(filterOptions?.collision_types || []).map((c) => ({
-        value: c,
-        label: c,
-      })),
-    ],
+      })
+    ),
+    weather_condition: (filterOptions?.weather_conditions || []).map((w) => ({
+      value: w,
+      label: w,
+    })),
+    light_condition: (filterOptions?.light_conditions || []).map((l) => ({
+      value: l,
+      label: l,
+    })),
+    collision_type: (filterOptions?.collision_types || []).map((c) => ({
+      value: c,
+      label: c,
+    })),
   };
 
   const activeFilterConfig = getFilterConfig(filters.visualization_type);
@@ -216,25 +194,28 @@ export default function Dashboard() {
   // Build a human-readable subtitle for the overlay
   const overlaySubtitle = useMemo(() => {
     const parts: string[] = ["Surat"];
-    if (filters.district && filters.district !== "all")
-      parts.push(filters.district);
-    if (filters.year && filters.year !== "all") parts.push(filters.year);
-    if (filters.severity && filters.severity !== "all")
-      parts.push(filters.severity);
+    if (filters.district?.length)
+      parts.push(filters.district.join(", "));
+    if (filters.year?.length) parts.push(filters.year.join(", "));
+    if (filters.severity?.length)
+      parts.push(filters.severity.join(", "));
     return parts.join(" · ");
   }, [filters.district, filters.year, filters.severity]);
 
   const renderFilter = (filter: (typeof activeFilterConfig)[number]) => {
-    const value = String(filters[filter.id] ?? "all");
-    const handleChange = (nextValue: string) => {
+    const value = filters[filter.id] ?? [];
+    const isMultiSelect =
+      filter.id !== "baseMap" && filter.id !== "visualization_type";
+
+    const handleChange = (nextValue: string | string[]) => {
       setFilters((current) => {
         if (filter.id === "visualization_type") {
           return {
             ...current,
-            visualization_type: nextValue,
-            month: "all",
-            day: "all",
-            time_period: "all",
+            visualization_type: nextValue as string,
+            month: [],
+            day: [],
+            time_period: [],
           };
         }
         return { ...current, [filter.id]: nextValue };
@@ -249,9 +230,10 @@ export default function Dashboard() {
           {filter.label}
         </label>
         <FilterSelect
-          value={value}
+          value={value as string | string[]}
           options={filterOptionsById[filter.id]}
           onChange={handleChange}
+          multiSelect={isMultiSelect}
         />
       </div>
     );
@@ -444,12 +426,12 @@ export default function Dashboard() {
           </motion.div>
 
           {/* Charts panel — shown below map only for Location Markers */}
-          {isLocationMarkers && data && !loading && (
+          {isLocationMarkers && data && (
             <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, ease: "easeOut" }}
-              className="pb-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: loading ? 0.6 : 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="mt-6 space-y-6"
             >
               <LocationMarkersInsights data={data} />
             </motion.div>

@@ -28,7 +28,7 @@ export default function ExportButton({ filters }: Props) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [activeFormat, setActiveFormat] = useState<ExportFormat | null>(null);
+  const [, setActiveFormat] = useState<ExportFormat | null>(null);
   const [pos, setPos] = useState<MenuPos | null>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -241,20 +241,20 @@ export default function ExportButton({ filters }: Props) {
 function ActiveFilterSummary({ filters }: { filters: DashboardFilters }) {
   const active: string[] = [];
 
-  if (filters.district && filters.district !== "all")
-    active.push(`Station: ${filters.district}`);
-  if (filters.year && filters.year !== "all")
-    active.push(`Year: ${filters.year}`);
-  if (filters.severity && filters.severity !== "all")
-    active.push(`Severity: ${filters.severity}`);
-  if (filters.road_classification && filters.road_classification !== "all")
-    active.push(`Road: ${filters.road_classification}`);
-  if (filters.weather_condition && filters.weather_condition !== "all")
-    active.push(`Weather: ${filters.weather_condition}`);
-  if (filters.light_condition && filters.light_condition !== "all")
-    active.push(`Light: ${filters.light_condition}`);
-  if (filters.collision_type && filters.collision_type !== "all")
-    active.push(`Collision: ${filters.collision_type}`);
+  if (filters.district && filters.district.length > 0)
+    active.push(`Station: ${filters.district.join(", ")}`);
+  if (filters.year && filters.year.length > 0)
+    active.push(`Year: ${filters.year.join(", ")}`);
+  if (filters.severity && filters.severity.length > 0)
+    active.push(`Severity: ${filters.severity.join(", ")}`);
+  if (filters.road_classification && filters.road_classification.length > 0)
+    active.push(`Road: ${filters.road_classification.join(", ")}`);
+  if (filters.weather_condition && filters.weather_condition.length > 0)
+    active.push(`Weather: ${filters.weather_condition.join(", ")}`);
+  if (filters.light_condition && filters.light_condition.length > 0)
+    active.push(`Light: ${filters.light_condition.join(", ")}`);
+  if (filters.collision_type && filters.collision_type.length > 0)
+    active.push(`Collision: ${filters.collision_type.join(", ")}`);
 
   return (
     <div className="border-t border-[#F1F4FB] px-3 py-2 bg-[#F7F9FD]">

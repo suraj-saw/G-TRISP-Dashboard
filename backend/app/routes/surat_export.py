@@ -17,7 +17,7 @@ GET /api/surat/dashboard/export
 import csv
 import io
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -114,13 +114,13 @@ def _build_filename(fmt: str, filters: dict) -> str:
 @router.get("/export")
 def export_data(
     format: str = Query("csv", enum=["csv", "excel"]),
-    police_station: Optional[str] = Query(None),
-    year: Optional[int] = Query(None),
-    severity: Optional[str] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    police_station: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     # Build query with filters

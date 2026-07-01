@@ -18,34 +18,40 @@ function buildExportParams(
 
   if (
     filters.district &&
-    filters.district !== "all" &&
-    filters.district !== "Surat"
+    filters.district.length > 0 &&
+    !filters.district.includes("Surat")
   ) {
-    params.set("police_station", filters.district);
+    filters.district.forEach((d) => params.append("police_station", d));
   }
 
-  if (filters.year && filters.year !== "all") {
-    params.set("year", filters.year);
+  if (filters.year && filters.year.length > 0) {
+    filters.year.forEach((y) => params.append("year", y));
   }
 
-  if (filters.severity && filters.severity !== "all") {
-    params.set("severity", filters.severity);
+  if (filters.severity && filters.severity.length > 0) {
+    filters.severity.forEach((s) => params.append("severity", s));
   }
 
-  if (filters.road_classification && filters.road_classification !== "all") {
-    params.set("road_classification", filters.road_classification);
+  if (filters.road_classification && filters.road_classification.length > 0) {
+    filters.road_classification.forEach((r) =>
+      params.append("road_classification", r)
+    );
   }
 
-  if (filters.weather_condition && filters.weather_condition !== "all") {
-    params.set("weather_condition", filters.weather_condition);
+  if (filters.weather_condition && filters.weather_condition.length > 0) {
+    filters.weather_condition.forEach((w) =>
+      params.append("weather_condition", w)
+    );
   }
 
-  if (filters.light_condition && filters.light_condition !== "all") {
-    params.set("light_condition", filters.light_condition);
+  if (filters.light_condition && filters.light_condition.length > 0) {
+    filters.light_condition.forEach((l) =>
+      params.append("light_condition", l)
+    );
   }
 
-  if (filters.collision_type && filters.collision_type !== "all") {
-    params.set("collision_type", filters.collision_type);
+  if (filters.collision_type && filters.collision_type.length > 0) {
+    filters.collision_type.forEach((c) => params.append("collision_type", c));
   }
 
   return params;

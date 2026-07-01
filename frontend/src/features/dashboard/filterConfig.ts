@@ -70,16 +70,16 @@ export const getFilterConfig = (
   visualizationType === "temporal_analysis" ? TEMPORAL_FILTERS : MAP_FILTERS;
 
 export const defaultFilters: DashboardFilters = {
-  district: "all",
-  year: "all",
-  month: "all",
-  day: "all",
-  time_period: "all",
-  severity: "all",
-  road_classification: "all",
-  weather_condition: "all",
-  light_condition: "all",
-  collision_type: "all",
+  district: [],
+  year: [],
+  month: [],
+  day: [],
+  time_period: [],
+  severity: [],
+  road_classification: [],
+  weather_condition: [],
+  light_condition: [],
+  collision_type: [],
   baseMap: DEFAULT_BASE_MAP,
   visualization_type: "location_markers",
 };

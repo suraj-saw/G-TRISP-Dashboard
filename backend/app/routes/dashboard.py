@@ -7,7 +7,7 @@ All field references use the iRAD-aligned names from the main project.
 
 import calendar
 from collections import defaultdict
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
@@ -103,12 +103,12 @@ def get_filter_options(db: Session = Depends(get_db)):
 
 @router.get("/summary", response_model=SummaryResponse)
 def get_summary(
-    district: Optional[str] = Query(None),
-    year: Optional[int] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    district: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query     = apply_filters(
@@ -146,11 +146,11 @@ def get_summary(
 
 @router.get("/by-district", response_model=DistrictResponse)
 def get_by_district(
-    year: Optional[int] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -187,12 +187,12 @@ def get_by_district(
 
 @router.get("/by-severity", response_model=SeverityResponse)
 def get_by_severity(
-    district: Optional[str] = Query(None),
-    year: Optional[int] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    district: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -216,11 +216,11 @@ def get_by_severity(
 
 @router.get("/time-series", response_model=TimeSeriesResponse)
 def get_time_series(
-    district: Optional[str] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    district: Optional[List[str]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     granularity: str = Query("month", enum=["month", "year"]),
     db: Session = Depends(get_db),
 ):
@@ -263,12 +263,12 @@ def get_time_series(
 
 @router.get("/by-collision", response_model=CollisionResponse)
 def get_by_collision(
-    district: Optional[str] = Query(None),
-    year: Optional[int] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    district: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -303,13 +303,13 @@ def get_by_collision(
 
 @router.get("/heatmap", response_model=HeatmapResponse)
 def get_heatmap(
-    district: Optional[str] = Query(None),
-    severity: Optional[str] = Query(None),
-    year: Optional[int] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    district: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -344,12 +344,12 @@ def get_heatmap(
 
 @router.get("/by-violation", response_model=ViolationResponse)
 def get_by_violation(
-    district: Optional[str] = Query(None),
-    year: Optional[int] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    district: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -386,11 +386,11 @@ def get_by_violation(
 
 @router.get("/by-road", response_model=RoadClassResponse)
 def get_by_road(
-    year: Optional[int] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -427,12 +427,12 @@ def get_by_road(
 
 @router.get("/by-weather", response_model=WeatherResponse)
 def get_by_weather(
-    district: Optional[str] = Query(None),
-    year: Optional[int] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    district: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -467,12 +467,12 @@ def get_by_weather(
 
 @router.get("/by-light", response_model=LightResponse)
 def get_by_light(
-    district: Optional[str] = Query(None),
-    year: Optional[int] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    district: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -507,12 +507,12 @@ def get_by_light(
 
 @router.get("/by-police-station", response_model=PoliceStationResponse)
 def get_by_police_station(
-    district: Optional[str] = Query(None),
-    year: Optional[int] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    district: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -549,12 +549,12 @@ def get_by_police_station(
 
 @router.get("/casualty-breakdown", response_model=CasualtyResponse)
 def get_casualty_breakdown(
-    district: Optional[str] = Query(None),
-    year: Optional[int] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    district: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     accidents = apply_filters(
@@ -588,11 +588,11 @@ def get_casualty_breakdown(
 @router.get("/top-dangerous", response_model=TopDangerousResponse)
 def get_top_dangerous(
     top_n: int = Query(TOP_DANGEROUS_DEFAULT_N, ge=1, le=TOP_DANGEROUS_MAX_N),
-    year: Optional[int] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -632,11 +632,11 @@ def get_top_dangerous(
 
 @router.get("/yearly-comparison", response_model=YearlyResponse)
 def get_yearly_comparison(
-    district: Optional[str] = Query(None),
-    road_classification: Optional[str] = Query(None),
-    weather_condition: Optional[str] = Query(None),
-    light_condition: Optional[str] = Query(None),
-    collision_type: Optional[str] = Query(None),
+    district: Optional[List[str]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(

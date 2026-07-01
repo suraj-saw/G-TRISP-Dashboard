@@ -19,36 +19,48 @@ import type {
  * "all" / "Surat" are sentinel values meaning "no filter"; they are omitted
  * from the request so the backend returns the full dataset.
  */
-const getParams = (
-  filters: DashboardFilters
-): Record<string, string | number> => {
-  const params: Record<string, string | number> = {};
+const getParams = (filters: DashboardFilters): URLSearchParams => {
+  const params = new URLSearchParams();
 
   // police_station replaces district for Surat-level granularity
   if (
     filters.district &&
-    filters.district !== "all" &&
-    filters.district !== "Surat"
+    filters.district.length > 0 &&
+    !filters.district.includes("Surat")
   ) {
-    params.police_station = filters.district;
+    filters.district.forEach((d) => params.append("police_station", d));
   }
 
-  if (filters.year !== "all") params.year = filters.year;
-  if (filters.severity !== "all") params.severity = filters.severity;
-  if (filters.road_classification !== "all")
-    params.road_classification = filters.road_classification;
-  if (filters.weather_condition !== "all")
-    params.weather_condition = filters.weather_condition;
-  if (filters.light_condition !== "all")
-    params.light_condition = filters.light_condition;
-  if (filters.collision_type !== "all")
-    params.collision_type = filters.collision_type;
+  if (filters.year && filters.year.length > 0) {
+    filters.year.forEach((y) => params.append("year", y));
+  }
+  if (filters.severity && filters.severity.length > 0) {
+    filters.severity.forEach((s) => params.append("severity", s));
+  }
+  if (filters.road_classification && filters.road_classification.length > 0) {
+    filters.road_classification.forEach((r) =>
+      params.append("road_classification", r)
+    );
+  }
+  if (filters.weather_condition && filters.weather_condition.length > 0) {
+    filters.weather_condition.forEach((w) =>
+      params.append("weather_condition", w)
+    );
+  }
+  if (filters.light_condition && filters.light_condition.length > 0) {
+    filters.light_condition.forEach((l) =>
+      params.append("light_condition", l)
+    );
+  }
+  if (filters.collision_type && filters.collision_type.length > 0) {
+    filters.collision_type.forEach((c) => params.append("collision_type", c));
+  }
 
   return params;
 };
 
-const hasValue = (value?: string): boolean =>
-  value !== undefined && value !== "" && value !== "all";
+const hasValue = (value?: string[]): boolean =>
+  value !== undefined && value.length > 0;
 
 // ---------------------------------------------------------------------------
 // API calls
@@ -78,7 +90,7 @@ export const fetchDashboardData = async (
   ] = await Promise.all([
     API.get(`${SURAT_API_BASE}/summary`, { params }),
     API.get(`${SURAT_API_BASE}/time-series`, {
-      params: { ...params, granularity: "month" },
+      params: new URLSearchParams([...params.entries(), ["granularity", "month"]]),
     }),
     API.get(`${SURAT_API_BASE}/by-severity`, { params }),
     API.get(`${SURAT_API_BASE}/heatmap`, { params }),
@@ -121,20 +133,39 @@ export const fetchDashboardData = async (
 export const fetchTemporalAnalysis = async (
   filters: DashboardFilters
 ): Promise<TemporalAnalysisData> => {
-  const params: Record<string, string | number> = {};
+  const params = new URLSearchParams();
 
-  if (hasValue(filters.district) && filters.district !== "Surat") {
-    params.police_station = filters.district!;
+  if (
+    hasValue(filters.district) &&
+    !filters.district!.includes("Surat")
+  ) {
+    filters.district!.forEach((d) => params.append("police_station", d));
   }
-  if (hasValue(filters.year)) params.year = filters.year;
-  if (hasValue(filters.month)) params.month = filters.month!;
-  if (hasValue(filters.day)) params.day = filters.day!;
-  if (hasValue(filters.time_period)) params.time_period = filters.time_period!;
-  if (hasValue(filters.severity)) params.severity = filters.severity;
-  if (hasValue(filters.weather_condition))
-    params.weather_condition = filters.weather_condition;
-  if (hasValue(filters.light_condition))
-    params.light_condition = filters.light_condition;
+  if (hasValue(filters.year)) {
+    filters.year!.forEach((y) => params.append("year", y));
+  }
+  if (hasValue(filters.month)) {
+    filters.month!.forEach((m) => params.append("month", m));
+  }
+  if (hasValue(filters.day)) {
+    filters.day!.forEach((d) => params.append("day", d));
+  }
+  if (hasValue(filters.time_period)) {
+    filters.time_period!.forEach((t) => params.append("time_period", t));
+  }
+  if (hasValue(filters.severity)) {
+    filters.severity!.forEach((s) => params.append("severity", s));
+  }
+  if (hasValue(filters.weather_condition)) {
+    filters.weather_condition!.forEach((w) =>
+      params.append("weather_condition", w)
+    );
+  }
+  if (hasValue(filters.light_condition)) {
+    filters.light_condition!.forEach((l) =>
+      params.append("light_condition", l)
+    );
+  }
 
   const { data } = await API.get(`${SURAT_API_BASE}/temporal-analysis`, {
     params,

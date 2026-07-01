@@ -84,45 +84,45 @@ export const MAP_STYLES = [
   // Google tile endpoints are intentionally disabled because they are not
   // licensed for direct use with third-party map libraries such as MapLibre.
 
-  // {
-  //   id: "google-streets",
-  //   label: "Google Streets",
-  //   url: createRasterStyle(
-  //     "google-streets",
-  //     "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
-  //     "© Google"
-  //   ),
-  // },
+  {
+    id: "google-streets",
+    label: "Google Streets",
+    url: createRasterStyle(
+      "google-streets",
+      "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+      "© Google"
+    ),
+  },
 
-  // {
-  //   id: "google-satellite",
-  //   label: "Google Satellite",
-  //   url: createRasterStyle(
-  //     "google-satellite",
-  //     "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-  //     "© Google"
-  //   ),
-  // },
+  {
+    id: "google-satellite",
+    label: "Google Satellite",
+    url: createRasterStyle(
+      "google-satellite",
+      "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+      "© Google"
+    ),
+  },
 
-  // {
-  //   id: "google-hybrid",
-  //   label: "Google Hybrid",
-  //   url: createRasterStyle(
-  //     "google-hybrid",
-  //     "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-  //     "© Google"
-  //   ),
-  // },
+  {
+    id: "google-hybrid",
+    label: "Google Hybrid",
+    url: createRasterStyle(
+      "google-hybrid",
+      "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+      "© Google"
+    ),
+  },
 
-  // {
-  //   id: "google-terrain",
-  //   label: "Google Terrain",
-  //   url: createRasterStyle(
-  //     "google-terrain",
-  //     "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
-  //     "© Google"
-  //   ),
-  // },
+  {
+    id: "google-terrain",
+    label: "Google Terrain",
+    url: createRasterStyle(
+      "google-terrain",
+      "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
+      "© Google"
+    ),
+  },
 
   // Carto Dark can be enabled later if a full dashboard dark theme is added.
 

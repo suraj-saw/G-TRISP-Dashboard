@@ -22,20 +22,37 @@ def apply_filters(
     Returns the (possibly modified) query.
     """
     if district:
-        query = query.filter(Accident.district == district)
+        if isinstance(district, list):
+            query = query.filter(Accident.district.in_(district))
+        else:
+            query = query.filter(Accident.district == district)
     if year:
-        query = query.filter(
-            extract("year", Accident.accident_date_time) == int(year)
-        )
+        if isinstance(year, list):
+            years_int = [int(y) for y in year]
+            query = query.filter(extract("year", Accident.accident_date_time).in_(years_int))
+        else:
+            query = query.filter(extract("year", Accident.accident_date_time) == int(year))
     if road_classification:
-        query = query.filter(Accident.road_classification == road_classification)
+        if isinstance(road_classification, list):
+            query = query.filter(Accident.road_classification.in_(road_classification))
+        else:
+            query = query.filter(Accident.road_classification == road_classification)
     if weather_condition:
-        query = query.filter(Accident.weather_condition == weather_condition)
+        if isinstance(weather_condition, list):
+            query = query.filter(Accident.weather_condition.in_(weather_condition))
+        else:
+            query = query.filter(Accident.weather_condition == weather_condition)
     if light_condition:
-        query = query.filter(Accident.light_condition == light_condition)
+        if isinstance(light_condition, list):
+            query = query.filter(Accident.light_condition.in_(light_condition))
+        else:
+            query = query.filter(Accident.light_condition == light_condition)
     if collision_type:
         # iRAD field is type_of_collision
-        query = query.filter(Accident.type_of_collision == collision_type)
+        if isinstance(collision_type, list):
+            query = query.filter(Accident.type_of_collision.in_(collision_type))
+        else:
+            query = query.filter(Accident.type_of_collision == collision_type)
     return query
 
 
