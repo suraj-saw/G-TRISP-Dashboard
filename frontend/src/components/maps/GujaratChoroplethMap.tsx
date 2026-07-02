@@ -8,32 +8,34 @@ import { fetchAllGujaratDistricts } from "../../api/geoApi";
 import { fetchGujaratDistrictSummary } from "../../api/gujaratDashboardApi";
 import { buildDistrictDashboardPath } from "../../config/constants";
 
-interface HoverInfo {
-  x: number;
-  y: number;
-  name: string;
-}
-
-// Internal dimensions for the SVG viewBox — abstract, does not dictate pixel size.
+// Internal dimensions for the SVG viewBox
 const SVG_W = 600;
 const SVG_H = 650;
+
+interface DistrictFeature {
+  slug: string;
+  name: string;
+  count: number;
+  d: string;
+  fill: string;
+}
 
 export default function GujaratChoroplethMap() {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const hoveredSlugRef = useRef<string | null>(null);
 
-  const [geojson, setGeojson] = useState<GeoJSON.FeatureCollection | null>(
-    null
-  );
+  const [districts, setDistricts] = useState<DistrictFeature[]>([]);
+  const [maxCount, setMaxCount] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hovered, setHovered] = useState<HoverInfo | null>(null);
+
+  // Single state only for which slug is hovered (triggers SVG stroke re-render only)
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-
-    // Safety timeout
     const timeout = setTimeout(() => {
       if (active && loading) {
         setLoading(false);
@@ -45,14 +47,9 @@ export default function GujaratChoroplethMap() {
       fetchAllGujaratDistricts(),
       fetchGujaratDistrictSummary().catch(() => []),
     ])
-      .then(([districts, summary]) => {
+      .then(([geoData, summary]) => {
         if (!active) return;
-
-        if (
-          !districts ||
-          !districts.features ||
-          districts.features.length === 0
-        ) {
+        if (!geoData?.features?.length) {
           setError("No district boundaries found.");
           return;
         }
@@ -63,46 +60,55 @@ export default function GujaratChoroplethMap() {
             s.accident_count,
           ])
         );
+        const maxVal = Math.max(1, ...summary.map((s) => s.accident_count));
 
-        const withCounts: GeoJSON.FeatureCollection = {
-          ...districts,
-          features: districts.features.map((f) => {
-            const name = String(f.properties?.name ?? "")
-              .trim()
-              .toLowerCase();
+        const colorScale = scaleLinear<string>()
+          .domain([0, maxVal * 0.5, maxVal])
+          .range(["#EAF0FE", "#7AA6F7", "#1E3A8A"]);
 
-            // CRITICAL FIX: D3-geo expects Clockwise (CW) outer rings because it models
-            // spherical geometry. GeoJSON standards (and PostGIS) output CCW outer rings.
-            // If we don't reverse the coordinates, D3 paints the polygon as "the entire
-            // rest of the world", resulting in a giant solid square.
-            const reverseCoords = (coords: any[]): any[] => {
-              if (typeof coords[0] === "number") return coords;
-              if (typeof coords[0][0] === "number")
-                return [...coords].reverse();
-              return coords.map(reverseCoords);
-            };
+        const reverseCoords = (coords: any[]): any[] => {
+          if (typeof coords[0] === "number") return coords;
+          if (typeof coords[0][0] === "number") return [...coords].reverse();
+          return coords.map(reverseCoords);
+        };
 
+        const collection: GeoJSON.FeatureCollection = {
+          type: "FeatureCollection",
+          features: geoData.features.map((f) => {
             const geom = f.geometry as any;
-            let newCoords = geom.coordinates;
-
-            if (geom.type === "Polygon" || geom.type === "MultiPolygon") {
-              newCoords = reverseCoords(geom.coordinates);
-            }
-
-            return {
-              ...f,
-              geometry: {
-                ...geom,
-                coordinates: newCoords,
-              },
-              properties: {
-                ...f.properties,
-                accident_count: countByName.get(name) ?? 0,
-              },
-            };
+            const newCoords =
+              geom.type === "Polygon" || geom.type === "MultiPolygon"
+                ? reverseCoords(geom.coordinates)
+                : geom.coordinates;
+            return { ...f, geometry: { ...geom, coordinates: newCoords } };
           }),
         };
-        setGeojson(withCounts);
+
+        const projection = geoMercator();
+        projection.fitExtent(
+          [
+            [20, 20],
+            [SVG_W - 20, SVG_H - 20],
+          ],
+          collection as any
+        );
+        const pathFn = geoPath(projection);
+
+        const built: DistrictFeature[] = [];
+        for (let i = 0; i < collection.features.length; i++) {
+          const f = collection.features[i];
+          const props = f.properties ?? {};
+          const name = String(props.name ?? "Unknown");
+          const slug = String(props.slug ?? "");
+          const count = countByName.get(name.trim().toLowerCase()) ?? 0;
+          const d = pathFn(f as any) ?? "";
+          if (d) {
+            built.push({ slug, name, count, d, fill: colorScale(count) });
+          }
+        }
+
+        setDistricts(built);
+        setMaxCount(maxVal);
       })
       .catch((err) => {
         if (active)
@@ -122,47 +128,31 @@ export default function GujaratChoroplethMap() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const maxCount = useMemo(() => {
-    if (!geojson) return 1;
-    return Math.max(
-      1,
-      ...geojson.features.map((f) => Number(f.properties?.accident_count) || 0)
-    );
-  }, [geojson]);
-
-  const colorScale = useMemo(
-    () =>
-      scaleLinear<string>()
-        .domain([0, maxCount * 0.5, maxCount])
-        .range(["#EAF0FE", "#7AA6F7", "#1E3A8A"]),
-    [maxCount]
-  );
-
-  const path = useMemo(() => {
-    if (!geojson) return null;
-    const projection = geoMercator();
-    projection.fitExtent(
-      [
-        [20, 20],
-        [SVG_W - 20, SVG_H - 20],
-      ],
-      geojson as any
-    );
-    return geoPath(projection);
-  }, [geojson]);
-
+  // Move tooltip via DOM ref — zero React re-renders
   const handleMouseMove = useCallback(
-    (e: React.MouseEvent, name: string, slug: string) => {
+    (e: React.MouseEvent<SVGPathElement>, slug: string, name: string) => {
       const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      setHoveredSlug(slug);
-      setHovered({ x: e.clientX - rect.left, y: e.clientY - rect.top, name });
+      const tip = tooltipRef.current;
+      if (!rect || !tip) return;
+
+      tip.style.left = `${e.clientX - rect.left + 14}px`;
+      tip.style.top = `${e.clientY - rect.top + 10}px`;
+      tip.textContent = name;
+      tip.style.opacity = "1";
+
+      // Only trigger SVG re-render when slug actually changes
+      if (hoveredSlugRef.current !== slug) {
+        hoveredSlugRef.current = slug;
+        setHoveredSlug(slug);
+      }
     },
     []
   );
 
   const handleMouseLeave = useCallback(() => {
-    setHovered(null);
+    const tip = tooltipRef.current;
+    if (tip) tip.style.opacity = "0";
+    hoveredSlugRef.current = null;
     setHoveredSlug(null);
   }, []);
 
@@ -194,7 +184,7 @@ export default function GujaratChoroplethMap() {
         </div>
       )}
 
-      {geojson && path && !loading && (
+      {districts.length > 0 && !loading && (
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           preserveAspectRatio="xMidYMid meet"
@@ -208,38 +198,31 @@ export default function GujaratChoroplethMap() {
             maxHeight: "100%",
           }}
         >
-          {geojson.features.map((feature, idx) => {
-            const props = feature.properties ?? {};
-            const name = String(props.name ?? "Unknown");
-            const slug = String(props.slug ?? "");
-            const count = Number(props.accident_count) || 0;
-            const isHovered = hoveredSlug === slug;
+          {districts.map((dist) => {
+            const isHovered = hoveredSlug === dist.slug;
             return (
               <path
-                key={slug || idx}
-                d={path(feature as any) ?? ""}
-                fill={colorScale(count)}
-                stroke={isHovered ? "#F59E0B" : "#FFFFFF"}
-                strokeWidth={isHovered ? 2.5 : 1}
-                className="transition-all duration-150 cursor-pointer"
-                style={{ filter: isHovered ? "brightness(1.05)" : undefined }}
-                onMouseMove={(e) => handleMouseMove(e, name, slug)}
+                key={dist.slug}
+                d={dist.d}
+                fill={dist.fill}
+                stroke={isHovered ? "#1e3a8a" : "#FFFFFF"}
+                strokeWidth={isHovered ? 3 : 1}
+                style={{ cursor: "pointer" }}
+                onMouseMove={(e) => handleMouseMove(e, dist.slug, dist.name)}
                 onMouseLeave={handleMouseLeave}
-                onClick={() => handleClick(slug)}
+                onClick={() => handleClick(dist.slug)}
               />
             );
           })}
         </svg>
       )}
 
-      {hovered && (
-        <div
-          className="pointer-events-none absolute z-30 rounded-lg bg-slate-900/90 px-3 py-1.5 text-xs font-semibold text-white shadow-lg"
-          style={{ left: hovered.x + 14, top: hovered.y + 10 }}
-        >
-          {hovered.name}
-        </div>
-      )}
+      {/* Tooltip rendered via DOM ref — no React re-renders on mousemove */}
+      <div
+        ref={tooltipRef}
+        className="pointer-events-none absolute z-30 rounded-lg bg-slate-900/90 px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition-opacity duration-75"
+        style={{ opacity: 0, left: 0, top: 0 }}
+      />
 
       {!loading && (
         <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-white/90 border border-[#E4E8F4] px-3 py-1.5 text-[11px] font-medium text-slate-500 shadow-sm">
@@ -248,7 +231,7 @@ export default function GujaratChoroplethMap() {
         </div>
       )}
 
-      {geojson && !loading && (
+      {districts.length > 0 && !loading && (
         <div className="pointer-events-none absolute top-3 right-3 z-10 rounded-xl border border-[#E4E8F4] bg-white/90 px-3 py-2.5 shadow-sm">
           <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
             Accidents

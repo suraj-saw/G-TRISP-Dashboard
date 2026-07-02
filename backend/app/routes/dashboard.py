@@ -11,7 +11,7 @@ from collections import defaultdict
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
+from sqlalchemy import func, distinct, case
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -169,27 +169,40 @@ def get_summary(
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
     )
-    accidents = query.all()
+    res = query.with_entities(
+        func.count(Accident.id).label("total_accidents"),
+        func.sum(
+            func.coalesce(Accident.driver_killed, 0) +
+            func.coalesce(Accident.passenger_killed, 0) +
+            func.coalesce(Accident.pedestrian_killed, 0)
+        ).label("total_fatalities"),
+        func.sum(
+            func.coalesce(Accident.driver_grievous_injury, 0) +
+            func.coalesce(Accident.passenger_grievous_injury, 0) +
+            func.coalesce(Accident.pedestrian_grievous_injury, 0)
+        ).label("total_grievous"),
+        func.sum(
+            func.coalesce(Accident.driver_minor_injury, 0) +
+            func.coalesce(Accident.passenger_minor_injury, 0) +
+            func.coalesce(Accident.pedestrian_minor_injury, 0)
+        ).label("total_minor"),
+        func.sum(
+            case((Accident.severity == SEVERITY_DAMAGE_ONLY, 1), else_=0)
+        ).label("total_damage_only"),
+        func.sum(func.coalesce(Accident.number_of_vehicles, 0)).label("total_vehicles"),
+        func.count(distinct(case((Accident.district != UNKNOWN_LABEL, Accident.district), else_=None))).label("districts_covered"),
+        func.count(distinct(case((Accident.police_station != UNKNOWN_LABEL, Accident.police_station), else_=None))).label("police_stations"),
+    ).first()
 
     return SummaryResponse(
-        total_accidents=len(accidents),
-        total_fatalities=sum(total_fatalities(a) for a in accidents),
-        total_grievous=sum(total_grievous(a) for a in accidents),
-        total_minor=sum(total_minor(a) for a in accidents),
-        total_damage_only=sum(
-            1 for a in accidents if a.severity == SEVERITY_DAMAGE_ONLY
-        ),
-        total_vehicles=sum(a.number_of_vehicles or 0 for a in accidents),
-        districts_covered=len({
-            safe_text(a.district)
-            for a in accidents
-            if safe_text(a.district) != UNKNOWN_LABEL
-        }),
-        police_stations=len({
-            safe_text(a.police_station)
-            for a in accidents
-            if safe_text(a.police_station) != UNKNOWN_LABEL
-        }),
+        total_accidents=res.total_accidents or 0,
+        total_fatalities=res.total_fatalities or 0,
+        total_grievous=res.total_grievous or 0,
+        total_minor=res.total_minor or 0,
+        total_damage_only=res.total_damage_only or 0,
+        total_vehicles=res.total_vehicles or 0,
+        districts_covered=res.districts_covered or 0,
+        police_stations=res.police_stations or 0,
     )
 
 
@@ -212,11 +225,21 @@ def get_by_district(
         weather_condition, light_condition, collision_type,
     )
 
+    rows = query.with_entities(
+        Accident.district,
+        func.count(Accident.id).label("accident_count"),
+        func.sum(
+            func.coalesce(Accident.driver_killed, 0) +
+            func.coalesce(Accident.passenger_killed, 0) +
+            func.coalesce(Accident.pedestrian_killed, 0)
+        ).label("fatalities")
+    ).group_by(Accident.district).all()
+
     district_map: dict = defaultdict(lambda: {"accident_count": 0, "fatalities": 0})
-    for a in query.all():
-        key = safe_text(a.district)
-        district_map[key]["accident_count"] += 1
-        district_map[key]["fatalities"]     += total_fatalities(a)
+    for r in rows:
+        key = safe_text(r.district)
+        district_map[key]["accident_count"] += (r.accident_count or 0)
+        district_map[key]["fatalities"]     += (r.fatalities or 0)
 
     return DistrictResponse(
         data=[
@@ -917,27 +940,25 @@ def get_top_dangerous(
         weather_condition, light_condition, collision_type,
     )
 
-    ranking: dict = defaultdict(lambda: {"fatal_accidents": 0, "total_killed": 0})
-    for a in query.all():
-        key = safe_text(a.district)
-        ranking[key]["fatal_accidents"] += 1
-        ranking[key]["total_killed"]    += total_fatalities(a)
-
-    rows = sorted(
-        ranking.items(),
-        key=lambda x: x[1]["fatal_accidents"],
-        reverse=True,
-    )[:top_n]
+    rows = query.with_entities(
+        Accident.district,
+        func.count(Accident.id).label("fatal_accidents"),
+        func.sum(
+            func.coalesce(Accident.driver_killed, 0) +
+            func.coalesce(Accident.passenger_killed, 0) +
+            func.coalesce(Accident.pedestrian_killed, 0)
+        ).label("total_killed")
+    ).group_by(Accident.district).order_by(func.count(Accident.id).desc()).limit(top_n).all()
 
     return TopDangerousResponse(
         data=[
             DangerousDistrict(
                 rank=idx + 1,
-                district=safe_text(name),
-                fatal_accidents=v["fatal_accidents"],
-                total_killed=v["total_killed"],
+                district=safe_text(r.district),
+                fatal_accidents=r.fatal_accidents or 0,
+                total_killed=r.total_killed or 0,
             )
-            for idx, (name, v) in enumerate(rows)
+            for idx, r in enumerate(rows)
         ]
     )
 
