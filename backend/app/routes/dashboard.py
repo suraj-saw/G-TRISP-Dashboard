@@ -5,6 +5,7 @@ Dashboard API router — Gujarat-wide endpoints.
 All field references use the iRAD-aligned names from the main project.
 """
 
+import base64
 import calendar
 from collections import defaultdict
 from typing import List, Optional
@@ -47,6 +48,16 @@ from app.schemas.dashboard_schema import (
     YearlyStats,
 )
 
+# Reused from the Surat schema module — the shape (hour/day/month/peak
+# summary) is model-agnostic, so there's no need to duplicate it.
+from app.schemas.surat_dashboard_schema import (
+    HourDayCount,
+    HourlyAccidentCount,
+    MonthlyAccidentCount,
+    PeakSummary,
+    TemporalAnalysisResponse,
+)
+
 from app.utils.accident_utils import (
     apply_filters,
     total_fatalities,
@@ -54,6 +65,13 @@ from app.utils.accident_utils import (
     total_minor,
 )
 from app.utils.text_utils import safe_text
+from app.utils.blackspot_utils import (
+    CrashPoint,
+    greedy_blackspots,
+    dbscan_blackspots,
+    blackspots_to_geojson,
+)
+from app.utils.kde_utils import compute_kde_heatmap
 
 from app.core.constants import (
     SEVERITY_FATAL,
@@ -63,12 +81,47 @@ from app.core.constants import (
     DASHBOARD_PREFIX,
     TOP_DANGEROUS_DEFAULT_N,
     TOP_DANGEROUS_MAX_N,
+    BLACKSPOT_RADIUS_METERS,
+    BLACKSPOT_MIN_CRASHES,
+    KDE_RADIUS_METERS,
+    KDE_PIXEL_METERS,
+    WEEKDAY_ORDER,
+    TIME_PERIOD_RANGES,
+    NIGHT_MORNING_CUTOFF,
+    HOURS_IN_DAY,
 )
 
 router = APIRouter(
     prefix=DASHBOARD_PREFIX,
     tags=["Dashboard"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Temporal helpers (kept local/duplicated from surat_dashboard.py on purpose
+# — small, model-agnostic, and keeps the two routers independently editable)
+# ---------------------------------------------------------------------------
+
+def _time_period_for_hour(hour: int) -> str:
+    for period, (start, end) in TIME_PERIOD_RANGES.items():
+        if period == "Night":
+            if hour >= start or hour < NIGHT_MORNING_CUTOFF:
+                return period
+        elif start <= hour < end:
+            return period
+    return "Night"
+
+
+def _format_hour_label(hour: int) -> str:
+    suffix = "AM" if hour < 12 else "PM"
+    value = hour % 12 or 12
+    return f"{value}:00 {suffix}"
+
+
+def _peak_item(counts: dict, fallback_key):
+    if not counts:
+        return fallback_key, 0
+    return max(counts.items(), key=lambda item: item[1])
 
 
 # ---------------------------------------------------------------------------
@@ -317,8 +370,11 @@ def get_heatmap(
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
     )
-    if severity and severity != "all":
-        query = query.filter(Accident.severity == severity)
+    if severity:
+        if isinstance(severity, list):
+            query = query.filter(Accident.severity.in_(severity))
+        else:
+            query = query.filter(Accident.severity == severity)
 
     accidents = query.all()
 
@@ -331,11 +387,271 @@ def get_heatmap(
                 longitude=a.longitude,
                 severity=safe_text(a.severity),
                 district=safe_text(a.district),
+                police_station=safe_text(a.police_station),
+                road_name=safe_text(a.road_name),
+                road_classification=safe_text(a.road_classification),
+                weather_condition=safe_text(a.weather_condition),
+                light_condition=safe_text(a.light_condition),
+                collision_type=safe_text(a.type_of_collision),
+                accident_date_time=a.accident_date_time,
             )
             for a in accidents
             if a.latitude is not None and a.longitude is not None
         ],
     )
+
+
+# ---------------------------------------------------------------------------
+# Temporal Analysis (generalized — mirrors surat_dashboard.py, but
+# accident_date_time is already a real DateTime column here so parsing is
+# simpler than the Surat string-based version)
+# ---------------------------------------------------------------------------
+
+@router.get("/temporal-analysis", response_model=TemporalAnalysisResponse)
+def get_temporal_analysis(
+    district: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    month: Optional[List[int]] = Query(None),
+    day: Optional[List[str]] = Query(None),
+    time_period: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Accident)
+
+    if district:
+        query = query.filter(Accident.district.in_(district))
+    if severity:
+        query = query.filter(Accident.severity.in_(severity))
+    if weather_condition:
+        query = query.filter(Accident.weather_condition.in_(weather_condition))
+    if light_condition:
+        query = query.filter(Accident.light_condition.in_(light_condition))
+
+    accidents_with_dt = []
+    for accident in query.all():
+        dt = accident.accident_date_time
+        if not dt:
+            continue
+        if year and dt.year not in [int(y) for y in year]:
+            continue
+        if month and dt.month not in [int(m) for m in month]:
+            continue
+        if day and dt.strftime("%A") not in day:
+            continue
+        if time_period and _time_period_for_hour(dt.hour) not in time_period:
+            continue
+        accidents_with_dt.append((accident, dt))
+
+    hour_day_counts: dict = defaultdict(int)
+    hourly_counts   = {h: 0 for h in range(HOURS_IN_DAY)}
+    monthly_counts: dict  = defaultdict(int)
+    day_counts: dict      = defaultdict(int)
+    period_counts: dict   = defaultdict(int)
+
+    for _accident, dt in accidents_with_dt:
+        hour     = dt.hour
+        day_name = dt.strftime("%A")
+        period   = _time_period_for_hour(hour)
+
+        hour_day_counts[(hour, day_name)] += 1
+        hourly_counts[hour]               += 1
+        monthly_counts[(dt.year, dt.month)] += 1
+        day_counts[day_name]              += 1
+        period_counts[period]             += 1
+
+    peak_hour,      peak_hour_count   = _peak_item(hourly_counts, 0)
+    peak_day,       peak_day_count    = _peak_item(day_counts, UNKNOWN_LABEL)
+    peak_month_key, peak_month_count  = _peak_item(monthly_counts, (0, 0))
+    peak_period,    peak_period_count = _peak_item(period_counts, UNKNOWN_LABEL)
+
+    peak_month_label = (
+        f"{calendar.month_abbr[peak_month_key[1]]} {peak_month_key[0]}"
+        if peak_month_key != (0, 0)
+        else UNKNOWN_LABEL
+    )
+
+    return TemporalAnalysisResponse(
+        hour_day=[
+            HourDayCount(hour=hour, day=day_name, count=hour_day_counts[(hour, day_name)])
+            for day_name in WEEKDAY_ORDER
+            for hour in range(HOURS_IN_DAY)
+        ],
+        hourly=[
+            HourlyAccidentCount(hour=h, count=hourly_counts[h])
+            for h in range(HOURS_IN_DAY)
+        ],
+        monthly=[
+            MonthlyAccidentCount(
+                year=yr, month=mo,
+                month_label=f"{calendar.month_abbr[mo]} {yr}",
+                count=count,
+            )
+            for (yr, mo), count in sorted(monthly_counts.items())
+        ],
+        summary=PeakSummary(
+            peak_hour=_format_hour_label(int(peak_hour)),
+            peak_hour_count=peak_hour_count,
+            peak_day=peak_day,
+            peak_day_count=peak_day_count,
+            peak_month=peak_month_label,
+            peak_month_count=peak_month_count,
+            peak_time_period=peak_period,
+            peak_time_period_count=peak_period_count,
+            total_accidents=len(accidents_with_dt),
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Blackspot detection (greedy) — generalized for any district
+# ---------------------------------------------------------------------------
+
+@router.get("/blackspots")
+def get_blackspots(
+    district: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
+    radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
+    min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
+    db: Session = Depends(get_db),
+):
+    query = apply_filters(
+        db.query(Accident),
+        district, year, road_classification,
+        weather_condition, light_condition, collision_type,
+    )
+    if severity:
+        query = query.filter(Accident.severity.in_(severity))
+
+    accidents = query.all()
+
+    points = [
+        CrashPoint(index=idx, accident_id=a.accident_id, lat=a.latitude, lon=a.longitude)
+        for idx, a in enumerate(accidents)
+        if a.latitude is not None and a.longitude is not None
+    ]
+
+    blackspots = greedy_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
+    geojson = blackspots_to_geojson(blackspots, radius_m=radius_m)
+
+    return {
+        "total_crashes": len(points),
+        "total_blackspots": len(blackspots),
+        "isolated_crashes": len(points) - sum(b.crash_count for b in blackspots),
+        "radius_m": radius_m,
+        "min_crashes": min_crashes,
+        "circles": geojson["circles"],
+        "centroids": geojson["centroids"],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Blackspot detection (DBSCAN-style) — generalized for any district
+# ---------------------------------------------------------------------------
+
+@router.get("/dbscan-blackspots")
+def get_dbscan_blackspots(
+    district: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
+    radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
+    min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
+    db: Session = Depends(get_db),
+):
+    query = apply_filters(
+        db.query(Accident),
+        district, year, road_classification,
+        weather_condition, light_condition, collision_type,
+    )
+    if severity:
+        query = query.filter(Accident.severity.in_(severity))
+
+    accidents = query.all()
+
+    points = [
+        CrashPoint(index=idx, accident_id=a.accident_id, lat=a.latitude, lon=a.longitude)
+        for idx, a in enumerate(accidents)
+        if a.latitude is not None and a.longitude is not None
+    ]
+
+    blackspots = dbscan_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
+    geojson = blackspots_to_geojson(blackspots, radius_m=radius_m)
+
+    return {
+        "total_crashes": len(points),
+        "total_blackspots": len(blackspots),
+        "isolated_crashes": len(points) - sum(b.crash_count for b in blackspots),
+        "radius_m": radius_m,
+        "min_crashes": min_crashes,
+        "circles": geojson["circles"],
+        "centroids": geojson["centroids"],
+    }
+
+
+# ---------------------------------------------------------------------------
+# KDE density heatmap — generalized for any district
+# ---------------------------------------------------------------------------
+
+@router.get("/kde-heatmap")
+def get_kde_heatmap(
+    district: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
+    radius_m: float = Query(KDE_RADIUS_METERS, ge=100, le=2000),
+    pixel_m: float = Query(KDE_PIXEL_METERS, ge=10, le=200),
+    db: Session = Depends(get_db),
+):
+    query = apply_filters(
+        db.query(Accident),
+        district, year, road_classification,
+        weather_condition, light_condition, collision_type,
+    )
+    if severity:
+        query = query.filter(Accident.severity.in_(severity))
+
+    accidents = query.all()
+    lats = [a.latitude for a in accidents if a.latitude is not None and a.longitude is not None]
+    lons = [a.longitude for a in accidents if a.latitude is not None and a.longitude is not None]
+
+    result = compute_kde_heatmap(lats, lons, radius_m=radius_m, pixel_m=pixel_m)
+
+    if result is None:
+        return {
+            "total_crashes": 0,
+            "radius_m": radius_m,
+            "pixel_m": pixel_m,
+            "image": None,
+            "coordinates": None,
+        }
+
+    image_data_url = (
+        "data:image/png;base64," + base64.b64encode(result["png_bytes"]).decode("ascii")
+    )
+
+    return {
+        "total_crashes": len(lats),
+        "radius_m": radius_m,
+        "pixel_m": pixel_m,
+        "image": image_data_url,
+        "coordinates": result["coordinates"],
+        "width": result["width"],
+        "height": result["height"],
+    }
 
 
 # ---------------------------------------------------------------------------

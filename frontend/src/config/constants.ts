@@ -93,12 +93,16 @@ export const ROUTES = {
   FORGOT_PASSWORD: "/forgot-password",
   RESET_PASSWORD: "/reset-password",
   DASHBOARD: "/dashboard",
+  DISTRICT_DASHBOARD: "/dashboard/district/:districtSlug",
   ADMIN: "/admin",
   ADMIN_PANEL: "/admin/panel",
 } as const;
 
 export const DASHBOARD_MODE = (import.meta.env.VITE_DASHBOARD_MODE ||
   "surat") as "surat" | "gujarat";
+
+export const buildDistrictDashboardPath = (slug: string) =>
+  `/dashboard/district/${slug}`;
 
 /**
  * ID of the default base map style.

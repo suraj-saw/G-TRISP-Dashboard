@@ -8,6 +8,7 @@ import MonthlyTrend from "./MonthlyTrend";
 
 interface Props {
   filters: DashboardFilters;
+  fetchFn?: (filters: DashboardFilters) => Promise<TemporalAnalysisData>;
 }
 
 const emptyTemporalData: TemporalAnalysisData = {
@@ -65,23 +66,25 @@ const toneClass = {
   red: "from-[#EF4444] to-[#991B1B]",
 };
 
-export default function TemporalAnalysis({ filters }: Props) {
+export default function TemporalAnalysis({ filters, fetchFn }: Props) {
   const [data, setData] = useState<TemporalAnalysisData>(emptyTemporalData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-
     setLoading(true);
     setError(null);
 
-    fetchTemporalAnalysis(filters)
+    const loader = fetchFn ?? fetchTemporalAnalysis;
+
+    loader(filters)
       .then((result) => {
         if (active) setData(result);
       })
       .catch((err) => {
-        if (active) setError(err.message || "Failed to load temporal analysis.");
+        if (active)
+          setError(err.message || "Failed to load temporal analysis.");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -90,6 +93,7 @@ export default function TemporalAnalysis({ filters }: Props) {
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filters.district,
     filters.year,

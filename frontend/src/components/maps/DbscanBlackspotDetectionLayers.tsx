@@ -10,6 +10,7 @@ import type { DashboardFilters } from "../../types/dashboard";
 
 interface Props {
   filters: DashboardFilters;
+  fetchFn?: (filters: DashboardFilters) => Promise<BlackspotData>;
 }
 
 interface HoveredBlackspot {
@@ -58,7 +59,7 @@ function getDcRiskColor(count: number): string {
   return DC_COLORS.veryLow;
 }
 
-export default function DbscanBlackspotDetectionLayers({ filters }: Props) {
+export default function DbscanBlackspotDetectionLayers({ filters, fetchFn }: Props) {
   const { current: mapRef } = useMap();
   const [data, setData] = useState<BlackspotData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,7 +71,8 @@ export default function DbscanBlackspotDetectionLayers({ filters }: Props) {
     setLoading(true);
     setError(null);
 
-    fetchDbscanBlackspots(filters)
+    const loader = fetchFn ?? fetchDbscanBlackspots;
+    loader(filters)
       .then((res) => {
         if (!active) return;
         setData(res);

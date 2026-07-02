@@ -7,9 +7,10 @@ import type { DashboardFilters } from "../../types/dashboard";
 
 interface Props {
   filters: DashboardFilters;
+  fetchFn?: (filters: DashboardFilters) => Promise<KdeHeatmapData>;
 }
 
-export default function AccidentDensityHeatmapLayers({ filters }: Props) {
+export default function AccidentDensityHeatmapLayers({ filters, fetchFn }: Props) {
   const [data, setData] = useState<KdeHeatmapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +20,8 @@ export default function AccidentDensityHeatmapLayers({ filters }: Props) {
     setLoading(true);
     setError(null);
 
-    fetchKdeHeatmap(filters)
+    const loader = fetchFn ?? fetchKdeHeatmap;
+    loader(filters)
       .then((res) => {
         if (!active) return;
         setData(res);

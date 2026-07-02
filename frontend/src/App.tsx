@@ -14,7 +14,8 @@ import Signup from "./features/auth/Register";
 import Login from "./features/auth/Login";
 import ForgotPassword from "./features/auth/ForgotPassword";
 import ResetPassword from "./features/auth/ResetPassword";
-import Dashboard from "./features/dashboard/Dashboard";
+import GujaratOverview from "./features/dashboard/GujaratOverview";
+import DistrictDashboard from "./features/dashboard/DistrictDashboard";
 import AdminDashboard from "./features/dashboard/AdminDashboard";
 import AdminPanel from "./features/dashboard/AdminPanel";
 
@@ -63,7 +64,11 @@ function App() {
         <Route path={ROUTES.LOGIN} element={<Login />} />
         <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPassword />} />
         <Route path={ROUTES.RESET_PASSWORD} element={<ResetPassword />} />
-        <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
+        <Route path={ROUTES.DASHBOARD} element={<GujaratOverview />} />
+        <Route
+          path={ROUTES.DISTRICT_DASHBOARD}
+          element={<DistrictDashboard />}
+        />
         <Route path={ROUTES.ADMIN} element={<AdminDashboard />} />
         <Route path={ROUTES.ADMIN_PANEL} element={<AdminPanel />} />
         <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />

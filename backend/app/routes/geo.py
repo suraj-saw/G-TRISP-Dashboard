@@ -77,6 +77,51 @@ def get_surat_boundary(db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
+# ALL Gujarat district boundaries in one request — used by the Gujarat
+# overview map so we don't do 33 separate fetches.
+# ---------------------------------------------------------------------------
+
+@router.get("/all-districts", summary="Get All Gujarat District Boundaries")
+def get_all_district_boundaries(db: Session = Depends(get_db)):
+    """
+    Returns every Gujarat district polygon as a single GeoJSON
+    FeatureCollection. Each feature's properties include `name` and `slug`
+    so the frontend can match it against `/api/dashboard/by-district`
+    counts and route to `/dashboard/district/{slug}` on click.
+    """
+    rows = db.query(
+        GujaratDistrict.id,
+        GujaratDistrict.shape_name,
+        ST_AsGeoJSON(GujaratDistrict.geometry).label("geojson"),
+    ).order_by(GujaratDistrict.shape_name).all()
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="No Gujarat districts found in database")
+
+    features = []
+    for row in rows:
+        features.append({
+            "type": "Feature",
+            "id": row.id,
+            "geometry": json.loads(row.geojson),
+            "properties": {
+                "name": row.shape_name,
+                "slug": _slugify(row.shape_name),
+            },
+        })
+
+    return JSONResponse(
+        content={
+            "type": "FeatureCollection",
+            "features": features,
+        },
+        headers={
+            "Cache-Control": f"public, max-age={GEO_CACHE_MAX_AGE_SECONDS}",
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
 # Gujarat district list
 # ---------------------------------------------------------------------------
 
@@ -126,7 +171,6 @@ def get_district_boundary(district_slug: str, db: Session = Depends(get_db)):
 
     Use `GET /api/geo/districts` to discover valid slugs.
     """
-    # Fetch all districts and match by slug (small table — 33 rows)
     rows = db.query(
         GujaratDistrict.id,
         GujaratDistrict.shape_name,
@@ -136,7 +180,6 @@ def get_district_boundary(district_slug: str, db: Session = Depends(get_db)):
         ST_AsGeoJSON(GujaratDistrict.geometry).label("geojson"),
     ).all()
 
-    # Find the district whose slug matches the path parameter
     matched = None
     for row in rows:
         if _slugify(row.shape_name) == district_slug.lower():
@@ -171,4 +214,4 @@ def get_district_boundary(district_slug: str, db: Session = Depends(get_db)):
         headers={
             "Cache-Control": f"public, max-age={GEO_CACHE_MAX_AGE_SECONDS}",
         },
-    )
+    )

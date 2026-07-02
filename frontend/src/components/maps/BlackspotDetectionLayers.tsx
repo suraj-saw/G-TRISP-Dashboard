@@ -4,10 +4,15 @@ import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
 import { Loader2, AlertCircle } from "lucide-react";
 import { fetchBlackspots, type BlackspotData } from "../../api/dashboardApi";
 import type { DashboardFilters } from "../../types/dashboard";
-import { getRiskColor, getRiskLabel, BS_COLOR_EXPR } from "../../config/blackspotConfig";
+import {
+  getRiskColor,
+  getRiskLabel,
+  BS_COLOR_EXPR,
+} from "../../config/blackspotConfig";
 
 interface Props {
   filters: DashboardFilters;
+  fetchFn?: (filters: DashboardFilters) => Promise<BlackspotData>;
 }
 
 interface HoveredBlackspot {
@@ -17,7 +22,7 @@ interface HoveredBlackspot {
   crash_count: number;
 }
 
-export default function BlackspotDetectionLayers({ filters }: Props) {
+export default function BlackspotDetectionLayers({ filters, fetchFn }: Props) {
   const { current: mapRef } = useMap();
   const [data, setData] = useState<BlackspotData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,15 +34,15 @@ export default function BlackspotDetectionLayers({ filters }: Props) {
     setLoading(true);
     setError(null);
 
-    fetchBlackspots(filters)
+    const loader = fetchFn ?? fetchBlackspots;
+
+    loader(filters)
       .then((res) => {
         if (!active) return;
-        console.log("[blackspots] response:", res);
         setData(res);
       })
       .catch((err) => {
         if (!active) return;
-        console.error("[blackspots] fetch failed:", err);
         setError(
           err?.response?.status
             ? `Request failed (${err.response.status}): ${err.response.data?.detail || err.message}`
@@ -52,6 +57,7 @@ export default function BlackspotDetectionLayers({ filters }: Props) {
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filters.district,
     filters.year,
@@ -66,9 +72,10 @@ export default function BlackspotDetectionLayers({ filters }: Props) {
     const map = mapRef?.getMap();
     if (!map || !data) return;
 
-    const layers = ["blackspot-circles-fill", "blackspot-centroids-point"].filter((id) =>
-      map.getLayer(id)
-    );
+    const layers = [
+      "blackspot-circles-fill",
+      "blackspot-centroids-point",
+    ].filter((id) => map.getLayer(id));
     if (!layers.length) return;
 
     const onMove = (e: any) => {
@@ -126,9 +133,9 @@ export default function BlackspotDetectionLayers({ filters }: Props) {
     return (
       <StatusBadge>
         <AlertCircle size={14} className="text-amber-500" />
-        No blackspots found for the current filters (min {data?.min_crashes ?? 5}{" "}
-        crashes within {data?.radius_m ?? 250}m). Total crashes considered:{" "}
-        {data?.total_crashes ?? 0}.
+        No blackspots found for the current filters (min{" "}
+        {data?.min_crashes ?? 5} crashes within {data?.radius_m ?? 250}m). Total
+        crashes considered: {data?.total_crashes ?? 0}.
       </StatusBadge>
     );
   }
@@ -136,7 +143,11 @@ export default function BlackspotDetectionLayers({ filters }: Props) {
   return (
     <>
       {/* blackspot_circles — 250m greedy-cluster influence zones */}
-      <Source id="blackspot-circles-source" type="geojson" data={data.circles as any}>
+      <Source
+        id="blackspot-circles-source"
+        type="geojson"
+        data={data.circles as any}
+      >
         <Layer
           id="blackspot-circles-fill"
           type="fill"
@@ -156,14 +167,29 @@ export default function BlackspotDetectionLayers({ filters }: Props) {
       </Source>
 
       {/* blackspot_centroids — greedy-cluster anchor points */}
-      <Source id="blackspot-centroids-source" type="geojson" data={data.centroids as any}>
+      <Source
+        id="blackspot-centroids-source"
+        type="geojson"
+        data={data.centroids as any}
+      >
         <Layer
           id="blackspot-centroids-point"
           type="circle"
           paint={{
             "circle-radius": [
-              "interpolate", ["linear"], ["get", "crash_count"],
-              5, 5, 15, 8, 50, 12, 150, 16, 350, 22,
+              "interpolate",
+              ["linear"],
+              ["get", "crash_count"],
+              5,
+              5,
+              15,
+              8,
+              50,
+              12,
+              150,
+              16,
+              350,
+              22,
             ],
             "circle-color": BS_COLOR_EXPR as any,
             "circle-stroke-width": 2,
@@ -188,8 +214,8 @@ export default function BlackspotDetectionLayers({ filters }: Props) {
       </Source>
 
       <StatusBadge>
-        {data.total_blackspots} blackspots · {data.total_crashes} crashes analyzed ·{" "}
-        {data.isolated_crashes} isolated
+        {data.total_blackspots} blackspots · {data.total_crashes} crashes
+        analyzed · {data.isolated_crashes} isolated
       </StatusBadge>
 
       {hovered && (
@@ -216,8 +242,16 @@ export default function BlackspotDetectionLayers({ filters }: Props) {
             >
               {getRiskLabel(hovered.crash_count)}
             </div>
-            <div style={{ padding: "8px 10px 6px", fontSize: 12, color: "#1e293b" }}>
-              <div style={{ fontWeight: 700, fontSize: 13 }}>Blackspot #{hovered.bs_id}</div>
+            <div
+              style={{
+                padding: "8px 10px 6px",
+                fontSize: 12,
+                color: "#1e293b",
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: 13 }}>
+                Blackspot #{hovered.bs_id}
+              </div>
               <div style={{ color: "#64748b", marginTop: 2 }}>
                 {hovered.crash_count.toLocaleString()} crashes within 250m
               </div>

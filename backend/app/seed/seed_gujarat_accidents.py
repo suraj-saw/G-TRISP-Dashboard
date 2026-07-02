@@ -239,26 +239,51 @@ def _build_accident(row, tag: str, default_district: str, seen_ids: set[str]) ->
 # Coordinate validation (state-level, fast path — no per-row district lookup)
 # ---------------------------------------------------------------------------
 
+def _normalize_district_name(name: str) -> str:
+    if not name:
+        return ""
+    s = name.strip().lower()
+    
+    # Strip common suffixes/prefixes used in the dataset
+    s = s.replace(" city", "").replace(" rural", "").replace(" district", "")
+    
+    if s == "ahmedabad":
+        return "ahmadabad"
+    if "dang" in s or "ahwa" in s:
+        return "the dangs"
+    
+    return s.strip()
+
 def _validate_coordinates(df: pd.DataFrame, db: Session, default_district: str) -> tuple[pd.DataFrame, int]:
     logger.info("  validating coordinates against Gujarat district boundaries…")
     coords = list(zip(df["latitude"].tolist(), df["longitude"].tolist()))
     report = validate_coordinates_batch(
         coords, db, check_district=True, log_progress_every=1000
     )
+    
     valid_mask = [r.is_valid for r in report.results]
-    valid_df = df[valid_mask].copy()
-
     mismatches = 0
+    
     for idx, result in enumerate(report.results):
         if result.is_valid and result.matched_district:
             claimed_district = _clean_text(df.iloc[idx]["district"]) or default_district
-            if claimed_district and claimed_district.lower() != result.matched_district.lower():
+            
+            norm_claimed = _normalize_district_name(claimed_district)
+            norm_matched = _normalize_district_name(result.matched_district)
+            
+            if norm_claimed != norm_matched:
+                # The point falls physically inside a different district boundary
+                # The user requested these rows be dropped/ignored.
+                valid_mask[idx] = False
                 mismatches += 1
-            # We use the PostGIS matched district as it's authoritative
-            valid_df.at[df.index[idx], "district"] = result.matched_district
+            else:
+                # We use the exact PostGIS matched district string for database consistency
+                df.at[df.index[idx], "district"] = result.matched_district
+
+    valid_df = df[valid_mask].copy()
 
     if mismatches > 0:
-        logger.warning("  found %d rows where claimed district differs from PostGIS boundary. Used PostGIS district.", mismatches)
+        logger.warning("  dropped %d rows where claimed district differs from physical PostGIS boundary.", mismatches)
 
     rejected = len(df) - len(valid_df)
     logger.info("  valid: %d, rejected: %d", len(valid_df), rejected)
