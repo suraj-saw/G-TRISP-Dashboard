@@ -5,9 +5,9 @@ import { MapPin } from "lucide-react";
 import API from "../../api/axios";
 import type { User } from "../../types/user";
 import TopBar from "../../components/layout/TopBar";
-import GujaratOverviewMap from "../../components/maps/GujaratOverviewMap";
+import GujaratChoroplethMap from "../../components/maps/GujaratChoroplethMap";
+import GujaratInsightsPanel from "../../components/dashboard/GujaratInsightsPanel";
 import { ROUTES } from "../../config/constants";
-import { TOPBAR_HEIGHT_PX } from "../../config/layout";
 
 export default function GujaratOverview() {
   const navigate = useNavigate();
@@ -52,7 +52,7 @@ export default function GujaratOverview() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F1F4FB] flex flex-col">
+    <div className="h-screen bg-[#F1F4FB] flex flex-col overflow-hidden">
       <TopBar
         appName="G-TRISP"
         user={user}
@@ -60,28 +60,33 @@ export default function GujaratOverview() {
         onLogout={logout}
       />
 
-      <main
-        className="flex-1 flex flex-col"
-        style={{ paddingTop: `${TOPBAR_HEIGHT_PX}px` }}
-      >
-        <div className="px-6 py-4 flex items-center gap-2">
+      {/* NO paddingTop here — TopBar is in normal flow, not position:fixed */}
+      <main className="flex-1 flex flex-col min-h-0">
+        {/* Header row — compact spacing */}
+        <div className="px-6 pt-3 pb-2 flex items-center gap-2 shrink-0">
           <MapPin size={16} className="text-[#1e3a8a]" />
           <div>
             <h1 className="text-lg font-bold text-[#1A1D2E]">
               Gujarat Road Accident Overview
             </h1>
             <p className="text-xs text-[#6B7299]">
-              Hover over a district to see accident totals. Click a district to
-              explore detailed analytics.
+              Hover a district to see its name. Click to explore its detailed
+              analytics.
             </p>
           </div>
         </div>
 
-        <div
-          className="flex-1 mx-6 mb-6 rounded-2xl overflow-hidden shadow-xl border border-[#E4E8F4] relative"
-          style={{ minHeight: "70vh" }}
-        >
-          <GujaratOverviewMap />
+        {/* Main content grid: 60% map | 40% insights */}
+        <div className="flex-1 min-h-0 mx-6 mb-4 grid grid-cols-1 lg:grid-cols-5 gap-4">
+          {/* Map panel — 60% width (3 of 5 cols) */}
+          <div className="lg:col-span-3 relative rounded-2xl overflow-hidden shadow-xl border border-[#E4E8F4] bg-white min-h-[420px]">
+            <GujaratChoroplethMap />
+          </div>
+
+          {/* Insights panel — 40% width (2 of 5 cols) */}
+          <div className="lg:col-span-2 rounded-2xl border border-[#E4E8F4] bg-white shadow-xl p-4 min-h-0 overflow-y-auto no-scrollbar">
+            <GujaratInsightsPanel />
+          </div>
         </div>
       </main>
     </div>

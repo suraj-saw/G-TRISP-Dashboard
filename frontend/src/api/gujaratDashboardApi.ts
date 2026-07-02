@@ -6,8 +6,13 @@ import type {
   FilterOptions,
   DashboardData,
   TemporalAnalysisData,
+  SummaryData,
+  SeverityCount,
+  DangerousDistrict,
 } from "../types/dashboard";
 import type { BlackspotData, KdeHeatmapData } from "./dashboardApi";
+
+
 
 /**
  * Query params for the Gujarat-wide endpoints, always scoped to a single
@@ -134,4 +139,36 @@ export const fetchGujaratKdeHeatmap = async (
   const params = getParams(filters, district);
   const { data } = await API.get(`${GUJARAT_API_BASE}/kde-heatmap`, { params });
   return data;
+};
+
+
+
+export interface GujaratOverviewInsights {
+  summary: SummaryData;
+  severity: SeverityCount[];
+  dangerous: DangerousDistrict[];
+}
+
+/**
+ * Lightweight statewide summary for the Gujarat overview landing page.
+ * Unlike fetchGujaratDashboardData(), this intentionally SKIPS the heatmap,
+ * casualty, road, collision and time-series endpoints — those scan/return
+ * every accident row statewide and are far too heavy for a landing view.
+ * Only 3 small aggregate queries are made.
+ */
+export const fetchGujaratOverviewInsights = async (): Promise<GujaratOverviewInsights> => {
+  const emptyParams = new URLSearchParams();
+  const topNParams = new URLSearchParams([["top_n", "6"]]);
+
+  const [summary, severity, dangerous] = await Promise.all([
+    API.get(`${GUJARAT_API_BASE}/summary`, { params: emptyParams }),
+    API.get(`${GUJARAT_API_BASE}/by-severity`, { params: emptyParams }),
+    API.get(`${GUJARAT_API_BASE}/top-dangerous`, { params: topNParams }),
+  ]);
+
+  return {
+    summary: summary.data,
+    severity: severity.data.data,
+    dangerous: dangerous.data.data,
+  };
 };
