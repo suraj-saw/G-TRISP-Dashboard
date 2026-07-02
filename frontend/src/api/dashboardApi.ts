@@ -48,12 +48,18 @@ const getParams = (filters: DashboardFilters): URLSearchParams => {
     );
   }
   if (filters.light_condition && filters.light_condition.length > 0) {
-    filters.light_condition.forEach((l) =>
-      params.append("light_condition", l)
-    );
+    filters.light_condition.forEach((l) => params.append("light_condition", l));
   }
   if (filters.collision_type && filters.collision_type.length > 0) {
     filters.collision_type.forEach((c) => params.append("collision_type", c));
+  }
+
+  // Date range filters
+  if (filters.date_from) {
+    params.set("date_from", filters.date_from);
+  }
+  if (filters.date_to) {
+    params.set("date_to", filters.date_to);
   }
 
   return params;
@@ -90,7 +96,10 @@ export const fetchDashboardData = async (
   ] = await Promise.all([
     API.get(`${SURAT_API_BASE}/summary`, { params }),
     API.get(`${SURAT_API_BASE}/time-series`, {
-      params: new URLSearchParams([...params.entries(), ["granularity", "month"]]),
+      params: new URLSearchParams([
+        ...params.entries(),
+        ["granularity", "month"],
+      ]),
     }),
     API.get(`${SURAT_API_BASE}/by-severity`, { params }),
     API.get(`${SURAT_API_BASE}/heatmap`, { params }),
@@ -135,10 +144,7 @@ export const fetchTemporalAnalysis = async (
 ): Promise<TemporalAnalysisData> => {
   const params = new URLSearchParams();
 
-  if (
-    hasValue(filters.district) &&
-    !filters.district!.includes("Surat")
-  ) {
+  if (hasValue(filters.district) && !filters.district!.includes("Surat")) {
     filters.district!.forEach((d) => params.append("police_station", d));
   }
   if (hasValue(filters.year)) {
@@ -166,6 +172,8 @@ export const fetchTemporalAnalysis = async (
       params.append("light_condition", l)
     );
   }
+  if (filters.date_from) params.set("date_from", filters.date_from);
+  if (filters.date_to) params.set("date_to", filters.date_to);
 
   const { data } = await API.get(`${SURAT_API_BASE}/temporal-analysis`, {
     params,

@@ -103,6 +103,8 @@ export default function TemporalAnalysis({ filters, fetchFn }: Props) {
     filters.severity,
     filters.weather_condition,
     filters.light_condition,
+    filters.date_from,
+    filters.date_to,
   ]);
 
   if (loading) {

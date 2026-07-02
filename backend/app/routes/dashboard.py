@@ -8,6 +8,7 @@ All field references use the iRAD-aligned names from the main project.
 import base64
 import calendar
 from collections import defaultdict
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -124,6 +125,15 @@ def _peak_item(counts: dict, fallback_key):
     return max(counts.items(), key=lambda item: item[1])
 
 
+def _parse_iso_date(value: Optional[str]):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Filter Options  (dynamic — never hard-coded)
 # ---------------------------------------------------------------------------
@@ -162,12 +172,15 @@ def get_summary(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query     = apply_filters(
         db.query(Accident),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     res = query.with_entities(
         func.count(Accident.id).label("total_accidents"),
@@ -217,12 +230,15 @@ def get_by_district(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
         db.query(Accident),
         None, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
 
     rows = query.with_entities(
@@ -269,12 +285,15 @@ def get_by_severity(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
         db.query(Accident.severity, func.count(Accident.id).label("count")),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     rows = query.group_by(Accident.severity).all()
 
@@ -297,6 +316,8 @@ def get_time_series(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     granularity: str = Query("month", enum=["month", "year"]),
     db: Session = Depends(get_db),
 ):
@@ -304,6 +325,7 @@ def get_time_series(
         db.query(Accident),
         district, None, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
 
     buckets: dict = defaultdict(lambda: {"count": 0, "fatalities": 0})
@@ -345,6 +367,8 @@ def get_by_collision(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -354,6 +378,7 @@ def get_by_collision(
         ),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     rows = (
         query
@@ -386,12 +411,15 @@ def get_heatmap(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
         db.query(Accident),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     if severity:
         if isinstance(severity, list):
@@ -440,9 +468,13 @@ def get_temporal_analysis(
     time_period: Optional[List[str]] = Query(None),
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = db.query(Accident)
+    start_date = _parse_iso_date(date_from)
+    end_date = _parse_iso_date(date_to)
 
     if district:
         query = query.filter(Accident.district.in_(district))
@@ -465,6 +497,10 @@ def get_temporal_analysis(
         if day and dt.strftime("%A") not in day:
             continue
         if time_period and _time_period_for_hour(dt.hour) not in time_period:
+            continue
+        if start_date and dt.date() < start_date:
+            continue
+        if end_date and dt.date() > end_date:
             continue
         accidents_with_dt.append((accident, dt))
 
@@ -541,6 +577,8 @@ def get_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
     min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
     db: Session = Depends(get_db),
@@ -549,6 +587,7 @@ def get_blackspots(
         db.query(Accident),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     if severity:
         query = query.filter(Accident.severity.in_(severity))
@@ -588,6 +627,8 @@ def get_dbscan_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
     min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
     db: Session = Depends(get_db),
@@ -596,6 +637,7 @@ def get_dbscan_blackspots(
         db.query(Accident),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     if severity:
         query = query.filter(Accident.severity.in_(severity))
@@ -635,6 +677,8 @@ def get_kde_heatmap(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     radius_m: float = Query(KDE_RADIUS_METERS, ge=100, le=2000),
     pixel_m: float = Query(KDE_PIXEL_METERS, ge=10, le=200),
     db: Session = Depends(get_db),
@@ -643,6 +687,7 @@ def get_kde_heatmap(
         db.query(Accident),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     if severity:
         query = query.filter(Accident.severity.in_(severity))
@@ -689,6 +734,8 @@ def get_by_violation(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -698,6 +745,7 @@ def get_by_violation(
         ),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     rows = (
         query
@@ -730,12 +778,15 @@ def get_by_road(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
         db.query(Accident),
         None, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
 
     road_map: dict = defaultdict(lambda: {"accident_count": 0, "fatalities": 0})
@@ -772,6 +823,8 @@ def get_by_weather(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -781,6 +834,7 @@ def get_by_weather(
         ),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     rows = (
         query
@@ -812,6 +866,8 @@ def get_by_light(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -821,6 +877,7 @@ def get_by_light(
         ),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     rows = (
         query
@@ -852,12 +909,15 @@ def get_by_police_station(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
         db.query(Accident),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
 
     stations: dict = defaultdict(
@@ -894,12 +954,15 @@ def get_casualty_breakdown(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     accidents = apply_filters(
         db.query(Accident),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     ).all()
 
     totals = {
@@ -932,12 +995,15 @@ def get_top_dangerous(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
         db.query(Accident).filter(Accident.severity == SEVERITY_FATAL),
         None, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
 
     rows = query.with_entities(
@@ -974,12 +1040,15 @@ def get_yearly_comparison(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
         db.query(Accident),
         district, None, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
 
     years: dict = defaultdict(

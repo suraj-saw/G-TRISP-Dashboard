@@ -45,15 +45,20 @@ function buildExportParams(
   }
 
   if (filters.light_condition && filters.light_condition.length > 0) {
-    filters.light_condition.forEach((l) =>
-      params.append("light_condition", l)
-    );
+    filters.light_condition.forEach((l) => params.append("light_condition", l));
   }
 
   if (filters.collision_type && filters.collision_type.length > 0) {
     filters.collision_type.forEach((c) => params.append("collision_type", c));
   }
 
+  if (filters.date_from) {
+    params.set("date_from", filters.date_from);
+  }
+
+  if (filters.date_to) {
+    params.set("date_to", filters.date_to);
+  }
   return params;
 }
 

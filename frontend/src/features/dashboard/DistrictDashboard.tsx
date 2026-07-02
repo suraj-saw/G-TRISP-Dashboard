@@ -67,7 +67,9 @@ type FilterId =
   | "road_classification"
   | "weather_condition"
   | "light_condition"
-  | "collision_type";
+  | "collision_type"
+  | "date_from"
+  | "date_to";
 
 interface FilterConfigItem {
   id: FilterId;
@@ -78,6 +80,8 @@ interface FilterConfigItem {
 const MAP_FILTERS: FilterConfigItem[] = [
   { id: "baseMap", label: "Base Map", icon: "layers" },
   { id: "visualization_type", label: "Visualization Type" },
+  { id: "date_from", label: "Start Date" },
+  { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
   { id: "severity", label: "Severity" },
   { id: "road_classification", label: "Road type" },
@@ -88,6 +92,8 @@ const MAP_FILTERS: FilterConfigItem[] = [
 
 const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "visualization_type", label: "Visualization Type" },
+  { id: "date_from", label: "Start Date" },
+  { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
   { id: "month", label: "Month" },
   { id: "day", label: "Day" },
@@ -113,6 +119,8 @@ const defaultDistrictFilters: DashboardFilters = {
   weather_condition: [],
   light_condition: [],
   collision_type: [],
+  date_from: "",
+  date_to: "",
   baseMap: DEFAULT_BASE_MAP,
   visualization_type: "location_markers",
 };
@@ -242,6 +250,8 @@ export default function DistrictDashboard() {
         weather_condition: filters.weather_condition,
         light_condition: filters.light_condition,
         collision_type: filters.collision_type,
+        date_from: filters.date_from,
+        date_to: filters.date_to,
       }),
     [filters]
   );
@@ -341,6 +351,8 @@ export default function DistrictDashboard() {
       value: c,
       label: c,
     })),
+    date_from: [],
+    date_to: [],
   };
 
   const activeFilterConfig = getDistrictFilterConfig(
@@ -391,12 +403,31 @@ export default function DistrictDashboard() {
           )}
           {filter.label}
         </label>
-        <FilterSelect
-          value={value as string | string[]}
-          options={filterOptionsById[filter.id]}
-          onChange={handleChange}
-          multiSelect={isMultiSelect}
-        />
+        {filter.id === "date_from" || filter.id === "date_to" ? (
+          <input
+            type="date"
+            value={(value as string) || ""}
+            max={
+              filter.id === "date_from"
+                ? filters.date_to || undefined
+                : undefined
+            }
+            min={
+              filter.id === "date_to"
+                ? filters.date_from || undefined
+                : undefined
+            }
+            onChange={(e) => handleChange(e.target.value)}
+            className="w-full rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-3 py-2 text-[13px] font-medium text-[#1A1D2E] outline-none transition focus:border-[#1e3a8a] focus:bg-white focus:ring-2 focus:ring-[#1e3a8a]/10 hover:border-[#C9CEDF]"
+          />
+        ) : (
+          <FilterSelect
+            value={value as string | string[]}
+            options={filterOptionsById[filter.id]}
+            onChange={handleChange}
+            multiSelect={isMultiSelect}
+          />
+        )}
       </div>
     );
   };

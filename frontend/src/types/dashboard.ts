@@ -11,6 +11,8 @@ export interface DashboardFilters {
   collision_type: string[];
   baseMap?: string;
   visualization_type?: string;
+  date_from?: string;
+  date_to?: string;
 }
 
 export interface FilterOptions {

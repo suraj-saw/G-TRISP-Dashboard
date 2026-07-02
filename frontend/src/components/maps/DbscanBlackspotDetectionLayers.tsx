@@ -101,6 +101,8 @@ export default function DbscanBlackspotDetectionLayers({ filters, fetchFn }: Pro
     filters.weather_condition,
     filters.light_condition,
     filters.collision_type,
+    filters.date_from,
+    filters.date_to,
   ]);
 
   useEffect(() => {

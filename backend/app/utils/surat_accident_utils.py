@@ -4,6 +4,9 @@ Shared query helpers and casualty calculators for the Surat dashboard.
 Mirrors accident_utils.py but operates on the SuratAccident model.
 """
 
+from datetime import datetime, date
+from typing import Optional
+
 from sqlalchemy import extract
 from app.models.surat_accident import SuratAccident
 
@@ -16,11 +19,15 @@ def apply_surat_filters(
     weather_condition=None,
     light_condition=None,
     collision_type=None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
 ):
     """
     Apply common dashboard filters to a SuratAccident query.
     Uses police_station instead of district (all records belong to Surat district).
-    Returns the (possibly modified) query.
+
+    date_from / date_to accept ISO date strings "YYYY-MM-DD" and filter
+    accident_date_time to the inclusive range [date_from 00:00, date_to 23:59:59].
     """
     if police_station:
         if isinstance(police_station, list):
@@ -53,6 +60,24 @@ def apply_surat_filters(
             query = query.filter(SuratAccident.type_of_collision.in_(collision_type))
         else:
             query = query.filter(SuratAccident.type_of_collision == collision_type)
+
+    # Date range — applied on accident_date_time column
+    if date_from:
+        try:
+            dt_from = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(SuratAccident.accident_date_time >= dt_from)
+        except ValueError:
+            pass  # Ignore malformed date strings
+    if date_to:
+        try:
+            # inclusive: end of the selected day
+            dt_to = datetime.strptime(date_to, "%Y-%m-%d").replace(
+                hour=23, minute=59, second=59
+            )
+            query = query.filter(SuratAccident.accident_date_time <= dt_to)
+        except ValueError:
+            pass
+
     return query
 
 

@@ -121,6 +121,8 @@ def export_data(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     # Build query with filters
@@ -128,9 +130,10 @@ def export_data(
         db.query(SuratAccident),
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
-    if severity and severity != "all":
-        query = query.filter(SuratAccident.severity == severity)
+    if severity and "all" not in severity:
+        query = query.filter(SuratAccident.severity.in_(severity))
 
     accidents = query.order_by(SuratAccident.accident_date_time).all()
 
@@ -138,6 +141,8 @@ def export_data(
         "police_station": police_station,
         "year": year,
         "severity": severity,
+        "date_from": date_from,
+        "date_to": date_to,
     }
     filename = _build_filename(format, active_filters)
 
@@ -175,6 +180,8 @@ def export_data(
             weather_condition=weather_condition,
             light_condition=light_condition,
             collision_type=collision_type,
+            date_from=date_from,
+            date_to=date_to,
             db=db,
         )
 

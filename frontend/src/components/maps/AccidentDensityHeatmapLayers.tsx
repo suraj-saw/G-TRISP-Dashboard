@@ -50,6 +50,8 @@ export default function AccidentDensityHeatmapLayers({ filters, fetchFn }: Props
     filters.weather_condition,
     filters.light_condition,
     filters.collision_type,
+    filters.date_from,
+    filters.date_to,
   ]);
 
   const StatusBadge = ({ children }: { children: React.ReactNode }) => (

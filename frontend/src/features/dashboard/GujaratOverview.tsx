@@ -4,22 +4,32 @@ import { useNavigate } from "react-router-dom";
 import { MapPin } from "lucide-react";
 import API from "../../api/axios";
 import type { User } from "../../types/user";
+import type { Notification } from "../../types/notification";
 import TopBar from "../../components/layout/TopBar";
 import GujaratChoroplethMap from "../../components/maps/GujaratChoroplethMap";
 import GujaratInsightsPanel from "../../components/dashboard/GujaratInsightsPanel";
 import { ROUTES } from "../../config/constants";
 
-export default function GujaratOverview() {
+interface Props {
+  allowAdmin?: boolean;
+  showAdminControls?: boolean;
+}
+
+export default function GujaratOverview({
+  allowAdmin = false,
+  showAdminControls = false,
+}: Props) {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [sessionChecking, setSessionChecking] = useState(true);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
     let active = true;
     API.get<User>("/auth/me")
       .then((res) => {
         if (!active) return;
-        if (res.data.role === "admin") {
+        if (res.data.role === "admin" && !allowAdmin) {
           navigate(ROUTES.ADMIN, { replace: true });
           return;
         }
@@ -32,7 +42,14 @@ export default function GujaratOverview() {
     return () => {
       active = false;
     };
-  }, [navigate]);
+  }, [allowAdmin, navigate]);
+
+  useEffect(() => {
+    if (!showAdminControls) return;
+    API.get<Notification[]>("/admin/notifications")
+      .then((res) => setNotifications(res.data))
+      .catch(() => {});
+  }, [showAdminControls]);
 
   const logout = async () => {
     try {
@@ -51,12 +68,16 @@ export default function GujaratOverview() {
     );
   }
 
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
+
   return (
     <div className="h-screen bg-[#F1F4FB] flex flex-col overflow-hidden">
       <TopBar
         appName="G-TRISP"
         user={user}
-        showNotificationBell={false}
+        showNotificationBell={showAdminControls}
+        notificationCount={unreadCount}
+        adminPanelPath={showAdminControls ? ROUTES.ADMIN_PANEL : undefined}
         onLogout={logout}
       />
 

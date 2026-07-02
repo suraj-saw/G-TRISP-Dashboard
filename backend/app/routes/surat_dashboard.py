@@ -12,6 +12,7 @@ with 'police_station' for more granular filtering within Surat.
 
 import calendar
 from collections import defaultdict
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -125,6 +126,15 @@ def _peak_item(counts: dict, fallback_key):
     return max(counts.items(), key=lambda item: item[1])
 
 
+def _parse_iso_date(value: Optional[str]):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Filter Options
 # ---------------------------------------------------------------------------
@@ -164,12 +174,15 @@ def get_summary(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query     = apply_surat_filters(
         db.query(SuratAccident),
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     accidents = query.all()
 
@@ -203,6 +216,8 @@ def get_by_police_station(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     """Breakdown of accidents by police station — main geo-grouping for Surat."""
@@ -210,6 +225,7 @@ def get_by_police_station(
         db.query(SuratAccident),
         None, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
 
     station_map: dict = defaultdict(
@@ -252,12 +268,15 @@ def get_by_severity(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
         db.query(SuratAccident.severity, func.count(SuratAccident.id).label("count")),
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     rows = query.group_by(SuratAccident.severity).all()
 
@@ -280,6 +299,8 @@ def get_time_series(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     granularity: str = Query("month", enum=["month", "year"]),
     db: Session = Depends(get_db),
 ):
@@ -287,6 +308,7 @@ def get_time_series(
         db.query(SuratAccident),
         police_station, None, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
 
     buckets: dict = defaultdict(lambda: {"count": 0, "fatalities": 0})
@@ -328,6 +350,8 @@ def get_by_collision(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -337,6 +361,7 @@ def get_by_collision(
         ),
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     rows = (
         query
@@ -369,12 +394,15 @@ def get_heatmap(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
         db.query(SuratAccident),
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     if severity:
         if isinstance(severity, list):
@@ -421,18 +449,22 @@ def get_temporal_analysis(
     time_period: Optional[List[str]] = Query(None),
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = db.query(SuratAccident)
+    start_date = _parse_iso_date(date_from)
+    end_date = _parse_iso_date(date_to)
 
     if police_station:
-        query = query.filter(SuratAccident.police_station == police_station)
+        query = query.filter(SuratAccident.police_station.in_(police_station))
     if severity:
-        query = query.filter(SuratAccident.severity == severity)
+        query = query.filter(SuratAccident.severity.in_(severity))
     if weather_condition:
-        query = query.filter(SuratAccident.weather_condition == weather_condition)
+        query = query.filter(SuratAccident.weather_condition.in_(weather_condition))
     if light_condition:
-        query = query.filter(SuratAccident.light_condition == light_condition)
+        query = query.filter(SuratAccident.light_condition.in_(light_condition))
 
     # Parse datetimes and apply temporal filters in Python
     accidents_with_dt = []
@@ -447,6 +479,10 @@ def get_temporal_analysis(
         if day         and dt.strftime("%A")    not in day:
             continue
         if time_period and _time_period_for_hour(dt.hour) not in time_period:
+            continue
+        if start_date and dt.date() < start_date:
+            continue
+        if end_date and dt.date() > end_date:
             continue
         accidents_with_dt.append((accident, dt))
 
@@ -528,6 +564,8 @@ def get_by_violation(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -537,6 +575,7 @@ def get_by_violation(
         ),
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     rows = (
         query
@@ -569,12 +608,15 @@ def get_by_road(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
         db.query(SuratAccident),
         None, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
 
     road_map: dict = defaultdict(lambda: {"accident_count": 0, "fatalities": 0})
@@ -611,6 +653,8 @@ def get_by_weather(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -620,6 +664,7 @@ def get_by_weather(
         ),
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     rows = (
         query
@@ -651,6 +696,8 @@ def get_by_light(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -660,6 +707,7 @@ def get_by_light(
         ),
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     rows = (
         query
@@ -691,12 +739,15 @@ def get_casualty_breakdown(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     accidents = apply_surat_filters(
         db.query(SuratAccident),
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     ).all()
 
     totals = {
@@ -729,6 +780,8 @@ def get_top_dangerous(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     """Top N police stations ranked by fatal accidents."""
@@ -736,6 +789,7 @@ def get_top_dangerous(
         db.query(SuratAccident).filter(SuratAccident.severity == SEVERITY_FATAL),
         None, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
 
     ranking: dict = defaultdict(lambda: {"fatal_accidents": 0, "total_killed": 0})
@@ -774,12 +828,15 @@ def get_yearly_comparison(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
         db.query(SuratAccident),
         police_station, None, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
 
     years: dict = defaultdict(
@@ -815,6 +872,8 @@ def get_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
     min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
     db: Session = Depends(get_db),
@@ -828,6 +887,7 @@ def get_blackspots(
         db.query(SuratAccident),
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     if severity:
         if isinstance(severity, list):
@@ -865,6 +925,8 @@ def get_dbscan_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
     min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
     db: Session = Depends(get_db),
@@ -879,6 +941,7 @@ def get_dbscan_blackspots(
         db.query(SuratAccident),
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     if severity:
         if isinstance(severity, list):
@@ -917,6 +980,8 @@ def get_kde_heatmap(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     radius_m: float = Query(KDE_RADIUS_METERS, ge=100, le=2000),
     pixel_m: float = Query(KDE_PIXEL_METERS, ge=10, le=200),
     db: Session = Depends(get_db),
@@ -931,6 +996,7 @@ def get_kde_heatmap(
         db.query(SuratAccident),
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
+        date_from, date_to,
     )
     if severity:
         if isinstance(severity, list):

@@ -39,6 +39,8 @@ const toFilterKey = (filters: DashboardFilters): string =>
     weather_condition: filters.weather_condition,
     light_condition: filters.light_condition,
     collision_type: filters.collision_type,
+    date_from: filters.date_from,
+    date_to: filters.date_to,
   });
 
 export const useDashboard = (filters: DashboardFilters) => {

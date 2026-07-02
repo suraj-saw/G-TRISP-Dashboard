@@ -66,6 +66,8 @@ export default function BlackspotDetectionLayers({ filters, fetchFn }: Props) {
     filters.weather_condition,
     filters.light_condition,
     filters.collision_type,
+    filters.date_from,
+    filters.date_to,
   ]);
 
   useEffect(() => {

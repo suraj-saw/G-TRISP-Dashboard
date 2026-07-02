@@ -22,7 +22,9 @@ export type FilterId =
   | "road_classification"
   | "weather_condition"
   | "light_condition"
-  | "collision_type";
+  | "collision_type"
+  | "date_from"
+  | "date_to";  
 
 export interface FilterConfigItem {
   id: FilterId;
@@ -42,6 +44,8 @@ export const VISUALIZATION_OPTIONS = [
 const MAP_FILTERS: FilterConfigItem[] = [
   { id: "baseMap", label: "Base Map", icon: "layers" },
   { id: "visualization_type", label: "Visualization Type" },
+  { id: "date_from", label: "Start Date" },
+  { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
   // The label here is driven by config (Police Station vs District)
   { id: "district", label: GEO_FILTER_LABEL },
@@ -54,6 +58,8 @@ const MAP_FILTERS: FilterConfigItem[] = [
 
 const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "visualization_type", label: "Visualization Type" },
+  { id: "date_from", label: "Start Date" },
+  { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
   { id: "month", label: "Month" },
   { id: "day", label: "Day" },
@@ -80,6 +86,8 @@ export const defaultFilters: DashboardFilters = {
   weather_condition: [],
   light_condition: [],
   collision_type: [],
+  date_from : "",
+  date_to : "",
   baseMap: DEFAULT_BASE_MAP,
   visualization_type: "location_markers",
 };

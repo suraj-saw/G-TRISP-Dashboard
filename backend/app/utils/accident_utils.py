@@ -4,6 +4,9 @@ Shared query helpers and casualty calculators for the dashboard.
 All field names use the iRAD-aligned names from the main project's Accident model.
 """
 
+from datetime import datetime
+from typing import Optional
+
 from sqlalchemy import extract
 from app.models.accident import Accident
 
@@ -16,10 +19,14 @@ def apply_filters(
     weather_condition=None,
     light_condition=None,
     collision_type=None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
 ):
     """
     Apply common dashboard filters to a SQLAlchemy query.
-    Returns the (possibly modified) query.
+
+    date_from / date_to accept ISO date strings "YYYY-MM-DD" and filter
+    accident_date_time to the inclusive range [date_from 00:00, date_to 23:59:59].
     """
     if district:
         if isinstance(district, list):
@@ -53,6 +60,23 @@ def apply_filters(
             query = query.filter(Accident.type_of_collision.in_(collision_type))
         else:
             query = query.filter(Accident.type_of_collision == collision_type)
+
+    # Date range — applied on accident_date_time column
+    if date_from:
+        try:
+            dt_from = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(Accident.accident_date_time >= dt_from)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            dt_to = datetime.strptime(date_to, "%Y-%m-%d").replace(
+                hour=23, minute=59, second=59
+            )
+            query = query.filter(Accident.accident_date_time <= dt_to)
+        except ValueError:
+            pass
+
     return query
 
 
