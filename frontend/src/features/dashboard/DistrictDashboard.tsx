@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import API from "../../api/axios";
 import type { User } from "../../types/user";
+import { AlertTriangle as NoDataIcon, MapPin } from "lucide-react";
 
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
@@ -604,6 +605,35 @@ export default function DistrictDashboard() {
                     />
                   )}
                 </DistrictBaseMap>
+                {!loading &&
+                  !error &&
+                  !boundaryLoading &&
+                  data.summary.total_accidents === 0 && (
+                    <div className="absolute inset-0 z-30 flex items-center justify-center p-6 bg-slate-900/10 backdrop-blur-[2px] rounded-2xl pointer-events-none">
+                      <div className="flex flex-col items-center justify-center gap-3 rounded-2xl bg-white/95 p-8 shadow-2xl border border-slate-200 text-center max-w-sm pointer-events-auto">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 border border-amber-100">
+                          <MapPin size={26} className="text-amber-500" />
+                        </div>
+                      <div>
+                        <p className="text-base font-bold text-slate-800">
+                          No accident data available yet
+                        </p>
+                        <p className="mt-1 max-w-sm text-sm text-slate-500">
+                          {districtName || "This district"} doesn't have
+                          recorded accident records in the system yet. Try a
+                          district with available data, such as Surat or
+                          Bhavnagar.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => navigate(ROUTES.DASHBOARD)}
+                        className="mt-1 rounded-lg bg-[#1e3a8a] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#17337b]"
+                      >
+                        Back to Gujarat map
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>

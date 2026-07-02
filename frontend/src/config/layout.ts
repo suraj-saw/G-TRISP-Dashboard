@@ -54,7 +54,7 @@ export const MAP_DEFAULT_HEIGHT = BELOW_TOPBAR_HEIGHT;
  * north–south extent of the district. Extra horizontal room lets the map zoom
  * out far enough to contain the whole district on initial load.
  */
-export const MAP_BOUNDS_PAD_DEGREES = 0.4;
+export const MAP_BOUNDS_PAD_DEGREES = 2.0;
 
 /** Minimum zoom level for the Surat district map */
 export const MAP_MIN_ZOOM = 8;
@@ -66,7 +66,7 @@ export const MAP_FIT_MAX_ZOOM = 12;
 export const MAP_FIT_DURATION_MS = 400;
 
 /** Padding (px) applied inside fitBounds call */
-export const MAP_FIT_PADDING_PX = 40;
+export const MAP_FIT_PADDING_PX = 24;
 
 /**
  * Duration (ms) to keep calling map.resize() after a sidebar animation ends.

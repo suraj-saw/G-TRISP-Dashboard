@@ -75,6 +75,21 @@ function getBbox(
   return isFinite(minLng) ? [minLng, minLat, maxLng, maxLat] : null;
 }
 
+function maxZoomForBbox(bbox: [number, number, number, number]): number {
+  const [w, s, e, n] = bbox;
+
+  const spanDeg = Math.max(e - w, n - s);
+
+  if (spanDeg < 0.25) return 13.5;
+  if (spanDeg < 0.5) return 13;
+  if (spanDeg < 1) return 12;
+  if (spanDeg < 2) return 10.5;
+
+  return 9;
+}
+
+
+
 const MASK_COLOR_SATELLITE = "#000000";
 const MASK_OPACITY_SATELLITE = 0.65;
 const MASK_COLOR_DEFAULT = "#F1F4FB";
@@ -122,21 +137,59 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
 
     const isSatelliteMap = SATELLITE_BASE_MAP_IDS.has(baseMap ?? "");
 
-    const fitToBounds = useCallback((duration: number) => {
-      if (!bboxRef.current) return;
-      const [w, s, e, n] = bboxRef.current;
-      mapRef.current?.fitBounds(
-        [
-          [w, s],
-          [e, n],
-        ],
-        {
-          padding: MAP_FIT_PADDING_PX,
-          duration,
-          maxZoom: MAP_FIT_MAX_ZOOM,
+    const applyMaxBounds = useCallback(
+      (bbox: [number, number, number, number] | null) => {
+        const map = mapRef.current?.getMap();
+        if (!map) return;
+        if (!bbox) {
+          map.setMaxBounds(undefined);
+          return;
         }
-      );
-    }, []);
+        const [w, s, e, n] = bbox;
+        const container = map.getContainer();
+        const aspect = container && container.clientHeight > 0 ? container.clientWidth / container.clientHeight : 2.0;
+        
+        const dw = e - w;
+        const dh = n - s;
+        // Ensure maxBounds has at least the aspect ratio of the screen to prevent forced zooming
+        const target_w = Math.max(dw, dh * aspect);
+        const target_h = Math.max(dh, dw / aspect);
+        
+        // 0.1 degrees padding (~11km) for a tiny bit of breathing room
+        const pad_w = (target_w - dw) / 2 + 0.1;
+        const pad_h = (target_h - dh) / 2 + 0.1;
+        
+        map.setMaxBounds([
+          [w - pad_w, s - pad_h],
+          [e + pad_w, n + pad_h],
+        ]);
+      },
+      []
+    );
+
+    const fitToBounds = useCallback(
+      (duration: number, onSettled?: () => void) => {
+        if (!bboxRef.current) return;
+        const [w, s, e, n] = bboxRef.current;
+        mapRef.current?.fitBounds(
+          [
+            [w, s],
+            [e, n],
+          ],
+          {
+            padding: MAP_FIT_PADDING_PX,
+            duration,
+            maxZoom: maxZoomForBbox(bboxRef.current),
+          }
+        );
+        if (onSettled) {
+          const map = mapRef.current?.getMap();
+          if (map) map.once("moveend", onSettled);
+          else setTimeout(onSettled, duration + 50);
+        }
+      },
+      []
+    );
 
     useImperativeHandle(ref, () => ({
       resize: () => {
@@ -152,20 +205,22 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
         setMask(null);
         bboxRef.current = null;
         setMaxBounds(undefined);
+        mapRef.current?.getMap()?.setMaxBounds(undefined);
         return;
       }
       setMask(buildMask(boundary) as GeoJSON.Feature);
       const bbox = getBbox(boundary);
       if (bbox) {
         bboxRef.current = bbox;
-        const [w, s, e, n] = bbox;
-        setMaxBounds([
-          [w - MAP_BOUNDS_PAD_DEGREES, s - MAP_BOUNDS_PAD_DEGREES],
-          [e + MAP_BOUNDS_PAD_DEGREES, n + MAP_BOUNDS_PAD_DEGREES],
-        ]);
+        // We defer applying the strict maxBounds until AFTER the map has smoothly
+        // zoomed to fit the district. This prevents clipping/snapping.
+        mapRef.current?.getMap()?.setMaxBounds(undefined);
+        setMaxBounds(undefined);
       }
-      if (mapLoaded) fitToBounds(900);
-    }, [boundary, mapLoaded, fitToBounds]);
+      if (mapLoaded) {
+        fitToBounds(900, () => applyMaxBounds(bboxRef.current));
+      }
+    }, [boundary, mapLoaded, fitToBounds, applyMaxBounds]);
 
     useEffect(() => {
       if (!mapLoaded) return;
@@ -177,13 +232,15 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
         if (now - start < MAP_RESIZE_LOOP_MS) {
           frameId = requestAnimationFrame(loop);
         } else {
-          fitToBounds(MAP_FIT_DURATION_MS);
+          fitToBounds(MAP_FIT_DURATION_MS, () =>
+            applyMaxBounds(bboxRef.current)
+          );
         }
       };
       frameId = requestAnimationFrame(loop);
 
       return () => cancelAnimationFrame(frameId);
-    }, [sidebarOpen, mapLoaded, fitToBounds]);
+    }, [sidebarOpen, mapLoaded, fitToBounds, applyMaxBounds]);
 
     const handleMapLoad = useCallback(() => setMapLoaded(true), []);
     const mapStyleUrl = getMapStyleUrl(baseMap);
