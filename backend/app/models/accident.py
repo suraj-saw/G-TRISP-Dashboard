@@ -18,7 +18,7 @@ Key renames from previous version:
   collision_type             → type_of_collision
 """
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, Index
+from sqlalchemy import Column, Integer, String, Float, DateTime, Index, UniqueConstraint
 from geoalchemy2 import Geometry
 
 from app.database import Base
@@ -27,11 +27,14 @@ from app.core.config import POSTGIS_SRID
 
 class Accident(Base):
     __tablename__ = "accidents"
+    __table_args__ = (
+        UniqueConstraint('accident_id', 'district', name='uq_accident_district'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
 
     # ── Identification ────────────────────────────────────────────────────────
-    accident_id    = Column(String, unique=True, nullable=True, index=True)
+    accident_id    = Column(String, nullable=True, index=True)
     district       = Column(String, nullable=True, index=True)
     police_station = Column(String, nullable=True)
 

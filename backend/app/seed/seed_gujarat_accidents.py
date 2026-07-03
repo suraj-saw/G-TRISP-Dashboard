@@ -156,17 +156,13 @@ def _make_point(lat: float | None, lon: float | None):
 # trusting the source files.
 # ---------------------------------------------------------------------------
 
-def _unique_id(raw_id: str | None, tag: str, seen: set[str]) -> str:
+def _unique_id(raw_id: str | None, tag: str, district: str, seen_records: set[tuple[str, str]]) -> str:
     if not raw_id:
         candidate = f"{tag}-{uuid.uuid4().hex[:8].upper()}"
-    else:
-        candidate = raw_id
-        if candidate in seen:
-            candidate = f"{tag}-{raw_id}"
-        while candidate in seen:
-            candidate = f"{candidate}-{uuid.uuid4().hex[:4].upper()}"
-    seen.add(candidate)
-    return candidate
+        seen_records.add((candidate, district))
+        return candidate
+    seen_records.add((raw_id, district))
+    return raw_id
 
 
 # ---------------------------------------------------------------------------
@@ -194,12 +190,12 @@ def _load_dataset(path: Path) -> pd.DataFrame:
     return df
 
 
-def _build_accident(row, tag: str, default_district: str, seen_ids: set[str]) -> Accident:
+def _build_accident(row, tag: str, default_district: str, seen_records: set[tuple[str, str]]) -> Accident:
     lat = _clean_float(row["latitude"])
     lon = _clean_float(row["longitude"])
 
     district = _clean_text(row["district"]) or default_district
-    accident_id = _unique_id(_clean_text(row["accident_id"]), tag, seen_ids)
+    accident_id = _unique_id(_clean_text(row["accident_id"]), tag, district, seen_records)
 
     return Accident(
         accident_id         = accident_id,
@@ -316,8 +312,9 @@ def seed_gujarat_accidents(
             db.query(Accident).delete()
             db.commit()
 
-        seen_ids: set[str] = set(
-            row[0] for row in db.query(Accident.accident_id).filter(Accident.accident_id.isnot(None)).all()
+        seen_records: set[tuple[str, str]] = set(
+            (row.accident_id, row.district)
+            for row in db.query(Accident.accident_id, Accident.district).filter(Accident.accident_id.isnot(None)).all()
         )
 
         keys = only or list(DISTRICT_FILES.keys())
@@ -345,10 +342,16 @@ def seed_gujarat_accidents(
                 valid_df, rejected = _validate_coordinates(df, db, cfg["default_district"])
             total_rejected += rejected
 
-            objects = [
-                _build_accident(row, cfg["tag"], cfg["default_district"], seen_ids)
-                for _, row in valid_df.iterrows()
-            ]
+            objects = []
+            for _, row in valid_df.iterrows():
+                raw_id = _clean_text(row["accident_id"])
+                district = _clean_text(row["district"]) or cfg["default_district"]
+                
+                # Check for duplicates using both accident_id and district
+                if raw_id and (raw_id, district) in seen_records:
+                    continue
+                    
+                objects.append(_build_accident(row, cfg["tag"], cfg["default_district"], seen_records))
 
             for start in range(0, len(objects), CHUNK_SIZE):
                 chunk = objects[start:start + CHUNK_SIZE]

@@ -4,7 +4,7 @@ Accident record model specifically for the Surat City dataset.
 Field names align with the standard database structure.
 """
 
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, UniqueConstraint
 from geoalchemy2 import Geometry
 
 from app.database import Base
@@ -13,11 +13,14 @@ from app.core.config import POSTGIS_SRID
 
 class SuratAccident(Base):
     __tablename__ = "surat_city"
+    __table_args__ = (
+        UniqueConstraint('accident_id', 'district', name='uq_surat_accident_district'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
 
     # ── Identification ────────────────────────────────────────────────────────
-    accident_id    = Column(String, unique=True, nullable=True, index=True)
+    accident_id    = Column(String, nullable=True, index=True)
     district       = Column(String, nullable=True, index=True)
     police_station = Column(String, nullable=True)
 
