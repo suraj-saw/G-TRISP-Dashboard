@@ -100,6 +100,9 @@ class HeatmapPoint(ResponseModel):
     light_condition: Optional[str] = None
     collision_type: Optional[str] = None
     accident_date_time: Optional[datetime] = None
+    pedestrian_killed: Optional[int] = None
+    pedestrian_grievous_injury: Optional[int] = None
+    pedestrian_minor_injury: Optional[int] = None
 
 class HeatmapResponse(ResponseModel):
     total: int

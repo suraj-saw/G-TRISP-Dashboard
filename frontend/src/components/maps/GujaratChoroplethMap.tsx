@@ -1,5 +1,5 @@
 // frontend/src/components/maps/GujaratChoroplethMap.tsx
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { geoMercator, geoPath } from "d3-geo";
 import { scaleLinear } from "d3-scale";

@@ -199,6 +199,16 @@ export const fetchBlackspots = async (
   return data;
 };
 
+export const fetchPedestrianBlackspots = async (
+  filters: DashboardFilters
+): Promise<BlackspotData> => {
+  const params = getParams(filters);
+  const { data } = await API.get(`${SURAT_API_BASE}/pedestrian-blackspots`, {
+    params,
+  });
+  return data;
+};
+
 export const fetchDbscanBlackspots = async (
   filters: DashboardFilters
 ): Promise<BlackspotData> => {

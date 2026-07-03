@@ -4,8 +4,10 @@ import { DEFAULT_BASE_MAP, GEO_FILTER_LABEL } from "../../config/constants";
 
 export type VisualizationType =
   | "location_markers"
+  | "pedestrian_accidents"
   | "density_heatmap"
   | "blackspot"
+  | "pedestrian_blackspot"
   | "dbscan_blackspot"
   | "kde_density_heatmap"
   | "temporal_analysis";
@@ -34,8 +36,10 @@ export interface FilterConfigItem {
 
 export const VISUALIZATION_OPTIONS = [
   { value: "location_markers", label: "Location Markers" },
+  { value: "pedestrian_accidents", label: "Pedestrian Accidents" },
   { value: "density_heatmap", label: "Density Heatmap" },
   { value: "blackspot", label: "Blackspot Detection" },
+  { value: "pedestrian_blackspot", label: "Pedestrian Blackspot Detection" },
   { value: "dbscan_blackspot", label: "DBSCAN Blackspot Detection" },
   { value: "kde_density_heatmap", label: "Accident Density Heatmap (KDE)" },
   { value: "temporal_analysis", label: "Temporal Analysis" },

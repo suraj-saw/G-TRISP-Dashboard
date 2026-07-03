@@ -15,6 +15,8 @@ interface Props {
   fetchFn?: (filters: DashboardFilters) => Promise<BlackspotData>;
   /** Raw accident points for individual markers at high zoom */
   heatmapData?: HeatmapPoint[];
+  analysisLabel?: string;
+  crashLabel?: string;
 }
 
 interface HoveredBlackspot {
@@ -105,6 +107,8 @@ export default function BlackspotDetectionLayers({
   filters,
   fetchFn,
   heatmapData,
+  analysisLabel = "greedy blackspot detection",
+  crashLabel = "crashes",
 }: Props) {
   const { current: mapRef } = useMap();
   const [data, setData] = useState<BlackspotData | null>(null);
@@ -119,6 +123,9 @@ export default function BlackspotDetectionLayers({
     let active = true;
     setLoading(true);
     setError(null);
+    setData(null);
+    setHovered(null);
+    setSelected(null);
 
     const loader = fetchFn ?? fetchBlackspots;
 
@@ -143,8 +150,8 @@ export default function BlackspotDetectionLayers({
     return () => {
       active = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    filters.visualization_type,
     filters.district,
     filters.year,
     filters.severity,
@@ -252,7 +259,7 @@ export default function BlackspotDetectionLayers({
     return (
       <StatusBadge>
         <Loader2 size={14} className="animate-spin text-[#2C6EF2]" />
-        Running greedy blackspot detection…
+        Running {analysisLabel}…
       </StatusBadge>
     );
   }
@@ -271,8 +278,8 @@ export default function BlackspotDetectionLayers({
       <StatusBadge>
         <AlertCircle size={14} className="text-amber-500" />
         No blackspots found for the current filters (min{" "}
-        {data?.min_crashes ?? 5} crashes within {data?.radius_m ?? 250}m). Total
-        crashes considered: {data?.total_crashes ?? 0}.
+        {data?.min_crashes ?? 5} {crashLabel} within {data?.radius_m ?? 250}m). Total
+        {crashLabel} considered: {data?.total_crashes ?? 0}.
       </StatusBadge>
     );
   }
@@ -505,7 +512,7 @@ export default function BlackspotDetectionLayers({
       </Source>
 
       <StatusBadge>
-        {data.total_blackspots} blackspots · {data.total_crashes} crashes
+        {data.total_blackspots} blackspots · {data.total_crashes} {crashLabel}
         analyzed · {data.isolated_crashes} isolated
       </StatusBadge>
 

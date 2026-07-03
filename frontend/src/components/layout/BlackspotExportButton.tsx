@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  Download,
   FileText,
   FileSpreadsheet,
   Loader2,

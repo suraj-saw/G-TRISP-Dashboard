@@ -4,7 +4,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import API from "../../api/axios";
 import type { User } from "../../types/user";
-import { AlertTriangle as NoDataIcon, MapPin } from "lucide-react";
+import { 
+  // AlertTriangle as NoDataIcon,
+   MapPin 
+  } from "lucide-react";
 
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
@@ -32,6 +35,7 @@ import {
   fetchGujaratFilterOptions,
   fetchGujaratDashboardData,
   fetchGujaratBlackspots,
+  fetchGujaratPedestrianBlackspots,
   fetchGujaratDbscanBlackspots,
   fetchGujaratKdeHeatmap,
   fetchGujaratTemporalAnalysis,
@@ -40,6 +44,7 @@ import type {
   DashboardFilters,
   FilterOptions,
   DashboardData,
+  HeatmapPoint,
 } from "../../types/dashboard";
 import { ROUTES, DEFAULT_BASE_MAP } from "../../config/constants";
 import {
@@ -51,6 +56,96 @@ import {
 } from "../../config/layout";
 import { VISUALIZATION_OPTIONS } from "./filterConfig";
 import { MAP_STYLES } from "../../components/maps/mapStyles";
+
+const pedestrianCasualtyTotal = (point: HeatmapPoint): number =>
+  (Number(point.pedestrian_killed) || 0) +
+  (Number(point.pedestrian_grievous_injury) || 0) +
+  (Number(point.pedestrian_minor_injury) || 0);
+
+const isPedestrianAccident = (point: HeatmapPoint): boolean =>
+  pedestrianCasualtyTotal(point) > 0;
+
+type DateBounds = {
+  min?: string;
+  max?: string;
+};
+
+const toDateInputValue = (value?: string | null): string | null => {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return value.slice(0, 10);
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+};
+
+const getDatasetDateBounds = (points?: HeatmapPoint[]): DateBounds => {
+  const dates =
+    points
+      ?.map((point) => toDateInputValue(point.accident_date_time))
+      .filter((value): value is string => Boolean(value))
+      .sort() || [];
+
+  return {
+    min: dates[0],
+    max: dates[dates.length - 1],
+  };
+};
+
+const clampDateValue = (value: string, bounds: DateBounds): string => {
+  if (!value) return "";
+  if (bounds.min && value < bounds.min) return bounds.min;
+  if (bounds.max && value > bounds.max) return bounds.max;
+  return value;
+};
+
+function DateFilterInput({
+  value,
+  min,
+  max,
+  onCommit,
+  className,
+}: {
+  value: string;
+  min?: string;
+  max?: string;
+  onCommit: (value: string) => void;
+  className: string;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const commit = () => {
+    const next = clampDateValue(draft, { min, max });
+    setDraft(next);
+    if (next !== value) onCommit(next);
+  };
+
+  return (
+    <input
+      type="date"
+      value={draft}
+      min={min}
+      max={max}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.currentTarget.blur();
+        }
+        if (event.key === "Escape") {
+          setDraft(value);
+          event.currentTarget.blur();
+        }
+      }}
+      className={className}
+    />
+  );
+}
 
 // ---------------------------------------------------------------------------
 // District-scoped filter config — no police-station/district filter, since
@@ -293,6 +388,39 @@ export default function DistrictDashboard() {
     [allData]
   );
 
+  const datasetDateBounds = useMemo(
+    () => getDatasetDateBounds(allData.heatmap),
+    [allData.heatmap]
+  );
+
+  useEffect(() => {
+    if (!datasetDateBounds.min && !datasetDateBounds.max) return;
+
+    setFilters((current) => {
+      const nextFrom = clampDateValue(current.date_from || "", {
+        min: datasetDateBounds.min,
+        max: current.date_to || datasetDateBounds.max,
+      });
+      const nextTo = clampDateValue(current.date_to || "", {
+        min: nextFrom || datasetDateBounds.min,
+        max: datasetDateBounds.max,
+      });
+
+      if (
+        nextFrom === (current.date_from || "") &&
+        nextTo === (current.date_to || "")
+      ) {
+        return current;
+      }
+
+      return {
+        ...current,
+        date_from: nextFrom,
+        date_to: nextTo,
+      };
+    });
+  }, [datasetDateBounds.min, datasetDateBounds.max]);
+
   const monthOptions = [
     { value: "01", label: "January" },
     { value: "02", label: "February" },
@@ -362,6 +490,8 @@ export default function DistrictDashboard() {
   const isTemporalAnalysis = filters.visualization_type === "temporal_analysis";
   const isDensityHeatmap = filters.visualization_type === "density_heatmap";
   const isBlackspotDetection = filters.visualization_type === "blackspot";
+  const isPedestrianBlackspot =
+    filters.visualization_type === "pedestrian_blackspot";
   const isDbscanBlackspot = filters.visualization_type === "dbscan_blackspot";
   const isKdeDensityHeatmap =
     filters.visualization_type === "kde_density_heatmap";
@@ -380,6 +510,7 @@ export default function DistrictDashboard() {
     const value = filters[filter.id] ?? [];
     const isMultiSelect =
       filter.id !== "baseMap" && filter.id !== "visualization_type";
+    const isDateFilter = filter.id === "date_from" || filter.id === "date_to";
 
     const handleChange = (nextValue: string | string[]) => {
       setFilters((current) => {
@@ -396,6 +527,15 @@ export default function DistrictDashboard() {
       });
     };
 
+    const minDate =
+      filter.id === "date_to"
+        ? filters.date_from || datasetDateBounds.min
+        : datasetDateBounds.min;
+    const maxDate =
+      filter.id === "date_from"
+        ? filters.date_to || datasetDateBounds.max
+        : datasetDateBounds.max;
+
     return (
       <div key={filter.id} className="flex flex-col gap-1.5">
         <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-[#6B7299]">
@@ -404,21 +544,12 @@ export default function DistrictDashboard() {
           )}
           {filter.label}
         </label>
-        {filter.id === "date_from" || filter.id === "date_to" ? (
-          <input
-            type="date"
+        {isDateFilter ? (
+          <DateFilterInput
             value={(value as string) || ""}
-            max={
-              filter.id === "date_from"
-                ? filters.date_to || undefined
-                : undefined
-            }
-            min={
-              filter.id === "date_to"
-                ? filters.date_from || undefined
-                : undefined
-            }
-            onChange={(e) => handleChange(e.target.value)}
+            min={minDate}
+            max={maxDate}
+            onCommit={(nextValue) => handleChange(nextValue)}
             className="w-full rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-3 py-2 text-[13px] font-medium text-[#1A1D2E] outline-none transition focus:border-[#1e3a8a] focus:bg-white focus:ring-2 focus:ring-[#1e3a8a]/10 hover:border-[#C9CEDF]"
           />
         ) : (
@@ -619,8 +750,20 @@ export default function DistrictDashboard() {
                     ) : undefined
                   }
                 >
-                  {isBlackspotDetection ? (
+                  {isPedestrianBlackspot ? (
                     <BlackspotDetectionLayers
+                      key="pedestrian-blackspot"
+                      filters={filters}
+                      fetchFn={(f) =>
+                        fetchGujaratPedestrianBlackspots(f, districtName)
+                      }
+                      heatmapData={data.heatmap.filter(isPedestrianAccident)}
+                      analysisLabel="pedestrian greedy blackspot detection"
+                      crashLabel="pedestrian crashes"
+                    />
+                  ) : isBlackspotDetection ? (
+                    <BlackspotDetectionLayers
+                      key="blackspot"
                       filters={filters}
                       fetchFn={(f) => fetchGujaratBlackspots(f, districtName)}
                       heatmapData={data.heatmap}

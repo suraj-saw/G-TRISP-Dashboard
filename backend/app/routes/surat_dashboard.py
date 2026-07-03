@@ -73,7 +73,11 @@ from app.utils.surat_accident_utils import (
 from app.utils.text_utils import safe_text
 from app.utils.datetime_utils import parse_accident_datetime_from_str
 from app.utils.blackspot_utils import CrashPoint, greedy_blackspots, blackspots_to_geojson, dbscan_blackspots
-from app.core.constants import BLACKSPOT_RADIUS_METERS, BLACKSPOT_MIN_CRASHES
+from app.core.constants import (
+    BLACKSPOT_RADIUS_METERS,
+    BLACKSPOT_MIN_CRASHES,
+    PEDESTRIAN_BLACKSPOT_MIN_CRASHES,
+)
 
 from app.core.constants import (
     SEVERITY_FATAL,
@@ -428,6 +432,9 @@ def get_heatmap(
                 light_condition=safe_text(a.light_condition),
                 collision_type=safe_text(a.type_of_collision),
                 accident_date_time=a.accident_date_time,
+                pedestrian_killed=a.pedestrian_killed or 0,
+                pedestrian_grievous_injury=a.pedestrian_grievous_injury or 0,
+                pedestrian_minor_injury=a.pedestrian_minor_injury or 0,
             )
             for a in accidents
             if a.latitude is not None and a.longitude is not None
@@ -896,6 +903,66 @@ def get_blackspots(
             query = query.filter(SuratAccident.severity == severity)
 
     accidents = query.all()
+
+    points = [
+        CrashPoint(index=idx, accident_id=a.accident_id, lat=a.latitude, lon=a.longitude)
+        for idx, a in enumerate(accidents)
+        if a.latitude is not None and a.longitude is not None
+    ]
+
+    blackspots = greedy_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
+    geojson = blackspots_to_geojson(blackspots, radius_m=radius_m)
+
+    return {
+        "total_crashes": len(points),
+        "total_blackspots": len(blackspots),
+        "isolated_crashes": len(points) - sum(b.crash_count for b in blackspots),
+        "radius_m": radius_m,
+        "min_crashes": min_crashes,
+        "circles": geojson["circles"],
+        "centroids": geojson["centroids"],
+    }
+
+
+@router.get("/pedestrian-blackspots")
+def get_pedestrian_blackspots(
+    police_station: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
+    min_crashes: int = Query(PEDESTRIAN_BLACKSPOT_MIN_CRASHES, ge=2, le=100),
+    db: Session = Depends(get_db),
+):
+    """
+    Greedy pedestrian blackspot detection using only crashes with pedestrian
+    casualties. Mirrors the notebook's pedestrian layer defaults: 250 m radius
+    and a minimum of 3 pedestrian crashes.
+    """
+    query = apply_surat_filters(
+        db.query(SuratAccident),
+        police_station, year, road_classification,
+        weather_condition, light_condition, collision_type,
+        date_from, date_to,
+    )
+    if severity:
+        if isinstance(severity, list):
+            query = query.filter(SuratAccident.severity.in_(severity))
+        else:
+            query = query.filter(SuratAccident.severity == severity)
+
+    accidents = query.filter(
+        (
+            func.coalesce(SuratAccident.pedestrian_killed, 0) +
+            func.coalesce(SuratAccident.pedestrian_grievous_injury, 0) +
+            func.coalesce(SuratAccident.pedestrian_minor_injury, 0)
+        ) > 0
+    ).all()
 
     points = [
         CrashPoint(index=idx, accident_id=a.accident_id, lat=a.latitude, lon=a.longitude)

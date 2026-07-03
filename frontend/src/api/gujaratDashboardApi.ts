@@ -125,6 +125,17 @@ export const fetchGujaratBlackspots = async (
   return data;
 };
 
+export const fetchGujaratPedestrianBlackspots = async (
+  filters: DashboardFilters,
+  district: string
+): Promise<BlackspotData> => {
+  const params = getParams(filters, district);
+  const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-blackspots`, {
+    params,
+  });
+  return data;
+};
+
 export const fetchGujaratDbscanBlackspots = async (
   filters: DashboardFilters,
   district: string

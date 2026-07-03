@@ -66,6 +66,9 @@ export interface HeatmapPoint {
   light_condition?: string | null;
   collision_type?: string | null;
   accident_date_time?: string | null;
+  pedestrian_killed?: number | null;
+  pedestrian_grievous_injury?: number | null;
+  pedestrian_minor_injury?: number | null;
 }
 
 export interface CasualtyBreakdown {

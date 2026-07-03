@@ -50,6 +50,9 @@ type SelectedAccident = {
   light_condition?: string | null;
   collision_type?: string | null;
   accident_date_time?: string | null;
+  pedestrian_killed?: number | null;
+  pedestrian_grievous_injury?: number | null;
+  pedestrian_minor_injury?: number | null;
   // cluster fields
   point_count?: number;
   isCluster?: boolean;
@@ -90,6 +93,18 @@ const getSeverityMarkerWeight = (severity?: string | null): number => {
   }
   return SEVERITY_DEFAULT_WEIGHT;
 };
+
+const pedestrianCasualtyTotal = (point: {
+  pedestrian_killed?: number | null;
+  pedestrian_grievous_injury?: number | null;
+  pedestrian_minor_injury?: number | null;
+}): number =>
+  (Number(point.pedestrian_killed) || 0) +
+  (Number(point.pedestrian_grievous_injury) || 0) +
+  (Number(point.pedestrian_minor_injury) || 0);
+
+const isPedestrianAccident = (point: HeatmapPoint): boolean =>
+  pedestrianCasualtyTotal(point) > 0;
 
 // ---------------------------------------------------------------------------
 // Colour palette for severity
@@ -143,6 +158,9 @@ function buildGeojson(data?: HeatmapPoint[]): GeoJSON.FeatureCollection {
             light_condition: p.light_condition,
             collision_type: p.collision_type,
             accident_date_time: p.accident_date_time,
+            pedestrian_killed: p.pedestrian_killed ?? 0,
+            pedestrian_grievous_injury: p.pedestrian_grievous_injury ?? 0,
+            pedestrian_minor_injury: p.pedestrian_minor_injury ?? 0,
           },
         })) || [],
   };
@@ -436,16 +454,24 @@ export function VisualizationLayers({
   const { current: mapRef } = useMap();
   const [selected, setSelected] = useState<SelectedAccident | null>(null);
 
+  const displayData = useMemo(
+    () =>
+      type === "pedestrian_accidents"
+        ? data?.filter(isPedestrianAccident)
+        : data,
+    [data, type]
+  );
+
   const geojsonData = useMemo<GeoJSON.FeatureCollection>(
-    () => buildGeojson(data),
-    [data]
+    () => buildGeojson(displayData),
+    [displayData]
   );
 
   // Click / hover handler — active for clickable point layers in both
   // location-marker mode and density mode (graduated points).
   useEffect(() => {
     const interactiveLayers =
-      type === "location_markers"
+      type === "location_markers" || type === "pedestrian_accidents"
         ? ["accident-points"]
         : type === "density_heatmap"
           ? ["density-points"]
@@ -524,7 +550,9 @@ export function VisualizationLayers({
 
   // ── Location markers ─────────────────────────────────────────────────────
   const markerColor =
-    selectedSeverity.length === 0
+    type === "pedestrian_accidents"
+      ? "#0F766E"
+      : selectedSeverity.length === 0
       ? SEVERITY_COLORS.all
       : (severityColorExpression as any);
 
@@ -593,7 +621,10 @@ export function VisualizationLayers({
           closeOnClick={false}
           onClose={() => setSelected(null)}
         >
-          <AccidentPopupBody selected={selected} />
+          <AccidentPopupBody
+            selected={selected}
+            showPedestrianCasualties={type === "pedestrian_accidents"}
+          />
         </Popup>
       )}
     </>
@@ -604,13 +635,26 @@ export function VisualizationLayers({
 // Shared popup body
 // ---------------------------------------------------------------------------
 
-function AccidentPopupBody({ selected }: { selected: SelectedAccident }) {
+function AccidentPopupBody({
+  selected,
+  showPedestrianCasualties = false,
+}: {
+  selected: SelectedAccident;
+  showPedestrianCasualties?: boolean;
+}) {
+  const pedestrianTotal = pedestrianCasualtyTotal(selected);
+
   return (
     <div className="min-w-[210px] text-[12px] text-slate-700">
       <p className="mb-2 text-[13px] font-bold text-slate-900">
         Accident Details
       </p>
       <div className="space-y-1">
+        {showPedestrianCasualties && pedestrianTotal > 0 && (
+          <p>
+            <b>Pedestrian casualties:</b> {pedestrianTotal}
+          </p>
+        )}
         <p>
           <b>Severity:</b> {safeText(selected.severity)}
         </p>
