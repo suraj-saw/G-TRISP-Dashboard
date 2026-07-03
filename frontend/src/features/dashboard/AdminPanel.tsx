@@ -289,13 +289,13 @@ function AdminPanel() {
   if (sessionStatus === "checking") {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-        >
-          <Loader2 className="w-10 h-10 text-blue-600 mb-4" />
-        </motion.div>
-        <p className="text-slate-500 font-medium animate-pulse">
+        <div className="flex h-12 w-12 items-center justify-center">
+          <Loader2
+            className="h-10 w-10 animate-spin text-blue-600 block origin-center"
+            aria-hidden="true"
+          />
+        </div>
+        <p className="mt-4 text-slate-500 font-medium animate-pulse">
           Checking secure session...
         </p>
       </div>

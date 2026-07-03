@@ -614,6 +614,7 @@ export default function DistrictDashboard() {
                     <BlackspotDetectionLayers
                       filters={filters}
                       fetchFn={(f) => fetchGujaratBlackspots(f, districtName)}
+                      heatmapData={data.heatmap}
                     />
                   ) : isDbscanBlackspot ? (
                     <DbscanBlackspotDetectionLayers
@@ -645,26 +646,26 @@ export default function DistrictDashboard() {
                         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 border border-amber-100">
                           <MapPin size={26} className="text-amber-500" />
                         </div>
-                      <div>
-                        <p className="text-base font-bold text-slate-800">
-                          No accident data available yet
-                        </p>
-                        <p className="mt-1 max-w-sm text-sm text-slate-500">
-                          {districtName || "This district"} doesn't have
-                          recorded accident records in the system yet. Try a
-                          district with available data, such as Surat or
-                          Bhavnagar.
-                        </p>
+                        <div>
+                          <p className="text-base font-bold text-slate-800">
+                            No accident data available yet
+                          </p>
+                          <p className="mt-1 max-w-sm text-sm text-slate-500">
+                            {districtName || "This district"} doesn't have
+                            recorded accident records in the system yet. Try a
+                            district with available data, such as Surat or
+                            Bhavnagar.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => navigate(ROUTES.DASHBOARD)}
+                          className="mt-1 rounded-lg bg-[#1e3a8a] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#17337b]"
+                        >
+                          Back to Gujarat map
+                        </button>
                       </div>
-                      <button
-                        onClick={() => navigate(ROUTES.DASHBOARD)}
-                        className="mt-1 rounded-lg bg-[#1e3a8a] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#17337b]"
-                      >
-                        Back to Gujarat map
-                      </button>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             )}
           </motion.div>

@@ -196,86 +196,84 @@ export default function Dashboard() {
   // Build a human-readable subtitle for the overlay
   const overlaySubtitle = useMemo(() => {
     const parts: string[] = ["Surat"];
-    if (filters.district?.length)
-      parts.push(filters.district.join(", "));
+    if (filters.district?.length) parts.push(filters.district.join(", "));
     if (filters.year?.length) parts.push(filters.year.join(", "));
-    if (filters.severity?.length)
-      parts.push(filters.severity.join(", "));
+    if (filters.severity?.length) parts.push(filters.severity.join(", "));
     return parts.join(" · ");
   }, [filters.district, filters.year, filters.severity]);
 
-    const renderFilter = (filter: (typeof activeFilterConfig)[number]) => {
-      const isDateFilter = filter.id === "date_from" || filter.id === "date_to";
+  const renderFilter = (filter: (typeof activeFilterConfig)[number]) => {
+    const isDateFilter = filter.id === "date_from" || filter.id === "date_to";
 
-      if (isDateFilter) {
-        const value = (filters[filter.id] as string | undefined) ?? "";
-
-        return (
-          <div key={filter.id} className="flex flex-col gap-1.5">
-            <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-[#6B7299]">
-              {filter.label}
-            </label>
-            <input
-              type="date"
-              value={value}
-              max={
-                filter.id === "date_from"
-                  ? filters.date_to || undefined
-                  : undefined
-              }
-              min={
-                filter.id === "date_to"
-                  ? filters.date_from || undefined
-                  : undefined
-              }
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  [filter.id]: event.target.value,
-                }))
-              }
-              className="w-full rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-3 py-2 text-[13px] font-medium text-[#1A1D2E] outline-none transition hover:border-[#C9CEDF] focus:border-[#1e3a8a] focus:bg-white focus:ring-2 focus:ring-[#1e3a8a]/10"
-            />
-          </div>
-        );
-      }
-
-      const value = filters[filter.id] ?? [];
-      const isMultiSelect =
-        filter.id !== "baseMap" && filter.id !== "visualization_type";
-
-      const handleChange = (nextValue: string | string[]) => {
-        setFilters((current) => {
-          if (filter.id === "visualization_type") {
-            return {
-              ...current,
-              visualization_type: nextValue as string,
-              month: [],
-              day: [],
-              time_period: [],
-            };
-          }
-          return { ...current, [filter.id]: nextValue };
-        });
-      };
+    if (isDateFilter) {
+      const value = (filters[filter.id] as string | undefined) ?? "";
 
       return (
         <div key={filter.id} className="flex flex-col gap-1.5">
           <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-[#6B7299]">
-            {filter.icon === "layers" && (
-              <Layers size={12} className="text-[#1e3a8a]" />
-            )}
             {filter.label}
           </label>
-          <FilterSelect
-            value={value as string | string[]}
-            options={filterOptionsById[filter.id]}
-            onChange={handleChange}
-            multiSelect={isMultiSelect}
+          <input
+            type="date"
+            value={value}
+            max={
+              filter.id === "date_from"
+                ? filters.date_to || undefined
+                : undefined
+            }
+            min={
+              filter.id === "date_to"
+                ? filters.date_from || undefined
+                : undefined
+            }
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                [filter.id]: event.target.value,
+              }))
+            }
+            className="w-full rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-3 py-2 text-[13px] font-medium text-[#1A1D2E] outline-none transition hover:border-[#C9CEDF] focus:border-[#1e3a8a] focus:bg-white focus:ring-2 focus:ring-[#1e3a8a]/10"
           />
         </div>
       );
+    }
+
+    const value = filters[filter.id] ?? [];
+    const isMultiSelect =
+      filter.id !== "baseMap" && filter.id !== "visualization_type";
+
+    const handleChange = (nextValue: string | string[]) => {
+      setFilters((current) => {
+        if (filter.id === "visualization_type") {
+          return {
+            ...current,
+            visualization_type: nextValue as string,
+            month: [],
+            day: [],
+            time_period: [],
+          };
+        }
+        return { ...current, [filter.id]: nextValue };
+      });
     };
+
+    return (
+      <div key={filter.id} className="flex flex-col gap-1.5">
+        <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-[#6B7299]">
+          {filter.icon === "layers" && (
+            <Layers size={12} className="text-[#1e3a8a]" />
+          )}
+          {filter.label}
+        </label>
+        <FilterSelect
+          value={value as string | string[]}
+          options={filterOptionsById[filter.id]}
+          onChange={handleChange}
+          multiSelect={isMultiSelect}
+        />
+      </div>
+    );
+  };
 
   if (sessionChecking || !user) {
     return (
@@ -445,7 +443,7 @@ export default function Dashboard() {
                   }
                 >
                   {isBlackspotDetection ? (
-                    <BlackspotDetectionLayers filters={filters} />
+                    <BlackspotDetectionLayers filters={filters} heatmapData={data?.heatmap} />
                   ) : isDbscanBlackspot ? (
                     <DbscanBlackspotDetectionLayers filters={filters} />
                   ) : isKdeDensityHeatmap ? (
