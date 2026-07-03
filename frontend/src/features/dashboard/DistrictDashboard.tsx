@@ -16,6 +16,7 @@ import FilterSelect from "../../components/layout/FilterSelect";
 import DistrictBaseMap from "../../components/maps/DistrictBaseMap";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
 import LocationMarkersInsights from "../../components/charts/LocationMarkersInsights";
+import BlackspotExportButton from "../../components/layout/BlackspotExportButton";
 
 import {
   Filter,
@@ -556,6 +557,14 @@ export default function DistrictDashboard() {
             <RotateCcw size={13} />
             Reset filters
           </button>
+          {(isBlackspotDetection || isDbscanBlackspot) && (
+            <BlackspotExportButton
+              filters={filters}
+              algorithm={isDbscanBlackspot ? "dbscan" : "greedy"}
+              isSurat={false}
+              districtName={districtName}
+            />
+          )}
         </div>
       </aside>
 

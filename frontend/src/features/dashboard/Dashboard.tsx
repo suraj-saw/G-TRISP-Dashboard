@@ -13,6 +13,7 @@ import FilterSelect from "../../components/layout/FilterSelect";
 import ExportButton from "../../components/layout/ExportButton";
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
 import AccidentDensityHeatmapLayers from "../../components/maps/AccidentDensityHeatmapLayers";
+import BlackspotExportButton from "../../components/layout/BlackspotExportButton";
 
 import {
   Filter,
@@ -387,6 +388,13 @@ export default function Dashboard() {
           })()}
 
           <ExportButton filters={filters} />
+          {(isBlackspotDetection || isDbscanBlackspot) && (
+            <BlackspotExportButton
+              filters={filters}
+              algorithm={isDbscanBlackspot ? "dbscan" : "greedy"}
+              isSurat={true}
+            />
+          )}
 
           <button
             onClick={() => setFilters(defaultFilters)}
@@ -443,7 +451,10 @@ export default function Dashboard() {
                   }
                 >
                   {isBlackspotDetection ? (
-                    <BlackspotDetectionLayers filters={filters} heatmapData={data?.heatmap} />
+                    <BlackspotDetectionLayers
+                      filters={filters}
+                      heatmapData={data?.heatmap}
+                    />
                   ) : isDbscanBlackspot ? (
                     <DbscanBlackspotDetectionLayers filters={filters} />
                   ) : isKdeDensityHeatmap ? (

@@ -1073,3 +1073,111 @@ def get_yearly_comparison(
             for yr, v in sorted(years.items())
         ]
     )
+
+@router.get("/blackspot-export")
+def export_blackspots(
+    format: str = Query("csv", enum=["csv", "excel"]),
+    district: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
+    min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
+    algorithm: str = Query("greedy", enum=["greedy", "dbscan"]),
+    bs_id: Optional[int] = Query(None, description="Blackspot number to export accident details for"),
+    db: Session = Depends(get_db),
+):
+    from fastapi.responses import StreamingResponse
+    from datetime import datetime as dt
+    from app.utils.export_utils import (
+        build_accident_csv,
+        build_accident_excel,
+    )
+
+    query = apply_filters(
+        db.query(Accident),
+        district, year, road_classification,
+        weather_condition, light_condition, collision_type,
+        date_from, date_to,
+    )
+    if severity and "all" not in severity:
+        query = query.filter(Accident.severity.in_(severity))
+
+    accidents = query.all()
+    points = [
+        CrashPoint(index=idx, accident_id=a.accident_id, lat=a.latitude, lon=a.longitude)
+        for idx, a in enumerate(accidents)
+        if a.latitude is not None and a.longitude is not None
+    ]
+
+    if algorithm == "dbscan":
+        blackspots = dbscan_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
+    else:
+        blackspots = greedy_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
+
+    # Build a lookup: accident_id -> Accident ORM object
+    acc_by_id = {a.accident_id: a for a in accidents if a.accident_id}
+
+    # Determine which blackspots to export
+    if bs_id is not None:
+        target_bs = [bs for bs in blackspots if bs.bs_id == bs_id]
+        if not target_bs:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=404,
+                content={"detail": f"Blackspot #{bs_id} not found."},
+            )
+    else:
+        target_bs = blackspots
+
+    # Collect (bs_id, Accident) pairs
+    accidents_with_bs = []
+    for bs in target_bs:
+        for cid in bs.crash_ids:
+            acc = acc_by_id.get(cid)
+            if acc:
+                accidents_with_bs.append((bs.bs_id, acc))
+
+    timestamp = dt.now().strftime("%Y%m%d_%H%M%S")
+    if bs_id is not None:
+        filename = f"blackspot_{bs_id}_accidents_{algorithm}_{timestamp}"
+    else:
+        filename = f"all_blackspot_accidents_{algorithm}_{timestamp}"
+
+    if format == "csv":
+        csv_data = build_accident_csv(accidents_with_bs)
+        return StreamingResponse(
+            iter([csv_data]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}.csv"',
+                "Access-Control-Expose-Headers": "Content-Disposition",
+            },
+        )
+
+    # Excel
+    meta_rows = [
+        ("Export Date", dt.now().strftime("%d %b %Y %H:%M")),
+        ("Algorithm", algorithm.upper()),
+        ("Blackspot #", bs_id if bs_id is not None else "All"),
+        ("Total Blackspots", len(target_bs)),
+        ("Total Accident Records", len(accidents_with_bs)),
+        ("Total Crashes Analyzed", len(points)),
+        ("Radius (m)", radius_m),
+        ("Min Crashes Threshold", min_crashes),
+        ("Source", "G-TRISP Dashboard"),
+    ]
+    buf = build_accident_excel(accidents_with_bs, meta_rows)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}.xlsx"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
