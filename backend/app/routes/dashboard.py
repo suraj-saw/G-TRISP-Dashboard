@@ -73,6 +73,7 @@ from app.utils.blackspot_utils import (
     blackspots_to_geojson,
 )
 from app.utils.kde_utils import compute_kde_heatmap
+from app.schemas.gujarat_insights_schema import DistrictInsightsResponse
 
 from app.core.constants import (
     SEVERITY_FATAL,
@@ -1241,3 +1242,682 @@ def export_blackspots(
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Risk level thresholding (quartile-based, relative to this dataset)
+# ---------------------------------------------------------------------------
+
+def _risk_level(total_accidents: int, sorted_totals: list[int]) -> str:
+    if not sorted_totals:
+        return "Low"
+    n = len(sorted_totals)
+
+    def pct(p: float) -> float:
+        idx = min(n - 1, int(p * (n - 1)))
+        return sorted_totals[idx]
+
+    p50, p75, p90 = pct(0.5), pct(0.75), pct(0.9)
+
+    if total_accidents >= p90:
+        return "Very High"
+    if total_accidents >= p75:
+        return "High"
+    if total_accidents >= p50:
+        return "Moderate"
+    return "Low"
+
+
+# ---------------------------------------------------------------------------
+# District Insights — computed ONCE per request, cheap to poll infrequently.
+# The frontend calls this a single time on load and caches it in memory;
+# hover interactions never hit the network again.
+# ---------------------------------------------------------------------------
+
+import logging
+from sqlalchemy import case, distinct, extract, text
+
+logger = logging.getLogger(__name__)
+
+
+@router.get("/district-insights", response_model=DistrictInsightsResponse)
+def get_district_insights(db: Session = Depends(get_db)):
+    try:
+        base_filter = (
+            Accident.district.isnot(None),
+            Accident.district != "",
+            Accident.district != "nan",
+        )
+
+        # ---- 1. Core numeric KPIs ----
+        core_rows = (
+            db.query(
+                Accident.district,
+                func.count(Accident.id).label("total"),
+                func.sum(case((Accident.severity == SEVERITY_FATAL, 1), else_=0)).label("fatal"),
+                func.sum(
+                    func.coalesce(Accident.driver_killed, 0)
+                    + func.coalesce(Accident.passenger_killed, 0)
+                    + func.coalesce(Accident.pedestrian_killed, 0)
+                ).label("fatalities"),
+                func.sum(
+                    func.coalesce(Accident.driver_grievous_injury, 0)
+                    + func.coalesce(Accident.passenger_grievous_injury, 0)
+                    + func.coalesce(Accident.pedestrian_grievous_injury, 0)
+                ).label("grievous"),
+                func.sum(
+                    func.coalesce(Accident.driver_minor_injury, 0)
+                    + func.coalesce(Accident.passenger_minor_injury, 0)
+                    + func.coalesce(Accident.pedestrian_minor_injury, 0)
+                ).label("minor"),
+                func.count(
+                    distinct(case((Accident.police_station != UNKNOWN_LABEL, Accident.police_station), else_=None))
+                ).label("stations"),
+            )
+            .filter(*base_filter)
+            .group_by(Accident.district)
+            .all()
+        )
+
+        # ---- 2. Severity breakdown per district ----
+        severity_rows = (
+            db.query(Accident.district, Accident.severity, func.count(Accident.id))
+            .filter(*base_filter)
+            .group_by(Accident.district, Accident.severity)
+            .all()
+        )
+        severity_by_district: dict = defaultdict(list)
+        for district, severity, count in severity_rows:
+            severity_by_district[district].append({"label": safe_text(severity), "count": count})
+
+        # ---- 3. Monthly trend — group by the extract() EXPRESSIONS, not string aliases ----
+        year_expr = extract("year", Accident.accident_date_time)
+        month_expr = extract("month", Accident.accident_date_time)
+        monthly_rows = (
+            db.query(Accident.district, year_expr, month_expr, func.count(Accident.id))
+            .filter(*base_filter, Accident.accident_date_time.isnot(None))
+            .group_by(Accident.district, year_expr, month_expr)
+            .all()
+        )
+        monthly_by_district: dict = defaultdict(list)
+        for district, year, month, count in monthly_rows:
+            year, month = int(year), int(month)
+            monthly_by_district[district].append({
+                "year": year, "month": month,
+                "month_label": f"{calendar.month_abbr[month]} {year}",
+                "count": count,
+            })
+        for v in monthly_by_district.values():
+            v.sort(key=lambda x: (x["year"], x["month"]))
+
+        # ---- 4. Weekday ----
+        weekday_expr = func.to_char(Accident.accident_date_time, "Day")
+        weekday_rows = (
+            db.query(Accident.district, weekday_expr, func.count(Accident.id))
+            .filter(*base_filter, Accident.accident_date_time.isnot(None))
+            .group_by(Accident.district, weekday_expr)
+            .all()
+        )
+        weekday_by_district: dict = defaultdict(dict)
+        for district, day, count in weekday_rows:
+            weekday_by_district[district][day.strip()] = count
+
+        # ---- 5. Time-of-day period ----
+        hour_expr = extract("hour", Accident.accident_date_time)
+        period_case = case(
+            (hour_expr.between(5, 11), "Morning"),
+            (hour_expr.between(12, 16), "Afternoon"),
+            (hour_expr.between(17, 20), "Evening"),
+            else_="Night",
+        )
+        period_rows = (
+            db.query(Accident.district, period_case, func.count(Accident.id))
+            .filter(*base_filter, Accident.accident_date_time.isnot(None))
+            .group_by(Accident.district, period_case)
+            .all()
+        )
+        period_by_district: dict = defaultdict(dict)
+        for district, period, count in period_rows:
+            period_by_district[district][period] = count
+
+        # ---- 6. Road / collision breakdown ----
+        road_rows = (
+            db.query(Accident.district, Accident.road_classification, func.count(Accident.id))
+            .filter(*base_filter)
+            .group_by(Accident.district, Accident.road_classification)
+            .all()
+        )
+        road_by_district: dict = defaultdict(list)
+        for district, road, count in road_rows:
+            road_by_district[district].append({"label": safe_text(road), "count": count})
+
+        collision_rows = (
+            db.query(Accident.district, Accident.type_of_collision, func.count(Accident.id))
+            .filter(*base_filter)
+            .group_by(Accident.district, Accident.type_of_collision)
+            .all()
+        )
+        collision_by_district: dict = defaultdict(list)
+        for district, collision, count in collision_rows:
+            collision_by_district[district].append({"label": safe_text(collision), "count": count})
+
+        # ---- 7. Most affected station ----
+        station_rows = (
+            db.query(Accident.district, Accident.police_station, func.count(Accident.id))
+            .filter(*base_filter)
+            .group_by(Accident.district, Accident.police_station)
+            .all()
+        )
+        station_counts: dict = defaultdict(dict)
+        for district, station, count in station_rows:
+            station_counts[district][safe_text(station)] = count
+
+        # ---- 8. Blackspots — ISOLATED so a PostGIS/version issue here can't
+        #          take down the whole endpoint. Falls back to 0 per district.
+        blackspots_by_district: dict = {}
+        try:
+            eps_degrees = BLACKSPOT_RADIUS_METERS / 111_320.0
+            blackspot_sql = text(
+                """
+                SELECT district, COUNT(DISTINCT cluster_id) AS blackspots
+                FROM (
+                    SELECT
+                        district,
+                        ST_ClusterDBSCAN(location, eps := :eps, minpoints := :minpts)
+                            OVER (PARTITION BY district) AS cluster_id
+                    FROM accidents
+                    WHERE location IS NOT NULL
+                      AND district IS NOT NULL AND district != '' AND district != 'nan'
+                ) clustered
+                WHERE cluster_id IS NOT NULL
+                GROUP BY district
+                """
+            )
+            blackspot_rows = db.execute(
+                blackspot_sql, {"eps": eps_degrees, "minpts": BLACKSPOT_MIN_CRASHES}
+            ).fetchall()
+            blackspots_by_district = {row.district: row.blackspots for row in blackspot_rows}
+        except Exception:
+            logger.exception("Blackspot clustering query failed — continuing with 0 for all districts.")
+            db.rollback()  # clear the failed-transaction state so later queries in this request still work
+
+        # ---- Assemble per-district payload ----
+        raw: dict = {}
+        for row in core_rows:
+            district = row.district
+            total = row.total or 0
+            fatal = row.fatal or 0
+            stations = station_counts.get(district, {})
+            most_affected = max(stations.items(), key=lambda x: x[1])[0] if stations else UNKNOWN_LABEL
+
+            months = monthly_by_district.get(district, [])
+            highest_month = max(months, key=lambda m: m["count"])["month_label"] if months else UNKNOWN_LABEL
+
+            periods = period_by_district.get(district, {})
+            peak_period = max(periods.items(), key=lambda x: x[1])[0] if periods else UNKNOWN_LABEL
+
+            weekdays = weekday_by_district.get(district, {})
+            weekday_out = [{"label": d, "count": weekdays.get(d, 0)} for d in WEEKDAY_ORDER]
+
+            raw[district] = {
+                "district": district,
+                "total_accidents": total,
+                "fatal_accidents": fatal,
+                "fatalities": row.fatalities or 0,
+                "grievous_injuries": row.grievous or 0,
+                "minor_injuries": row.minor or 0,
+                "fatality_rate": round((fatal / total * 100), 2) if total else 0.0,
+                "police_stations": row.stations or 0,
+                "most_affected_police_station": most_affected,
+                "highest_accident_month": highest_month,
+                "peak_accident_time": peak_period,
+                "blackspots_count": blackspots_by_district.get(district, 0),
+                "severity": severity_by_district.get(district, []),
+                "monthly_trend": months,
+                "time_of_day": [{"label": k, "count": v} for k, v in periods.items()],
+                "weekday": weekday_out,
+                "road_type": road_by_district.get(district, []),
+                "collision_type": collision_by_district.get(district, []),
+            }
+
+        sorted_totals = sorted(v["total_accidents"] for v in raw.values())
+
+        def _risk_level(total: int) -> str:
+            if not sorted_totals:
+                return "Low"
+            n = len(sorted_totals)
+            def pct(p): return sorted_totals[min(n - 1, int(p * (n - 1)))]
+            if total >= pct(0.9): return "Very High"
+            if total >= pct(0.75): return "High"
+            if total >= pct(0.5): return "Moderate"
+            return "Low"
+
+        for v in raw.values():
+            v["risk_level"] = _risk_level(v["total_accidents"])
+
+        total_accidents = sum(v["total_accidents"] for v in raw.values())
+        total_fatalities = sum(v["fatalities"] for v in raw.values())
+        total_grievous = sum(v["grievous_injuries"] for v in raw.values())
+        total_minor = sum(v["minor_injuries"] for v in raw.values())
+
+        gujarat_severity: dict = defaultdict(int)
+        for entries in severity_by_district.values():
+            for e in entries:
+                gujarat_severity[e["label"]] += e["count"]
+
+        fatal_by_district = sorted(
+            (
+                {"district": name, "fatal_accidents": v["fatal_accidents"], "total_killed": v["fatalities"]}
+                for name, v in raw.items()
+            ),
+            key=lambda x: x["fatal_accidents"],
+            reverse=True,
+        )[:6]
+
+        all_stations = {s for stations in station_counts.values() for s in stations if s != UNKNOWN_LABEL}
+
+        gujarat = {
+            "total_accidents": total_accidents,
+            "total_fatalities": total_fatalities,
+            "total_grievous": total_grievous,
+            "total_minor": total_minor,
+            "districts_covered": len(raw),
+            "police_stations": len(all_stations),
+            "severity": [{"label": k, "count": v} for k, v in gujarat_severity.items()],
+            "dangerous": fatal_by_district,
+        }
+
+        return {"gujarat": gujarat, "districts": raw}
+
+    except Exception:
+        logger.exception("get_district_insights failed")
+        db.rollback()
+        raise
+    base_filter = (
+        Accident.district.isnot(None),
+        Accident.district != "",
+        Accident.district != "nan",
+    )
+
+    # ---- 1. Core numeric KPIs — ONE grouped query, no Python row loop ----
+    core_rows = (
+        db.query(
+            Accident.district,
+            func.count(Accident.id).label("total"),
+            func.sum(case((Accident.severity == SEVERITY_FATAL, 1), else_=0)).label("fatal"),
+            func.sum(
+                func.coalesce(Accident.driver_killed, 0)
+                + func.coalesce(Accident.passenger_killed, 0)
+                + func.coalesce(Accident.pedestrian_killed, 0)
+            ).label("fatalities"),
+            func.sum(
+                func.coalesce(Accident.driver_grievous_injury, 0)
+                + func.coalesce(Accident.passenger_grievous_injury, 0)
+                + func.coalesce(Accident.pedestrian_grievous_injury, 0)
+            ).label("grievous"),
+            func.sum(
+                func.coalesce(Accident.driver_minor_injury, 0)
+                + func.coalesce(Accident.passenger_minor_injury, 0)
+                + func.coalesce(Accident.pedestrian_minor_injury, 0)
+            ).label("minor"),
+            func.count(
+                distinct(case((Accident.police_station != UNKNOWN_LABEL, Accident.police_station), else_=None))
+            ).label("stations"),
+        )
+        .filter(*base_filter)
+        .group_by(Accident.district)
+        .all()
+    )
+
+    # ---- 2. Severity breakdown per district — grouped query ----
+    severity_rows = (
+        db.query(Accident.district, Accident.severity, func.count(Accident.id))
+        .filter(*base_filter)
+        .group_by(Accident.district, Accident.severity)
+        .all()
+    )
+    severity_by_district: dict = defaultdict(list)
+    for district, severity, count in severity_rows:
+        severity_by_district[district].append({"label": safe_text(severity), "count": count})
+
+    # ---- 3. Monthly trend — grouped by district/year/month ----
+    monthly_rows = (
+        db.query(
+            Accident.district,
+            extract("year", Accident.accident_date_time).label("year"),
+            extract("month", Accident.accident_date_time).label("month"),
+            func.count(Accident.id),
+        )
+        .filter(*base_filter, Accident.accident_date_time.isnot(None))
+        .group_by(Accident.district, "year", "month")
+        .all()
+    )
+    monthly_by_district: dict = defaultdict(list)
+    for district, year, month, count in monthly_rows:
+        year, month = int(year), int(month)
+        monthly_by_district[district].append({
+            "year": year, "month": month,
+            "month_label": f"{calendar.month_abbr[month]} {year}",
+            "count": count,
+        })
+    for v in monthly_by_district.values():
+        v.sort(key=lambda x: (x["year"], x["month"]))
+
+    # ---- 4. Weekday / hour-of-day / road / collision — grouped queries ----
+    weekday_expr = func.to_char(Accident.accident_date_time, "Day")
+    weekday_rows = (
+        db.query(Accident.district, weekday_expr, func.count(Accident.id))
+        .filter(*base_filter, Accident.accident_date_time.isnot(None))
+        .group_by(Accident.district, weekday_expr)
+        .all()
+    )
+    weekday_by_district: dict = defaultdict(dict)
+    for district, day, count in weekday_rows:
+        weekday_by_district[district][day.strip()] = count
+
+    hour_expr = extract("hour", Accident.accident_date_time)
+    period_case = case(
+        (hour_expr.between(5, 11), "Morning"),
+        (hour_expr.between(12, 16), "Afternoon"),
+        (hour_expr.between(17, 20), "Evening"),
+        else_="Night",
+    )
+    period_rows = (
+        db.query(Accident.district, period_case, func.count(Accident.id))
+        .filter(*base_filter, Accident.accident_date_time.isnot(None))
+        .group_by(Accident.district, period_case)
+        .all()
+    )
+    period_by_district: dict = defaultdict(dict)
+    for district, period, count in period_rows:
+        period_by_district[district][period] = count
+
+    road_rows = (
+        db.query(Accident.district, Accident.road_classification, func.count(Accident.id))
+        .filter(*base_filter)
+        .group_by(Accident.district, Accident.road_classification)
+        .all()
+    )
+    road_by_district: dict = defaultdict(list)
+    for district, road, count in road_rows:
+        road_by_district[district].append({"label": safe_text(road), "count": count})
+
+    collision_rows = (
+        db.query(Accident.district, Accident.type_of_collision, func.count(Accident.id))
+        .filter(*base_filter)
+        .group_by(Accident.district, Accident.type_of_collision)
+        .all()
+    )
+    collision_by_district: dict = defaultdict(list)
+    for district, collision, count in collision_rows:
+        collision_by_district[district].append({"label": safe_text(collision), "count": count})
+
+    # ---- 5. Most affected police station per district — grouped, reduced in Python (tiny) ----
+    station_rows = (
+        db.query(Accident.district, Accident.police_station, func.count(Accident.id))
+        .filter(*base_filter)
+        .group_by(Accident.district, Accident.police_station)
+        .all()
+    )
+    station_counts: dict = defaultdict(dict)
+    for district, station, count in station_rows:
+        station_counts[district][safe_text(station)] = count
+
+    # ---- 6. Blackspots — ONE PostGIS query using ST_ClusterDBSCAN, not Python loops ----
+    blackspot_sql = text(
+        """
+        SELECT district, COUNT(DISTINCT cluster_id) AS blackspots
+        FROM (
+            SELECT
+                district,
+                ST_ClusterDBSCAN(location, eps := :eps, minpoints := :minpts)
+                    OVER (PARTITION BY district) AS cluster_id
+            FROM accidents
+            WHERE location IS NOT NULL
+              AND district IS NOT NULL AND district != '' AND district != 'nan'
+        ) clustered
+        WHERE cluster_id IS NOT NULL
+        GROUP BY district
+        """
+    )
+    # eps in degrees ≈ BLACKSPOT_RADIUS_METERS at Gujarat's latitude
+    eps_degrees = BLACKSPOT_RADIUS_METERS / 111_320.0
+    blackspot_rows = db.execute(
+        blackspot_sql, {"eps": eps_degrees, "minpts": BLACKSPOT_MIN_CRASHES}
+    ).fetchall()
+    blackspots_by_district = {row.district: row.blackspots for row in blackspot_rows}
+
+    # ---- Assemble per-district payload (cheap — just dict merging, no DB hits) ----
+    raw: dict = {}
+    for row in core_rows:
+        district = row.district
+        total = row.total or 0
+        fatal = row.fatal or 0
+        stations = station_counts.get(district, {})
+        most_affected = max(stations.items(), key=lambda x: x[1])[0] if stations else UNKNOWN_LABEL
+
+        months = monthly_by_district.get(district, [])
+        highest_month = max(months, key=lambda m: m["count"])["month_label"] if months else UNKNOWN_LABEL
+
+        periods = period_by_district.get(district, {})
+        peak_period = max(periods.items(), key=lambda x: x[1])[0] if periods else UNKNOWN_LABEL
+
+        weekdays = weekday_by_district.get(district, {})
+        weekday_out = [
+            {"label": d, "count": weekdays.get(d, 0)} for d in WEEKDAY_ORDER
+        ]
+
+        raw[district] = {
+            "district": district,
+            "total_accidents": total,
+            "fatal_accidents": fatal,
+            "fatalities": row.fatalities or 0,
+            "grievous_injuries": row.grievous or 0,
+            "minor_injuries": row.minor or 0,
+            "fatality_rate": round((fatal / total * 100), 2) if total else 0.0,
+            "police_stations": row.stations or 0,
+            "most_affected_police_station": most_affected,
+            "highest_accident_month": highest_month,
+            "peak_accident_time": peak_period,
+            "blackspots_count": blackspots_by_district.get(district, 0),
+            "severity": severity_by_district.get(district, []),
+            "monthly_trend": months,
+            "time_of_day": [{"label": k, "count": v} for k, v in periods.items()],
+            "weekday": weekday_out,
+            "road_type": road_by_district.get(district, []),
+            "collision_type": collision_by_district.get(district, []),
+        }
+
+    # Relative risk level via quartiles of total_accidents across districts
+    sorted_totals = sorted(v["total_accidents"] for v in raw.values())
+
+    def _risk_level(total: int) -> str:
+        if not sorted_totals:
+            return "Low"
+        n = len(sorted_totals)
+        def pct(p): return sorted_totals[min(n - 1, int(p * (n - 1)))]
+        if total >= pct(0.9): return "Very High"
+        if total >= pct(0.75): return "High"
+        if total >= pct(0.5): return "Moderate"
+        return "Low"
+
+    for v in raw.values():
+        v["risk_level"] = _risk_level(v["total_accidents"])
+
+    # ---- Gujarat-wide summary — reuse the grouped rows, no extra full-table scan ----
+    total_accidents = sum(v["total_accidents"] for v in raw.values())
+    total_fatalities = sum(v["fatalities"] for v in raw.values())
+    total_grievous = sum(v["grievous_injuries"] for v in raw.values())
+    total_minor = sum(v["minor_injuries"] for v in raw.values())
+
+    gujarat_severity: dict = defaultdict(int)
+    for entries in severity_by_district.values():
+        for e in entries:
+            gujarat_severity[e["label"]] += e["count"]
+
+    fatal_by_district = sorted(
+        (
+            {"district": name, "fatal_accidents": v["fatal_accidents"], "total_killed": v["fatalities"]}
+            for name, v in raw.items()
+        ),
+        key=lambda x: x["fatal_accidents"],
+        reverse=True,
+    )[:6]
+
+    all_stations = {s for stations in station_counts.values() for s in stations if s != UNKNOWN_LABEL}
+
+    gujarat = {
+        "total_accidents": total_accidents,
+        "total_fatalities": total_fatalities,
+        "total_grievous": total_grievous,
+        "total_minor": total_minor,
+        "districts_covered": len(raw),
+        "police_stations": len(all_stations),
+        "severity": [{"label": k, "count": v} for k, v in gujarat_severity.items()],
+        "dangerous": fatal_by_district,
+    }
+
+    return {"gujarat": gujarat, "districts": raw}
+    accidents = db.query(Accident).all()
+
+    groups: dict = defaultdict(list)
+    for a in accidents:
+        name = safe_text(a.district)
+        if name != UNKNOWN_LABEL:
+            groups[name].append(a)
+
+    def _compute(district_name: str, group: list) -> dict:
+        total = len(group)
+        fatal = sum(1 for a in group if a.severity == SEVERITY_FATAL)
+        fatalities = sum(total_fatalities(a) for a in group)
+        grievous = sum(total_grievous(a) for a in group)
+        minor = sum(total_minor(a) for a in group)
+        fatality_rate = round((fatal / total * 100), 2) if total else 0.0
+
+        station_counts: dict = defaultdict(int)
+        for a in group:
+            station_counts[safe_text(a.police_station)] += 1
+        police_stations = len(
+            [k for k in station_counts if k != UNKNOWN_LABEL]
+        )
+        most_affected = (
+            max(station_counts.items(), key=lambda x: x[1])[0]
+            if station_counts else UNKNOWN_LABEL
+        )
+
+        sev_counts: dict = defaultdict(int)
+        for a in group:
+            sev_counts[safe_text(a.severity)] += 1
+        severity = [{"label": k, "count": v} for k, v in sev_counts.items()]
+
+        month_counts: dict = defaultdict(int)
+        weekday_counts: dict = defaultdict(int)
+        period_counts: dict = defaultdict(int)
+        for a in group:
+            dt = a.accident_date_time
+            if not dt:
+                continue
+            month_counts[(dt.year, dt.month)] += 1
+            weekday_counts[dt.strftime("%A")] += 1
+            period_counts[_time_period_for_hour(dt.hour)] += 1
+
+        monthly_trend = [
+            {"year": y, "month": m, "month_label": f"{calendar.month_abbr[m]} {y}", "count": c}
+            for (y, m), c in sorted(month_counts.items())
+        ]
+        highest_month = (
+            max(month_counts.items(), key=lambda x: x[1]) if month_counts else None
+        )
+        highest_accident_month = (
+            f"{calendar.month_abbr[highest_month[0][1]]} {highest_month[0][0]}"
+            if highest_month else UNKNOWN_LABEL
+        )
+        peak_period = (
+            max(period_counts.items(), key=lambda x: x[1])[0]
+            if period_counts else UNKNOWN_LABEL
+        )
+        weekday = [
+            {"label": d, "count": weekday_counts.get(d, 0)} for d in WEEKDAY_ORDER
+        ]
+        time_of_day = [{"label": p, "count": c} for p, c in period_counts.items()]
+
+        road_counts: dict = defaultdict(int)
+        for a in group:
+            road_counts[safe_text(a.road_classification)] += 1
+        road_type = [{"label": k, "count": v} for k, v in road_counts.items()]
+
+        collision_counts: dict = defaultdict(int)
+        for a in group:
+            collision_counts[safe_text(a.type_of_collision)] += 1
+        collision_type = [{"label": k, "count": v} for k, v in collision_counts.items()]
+
+        points = [
+            CrashPoint(index=i, accident_id=a.accident_id, lat=a.latitude, lon=a.longitude)
+            for i, a in enumerate(group)
+            if a.latitude is not None and a.longitude is not None
+        ]
+        blackspots = greedy_blackspots(
+            points, radius_m=BLACKSPOT_RADIUS_METERS, min_crashes=BLACKSPOT_MIN_CRASHES
+        )
+
+        return {
+            "district": district_name,
+            "total_accidents": total,
+            "fatal_accidents": fatal,
+            "fatalities": fatalities,
+            "grievous_injuries": grievous,
+            "minor_injuries": minor,
+            "fatality_rate": fatality_rate,
+            "police_stations": police_stations,
+            "most_affected_police_station": most_affected,
+            "highest_accident_month": highest_accident_month,
+            "peak_accident_time": peak_period,
+            "blackspots_count": len(blackspots),
+            "severity": severity,
+            "monthly_trend": monthly_trend,
+            "time_of_day": time_of_day,
+            "weekday": weekday,
+            "road_type": road_type,
+            "collision_type": collision_type,
+        }
+
+    raw = {name: _compute(name, group) for name, group in groups.items()}
+
+    # Second pass: assign relative risk levels once we know the full distribution
+    sorted_totals = sorted(v["total_accidents"] for v in raw.values())
+    for v in raw.values():
+        v["risk_level"] = _risk_level(v["total_accidents"], sorted_totals)
+
+    # Gujarat-wide summary (reuses the same in-memory accident list — no extra query)
+    gujarat_sev: dict = defaultdict(int)
+    for a in accidents:
+        gujarat_sev[safe_text(a.severity)] += 1
+
+    fatal_by_district = sorted(
+        (
+            {
+                "district": name,
+                "fatal_accidents": v["fatal_accidents"],
+                "total_killed": v["fatalities"],
+            }
+            for name, v in raw.items()
+        ),
+        key=lambda x: x["fatal_accidents"],
+        reverse=True,
+    )[:6]
+
+    gujarat = {
+        "total_accidents": len(accidents),
+        "total_fatalities": sum(total_fatalities(a) for a in accidents),
+        "total_grievous": sum(total_grievous(a) for a in accidents),
+        "total_minor": sum(total_minor(a) for a in accidents),
+        "districts_covered": len(raw),
+        "police_stations": len({
+            safe_text(a.police_station) for a in accidents
+            if safe_text(a.police_station) != UNKNOWN_LABEL
+        }),
+        "severity": [{"label": k, "count": v} for k, v in gujarat_sev.items()],
+        "dangerous": fatal_by_district,
+    }
+
+    return {"gujarat": gujarat, "districts": raw}

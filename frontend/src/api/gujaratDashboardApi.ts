@@ -12,22 +12,29 @@ import type {
 } from "../types/dashboard";
 import type { BlackspotData, KdeHeatmapData } from "./dashboardApi";
 
-
-
 /**
  * Query params for the Gujarat-wide endpoints, always scoped to a single
  * district (the one currently being drilled into).
  */
-function getParams(filters: DashboardFilters, district: string): URLSearchParams {
+function getParams(
+  filters: DashboardFilters,
+  district: string
+): URLSearchParams {
   const params = new URLSearchParams();
   if (district) params.append("district", district);
 
-  if (filters.year?.length) filters.year.forEach((y) => params.append("year", y));
-  if (filters.severity?.length) filters.severity.forEach((s) => params.append("severity", s));
+  if (filters.year?.length)
+    filters.year.forEach((y) => params.append("year", y));
+  if (filters.severity?.length)
+    filters.severity.forEach((s) => params.append("severity", s));
   if (filters.road_classification?.length)
-    filters.road_classification.forEach((r) => params.append("road_classification", r));
+    filters.road_classification.forEach((r) =>
+      params.append("road_classification", r)
+    );
   if (filters.weather_condition?.length)
-    filters.weather_condition.forEach((w) => params.append("weather_condition", w));
+    filters.weather_condition.forEach((w) =>
+      params.append("weather_condition", w)
+    );
   if (filters.light_condition?.length)
     filters.light_condition.forEach((l) => params.append("light_condition", l));
   if (filters.collision_type?.length)
@@ -50,7 +57,9 @@ export interface DistrictSummaryRow {
 }
 
 /** Powers the choropleth on the Gujarat overview map. */
-export const fetchGujaratDistrictSummary = async (): Promise<DistrictSummaryRow[]> => {
+export const fetchGujaratDistrictSummary = async (): Promise<
+  DistrictSummaryRow[]
+> => {
   const { data } = await API.get(`${GUJARAT_API_BASE}/by-district`);
   return data.data;
 };
@@ -75,7 +84,10 @@ export const fetchGujaratDashboardData = async (
   ] = await Promise.all([
     API.get(`${GUJARAT_API_BASE}/summary`, { params }),
     API.get(`${GUJARAT_API_BASE}/time-series`, {
-      params: new URLSearchParams([...params.entries(), ["granularity", "month"]]),
+      params: new URLSearchParams([
+        ...params.entries(),
+        ["granularity", "month"],
+      ]),
     }),
     API.get(`${GUJARAT_API_BASE}/by-severity`, { params }),
     API.get(`${GUJARAT_API_BASE}/heatmap`, { params }),
@@ -94,11 +106,17 @@ export const fetchGujaratDashboardData = async (
     districts: [],
     heatmap: heatmap.data.data,
     casualty: casualty.data.data,
-    weather: weather.data.data.map((w: any) => ({ ...w, name: w.weather_condition })),
+    weather: weather.data.data.map((w: any) => ({
+      ...w,
+      name: w.weather_condition,
+    })),
     light: light.data.data.map((l: any) => ({ ...l, name: l.light_condition })),
     dangerous: dangerous.data.data,
     roads: roads.data.data,
-    violations: violations.data.data.map((v: any) => ({ ...v, name: v.collision_type })),
+    violations: violations.data.data.map((v: any) => ({
+      ...v,
+      name: v.collision_type,
+    })),
   };
 };
 
@@ -107,12 +125,15 @@ export const fetchGujaratTemporalAnalysis = async (
   district: string
 ): Promise<TemporalAnalysisData> => {
   const params = getParams(filters, district);
-  if (filters.month?.length) filters.month.forEach((m) => params.append("month", m));
+  if (filters.month?.length)
+    filters.month.forEach((m) => params.append("month", m));
   if (filters.day?.length) filters.day.forEach((d) => params.append("day", d));
   if (filters.time_period?.length)
     filters.time_period.forEach((t) => params.append("time_period", t));
 
-  const { data } = await API.get(`${GUJARAT_API_BASE}/temporal-analysis`, { params });
+  const { data } = await API.get(`${GUJARAT_API_BASE}/temporal-analysis`, {
+    params,
+  });
   return data;
 };
 
@@ -141,7 +162,9 @@ export const fetchGujaratDbscanBlackspots = async (
   district: string
 ): Promise<BlackspotData> => {
   const params = getParams(filters, district);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/dbscan-blackspots`, { params });
+  const { data } = await API.get(`${GUJARAT_API_BASE}/dbscan-blackspots`, {
+    params,
+  });
   return data;
 };
 
@@ -153,8 +176,6 @@ export const fetchGujaratKdeHeatmap = async (
   const { data } = await API.get(`${GUJARAT_API_BASE}/kde-heatmap`, { params });
   return data;
 };
-
-
 
 export interface GujaratOverviewInsights {
   summary: SummaryData;
@@ -169,19 +190,78 @@ export interface GujaratOverviewInsights {
  * every accident row statewide and are far too heavy for a landing view.
  * Only 3 small aggregate queries are made.
  */
-export const fetchGujaratOverviewInsights = async (): Promise<GujaratOverviewInsights> => {
-  const emptyParams = new URLSearchParams();
-  const topNParams = new URLSearchParams([["top_n", "6"]]);
+export const fetchGujaratOverviewInsights =
+  async (): Promise<GujaratOverviewInsights> => {
+    const emptyParams = new URLSearchParams();
+    const topNParams = new URLSearchParams([["top_n", "6"]]);
 
-  const [summary, severity, dangerous] = await Promise.all([
-    API.get(`${GUJARAT_API_BASE}/summary`, { params: emptyParams }),
-    API.get(`${GUJARAT_API_BASE}/by-severity`, { params: emptyParams }),
-    API.get(`${GUJARAT_API_BASE}/top-dangerous`, { params: topNParams }),
-  ]);
+    const [summary, severity, dangerous] = await Promise.all([
+      API.get(`${GUJARAT_API_BASE}/summary`, { params: emptyParams }),
+      API.get(`${GUJARAT_API_BASE}/by-severity`, { params: emptyParams }),
+      API.get(`${GUJARAT_API_BASE}/top-dangerous`, { params: topNParams }),
+    ]);
 
-  return {
-    summary: summary.data,
-    severity: severity.data.data,
-    dangerous: dangerous.data.data,
+    return {
+      summary: summary.data,
+      severity: severity.data.data,
+      dangerous: dangerous.data.data,
+    };
   };
-};
+
+export interface NamedCount {
+  label: string;
+  count: number;
+}
+
+export interface DistrictInsight {
+  district: string;
+  total_accidents: number;
+  fatal_accidents: number;
+  fatalities: number;
+  grievous_injuries: number;
+  minor_injuries: number;
+  fatality_rate: number;
+  police_stations: number;
+  most_affected_police_station: string;
+  highest_accident_month: string;
+  peak_accident_time: string;
+  blackspots_count: number;
+  risk_level: "Low" | "Moderate" | "High" | "Very High";
+  severity: NamedCount[];
+  monthly_trend: {
+    year: number;
+    month: number;
+    month_label: string;
+    count: number;
+  }[];
+  time_of_day: NamedCount[];
+  weekday: NamedCount[];
+  road_type: NamedCount[];
+  collision_type: NamedCount[];
+}
+
+export interface GujaratWideSummary {
+  total_accidents: number;
+  total_fatalities: number;
+  total_grievous: number;
+  total_minor: number;
+  districts_covered: number;
+  police_stations: number;
+  severity: NamedCount[];
+  dangerous: {
+    district: string;
+    fatal_accidents: number;
+    total_killed: number;
+  }[];
+}
+
+export interface DistrictInsightsResponse {
+  gujarat: GujaratWideSummary;
+  districts: Record<string, DistrictInsight>;
+}
+
+export const fetchDistrictInsights =
+  async (): Promise<DistrictInsightsResponse> => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/district-insights`);
+    return data;
+  };

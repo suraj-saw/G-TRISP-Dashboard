@@ -9,6 +9,7 @@ import TopBar from "../../components/layout/TopBar";
 import GujaratChoroplethMap from "../../components/maps/GujaratChoroplethMap";
 import GujaratInsightsPanel from "../../components/dashboard/GujaratInsightsPanel";
 import { ROUTES } from "../../config/constants";
+import { DistrictInsightsProvider } from "../../context/DistrictInsightsContext";
 
 interface Props {
   allowAdmin?: boolean;
@@ -96,17 +97,16 @@ export default function GujaratOverview({
         </div>
 
         {/* Main content grid: 60% map | 40% insights */}
-        <div className="flex-1 min-h-0 mx-6 mb-4 grid grid-cols-1 lg:grid-cols-5 gap-4">
-          {/* Map panel */}
-          <div className="lg:col-span-3 relative rounded-2xl overflow-hidden shadow-xl border border-[#E4E8F4] bg-white min-h-[420px]">
-            <GujaratChoroplethMap />
+        <DistrictInsightsProvider>
+          <div className="flex-1 min-h-0 mx-6 mb-4 grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <div className="lg:col-span-3 relative rounded-2xl overflow-hidden shadow-xl border border-[#E4E8F4] bg-white min-h-[420px]">
+              <GujaratChoroplethMap />
+            </div>
+            <div className="lg:col-span-2 rounded-2xl border border-[#E4E8F4] bg-white shadow-xl p-4 min-h-0 overflow-y-auto no-scrollbar">
+              <GujaratInsightsPanel />
+            </div>
           </div>
-
-          {/* Insights panel */}
-          <div className="lg:col-span-2 rounded-2xl border border-[#E4E8F4] bg-white shadow-xl p-4 min-h-0 overflow-y-auto no-scrollbar">
-            <GujaratInsightsPanel />
-          </div>
-        </div>
+        </DistrictInsightsProvider>
       </main>
     </div>
   );

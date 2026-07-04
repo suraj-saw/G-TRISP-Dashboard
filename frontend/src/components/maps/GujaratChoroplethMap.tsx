@@ -7,7 +7,7 @@ import { Loader2, AlertCircle, MousePointerClick } from "lucide-react";
 import { fetchAllGujaratDistricts } from "../../api/geoApi";
 import { fetchGujaratDistrictSummary } from "../../api/gujaratDashboardApi";
 import { buildDistrictDashboardPath } from "../../config/constants";
-
+import { useDistrictInsights } from "../../context/DistrictInsightsContext";
 // Internal dimensions for the SVG viewBox
 const SVG_W = 600;
 const SVG_H = 650;
@@ -22,6 +22,7 @@ interface DistrictFeature {
 
 export default function GujaratChoroplethMap() {
   const navigate = useNavigate();
+  const { setHoveredDistrict } = useDistrictInsights();
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const hoveredSlugRef = useRef<string | null>(null);
@@ -144,6 +145,7 @@ export default function GujaratChoroplethMap() {
       if (hoveredSlugRef.current !== slug) {
         hoveredSlugRef.current = slug;
         setHoveredSlug(slug);
+        setHoveredDistrict(name);
       }
     },
     []
@@ -154,7 +156,8 @@ export default function GujaratChoroplethMap() {
     if (tip) tip.style.opacity = "0";
     hoveredSlugRef.current = null;
     setHoveredSlug(null);
-  }, []);
+    setHoveredDistrict(null);
+  }, [setHoveredDistrict]);
 
   const handleClick = useCallback(
     (slug: string) => {
@@ -231,7 +234,7 @@ export default function GujaratChoroplethMap() {
         </div>
       )}
 
-      {districts.length > 0 && !loading && (
+      {/* {districts.length > 0 && !loading && (
         <div className="pointer-events-none absolute top-3 right-3 z-10 rounded-xl border border-[#E4E8F4] bg-white/90 px-3 py-2.5 shadow-sm">
           <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
             Accidents
@@ -242,7 +245,7 @@ export default function GujaratChoroplethMap() {
             <span>{maxCount.toLocaleString()}</span>
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 }
