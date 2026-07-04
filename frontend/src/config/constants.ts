@@ -96,6 +96,7 @@ export const ROUTES = {
   DISTRICT_DASHBOARD: "/dashboard/district/:districtSlug",
   ADMIN: "/admin",
   ADMIN_PANEL: "/admin/panel",
+  ADMIN_ACCIDENTS: "/admin/accidents",
 } as const;
 
 export const DASHBOARD_MODE = (import.meta.env.VITE_DASHBOARD_MODE ||

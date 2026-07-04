@@ -52,29 +52,29 @@ export const MAP_STYLES = [
   // Satellite Imagery
   // Useful for analysing accident surroundings.
   // ==========================================================================
-  {
-    id: "esri-satellite",
-    label: "Esri World Imagery",
-    url: createRasterStyle(
-      "esri-satellite",
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      "Tiles © Esri"
-    ),
-  },
+  // {
+  //   id: "esri-satellite",
+  //   label: "Esri World Imagery",
+  //   url: createRasterStyle(
+  //     "esri-satellite",
+  //     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  //     "Tiles © Esri"
+  //   ),
+  // },
 
   // ==========================================================================
   // Minimal Basemap
   // Best suited for heatmaps, hotspot analysis and thematic visualizations.
   // ==========================================================================
-  {
-    id: "esri-light-gray",
-    label: "Esri Light Gray",
-    url: createRasterStyle(
-      "esri-light-gray",
-      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-      "Tiles © Esri"
-    ),
-  },
+  // {
+  //   id: "esri-light-gray",
+  //   label: "Esri Light Gray",
+  //   url: createRasterStyle(
+  //     "esri-light-gray",
+  //     "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+  //     "Tiles © Esri"
+  //   ),
+  // },
 
   // ==========================================================================
   // Not currently used
@@ -114,15 +114,15 @@ export const MAP_STYLES = [
     ),
   },
 
-  {
-    id: "google-terrain",
-    label: "Google Terrain",
-    url: createRasterStyle(
-      "google-terrain",
-      "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
-      "© Google"
-    ),
-  },
+  // {
+  //   id: "google-terrain",
+  //   label: "Google Terrain",
+  //   url: createRasterStyle(
+  //     "google-terrain",
+  //     "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
+  //     "© Google"
+  //   ),
+  // },
 
   // Carto Dark can be enabled later if a full dashboard dark theme is added.
 

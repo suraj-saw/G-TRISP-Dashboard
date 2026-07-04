@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { geoMercator, geoPath } from "d3-geo";
 import { scaleLinear } from "d3-scale";
+import { scaleSqrt } from "d3-scale";
 import { Loader2, AlertCircle, MousePointerClick } from "lucide-react";
 import { fetchAllGujaratDistricts } from "../../api/geoApi";
 import { fetchGujaratDistrictSummary } from "../../api/gujaratDashboardApi";
@@ -63,9 +64,9 @@ export default function GujaratChoroplethMap() {
         );
         const maxVal = Math.max(1, ...summary.map((s) => s.accident_count));
 
-        const colorScale = scaleLinear<string>()
-          .domain([0, maxVal * 0.5, maxVal])
-          .range(["#EAF0FE", "#7AA6F7", "#1E3A8A"]);
+        const colorScale = scaleSqrt<string>()
+          .domain([0, maxVal])
+          .range(["#EAF0FE", "#1E3A8A"]);
 
         const reverseCoords = (coords: any[]): any[] => {
           if (typeof coords[0] === "number") return coords;
@@ -136,19 +137,26 @@ export default function GujaratChoroplethMap() {
       const tip = tooltipRef.current;
       if (!rect || !tip) return;
 
-      tip.style.left = `${e.clientX - rect.left + 14}px`;
-      tip.style.top = `${e.clientY - rect.top + 10}px`;
-      tip.textContent = name;
+      // Offset the tooltip slightly more so it doesn't block the cursor
+      tip.style.left = `${e.clientX - rect.left + 20}px`;
+      tip.style.top = `${e.clientY - rect.top + 20}px`;
+
+      // Improved Tooltip UI using Tailwind classes directly in innerHTML
+      tip.innerHTML = `
+      <div class="flex flex-col gap-0.5">
+        <span class="text-[13px] font-bold text-slate-800">${name}</span>
+        
+      </div>
+    `;
       tip.style.opacity = "1";
 
-      // Only trigger SVG re-render when slug actually changes
       if (hoveredSlugRef.current !== slug) {
         hoveredSlugRef.current = slug;
         setHoveredSlug(slug);
         setHoveredDistrict(name);
       }
     },
-    []
+    [setHoveredDistrict]
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -169,7 +177,12 @@ export default function GujaratChoroplethMap() {
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 flex items-center justify-center overflow-hidden bg-gradient-to-br from-white to-slate-50"
+      // Color Theory: Radial gradient focuses attention on the center map
+      className="absolute inset-0 flex items-center justify-center overflow-hidden"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle at center, #FFFFFF 0%, #F1F5F9 100%)",
+      }}
     >
       {loading && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
@@ -192,47 +205,59 @@ export default function GujaratChoroplethMap() {
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           preserveAspectRatio="xMidYMid meet"
           role="img"
-          aria-label="Gujarat district accident choropleth map"
           style={{
             display: "block",
             width: "100%",
             height: "100%",
             maxWidth: "100%",
             maxHeight: "100%",
+            // Add a very subtle drop shadow to the entire map shape
+            filter: "drop-shadow(0px 10px 15px rgba(30, 58, 138, 0.08))",
           }}
         >
+          {/* Layer 1: Base Map */}
           {districts.map((dist) => {
-            const isHovered = hoveredSlug === dist.slug;
             return (
               <path
                 key={dist.slug}
                 d={dist.d}
                 fill={dist.fill}
-                stroke={isHovered ? "#1e3a8a" : "#FFFFFF"}
-                strokeWidth={isHovered ? 3 : 1}
-                style={{ cursor: "pointer" }}
+                stroke="#CBD5E1" // Soft slate border for un-hovered districts
+                strokeWidth={0.75}
+                style={{ cursor: "pointer", transition: "fill 0.3s ease" }}
                 onMouseMove={(e) => handleMouseMove(e, dist.slug, dist.name)}
                 onMouseLeave={handleMouseLeave}
                 onClick={() => handleClick(dist.slug)}
               />
             );
           })}
+
+          {/* Layer 2: Highlight Overlay (Drawn last, so it stays perfectly on top) */}
+          {hoveredSlug && (
+            <path
+              d={districts.find((d) => d.slug === hoveredSlug)?.d || ""}
+              fill="rgba(255, 255, 255, 0.2)" // Slightly higher brightness bump on hover
+              stroke="#1E293B" // Deep, crisp slate/navy border instead of orange
+              strokeWidth={2.5}
+              className="pointer-events-none transition-all duration-200"
+            />
+          )}
         </svg>
       )}
 
-      {/* Tooltip rendered via DOM ref — no React re-renders on mousemove */}
+      {/* Updated Tooltip UI styling */}
       <div
         ref={tooltipRef}
-        className="pointer-events-none absolute z-30 rounded-lg bg-slate-900/90 px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition-opacity duration-75"
+        className="pointer-events-none absolute z-30 rounded-xl bg-white/95 px-3 py-2 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.15)] border border-slate-100 backdrop-blur-sm transition-opacity duration-150"
         style={{ opacity: 0, left: 0, top: 0 }}
       />
 
-      {!loading && (
+      {/* {!loading && (
         <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-white/90 border border-[#E4E8F4] px-3 py-1.5 text-[11px] font-medium text-slate-500 shadow-sm">
           <MousePointerClick size={12} className="text-[#1e3a8a]" />
           Click a district to explore detailed analytics
         </div>
-      )}
+      )} */}
 
       {/* {districts.length > 0 && !loading && (
         <div className="pointer-events-none absolute top-3 right-3 z-10 rounded-xl border border-[#E4E8F4] bg-white/90 px-3 py-2.5 shadow-sm">

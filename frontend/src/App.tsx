@@ -18,6 +18,7 @@ import GujaratOverview from "./features/dashboard/GujaratOverview";
 import DistrictDashboard from "./features/dashboard/DistrictDashboard";
 import AdminDashboard from "./features/dashboard/AdminDashboard";
 import AdminPanel from "./features/dashboard/AdminPanel";
+import AccidentsPage from "./features/dashboard/AccidentsPage";
 
 function RootHandler() {
   const navigate = useNavigate();
@@ -71,6 +72,7 @@ function App() {
         />
         <Route path={ROUTES.ADMIN} element={<AdminDashboard />} />
         <Route path={ROUTES.ADMIN_PANEL} element={<AdminPanel />} />
+        <Route path={ROUTES.ADMIN_ACCIDENTS} element={<AccidentsPage />} />
         <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />
       </Routes>
     </BrowserRouter>

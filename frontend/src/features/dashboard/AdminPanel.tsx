@@ -27,8 +27,7 @@ import {
 import API from "../../api/axios";
 import TopBar from "../../components/layout/TopBar";
 import { ROUTES } from "../../config/constants";
-import AddAccidentModal from "../../components/admin/AddAccidentModal";
-import { PlusCircle } from "lucide-react"; // already imported via lucide-react
+import { Database } from "lucide-react";
 
 import type { User } from "../../types/user";
 import type { Notification } from "../../types/notification";
@@ -91,10 +90,6 @@ function AdminPanel() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
   const [activeTab, setActiveTab] = useState<ActiveTab>("pending");
-  const [addAccidentOpen, setAddAccidentOpen] = useState(false);
-  const [addAccidentSuccess, setAddAccidentSuccess] = useState<string | null>(
-    null
-  );
 
   const loaded = useRef(false);
   // Tracks whether we have already fired the mark-all-read call for this
@@ -215,11 +210,7 @@ function AdminPanel() {
     navigate(ROUTES.LOGIN, { replace: true });
   };
 
-  const handleAccidentAdded = (accidentId: string) => {
-    setAddAccidentOpen(false);
-    setAddAccidentSuccess(`Accident ${accidentId} added successfully.`);
-    setTimeout(() => setAddAccidentSuccess(null), 5000);
-  };
+
 
   const openConfirmation = ({
     title,
@@ -320,19 +311,6 @@ function AdminPanel() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 relative overflow-hidden font-sans">
-      <AnimatePresence>
-        {addAccidentSuccess && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 right-6 z-[100] flex items-center gap-3 rounded-2xl bg-emerald-50 border border-emerald-200 px-5 py-3.5 shadow-xl shadow-emerald-900/10 text-emerald-800 text-sm font-semibold"
-          >
-            <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
-            {addAccidentSuccess}
-          </motion.div>
-        )}
-      </AnimatePresence>
       {/* Decorative Background Elements */}
       <div className="absolute top-[-10%] left-[-5%] w-96 h-96 bg-blue-400/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-pulse pointer-events-none" />
       <div
@@ -385,12 +363,12 @@ function AdminPanel() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => setAddAccidentOpen(true)}
+            onClick={() => navigate(ROUTES.ADMIN_ACCIDENTS)}
             className="shrink-0 flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-indigo-700/25 transition-all cursor-pointer"
           >
-            <PlusCircle className="w-4 h-4" />
-            <span className="hidden sm:inline">Add Accident</span>
-            <span className="sm:hidden">Add</span>
+            <Database className="w-4 h-4" />
+            <span className="hidden sm:inline">Accident Management</span>
+            <span className="sm:hidden">Accidents</span>
           </motion.button>
         </motion.div>
 
@@ -567,6 +545,8 @@ function AdminPanel() {
                     {allUsers.length}
                   </span>
                 </button>
+
+
               </div>
 
               <div className="p-5 flex flex-col flex-1">
@@ -659,12 +639,12 @@ function AdminPanel() {
                                         onClick={() =>
                                           openConfirmation({
                                             title: "Reject Registration",
-                                            message: `Reject registration for ${user!.username}?`,
+                                            message: `Reject registration for ${pu.username}?`,
                                             buttonText: "Reject",
                                             danger: true,
                                             action: () =>
                                               handleDecision(
-                                                user!.id,
+                                                pu.id,
                                                 "reject"
                                               ),
                                           })
@@ -679,11 +659,11 @@ function AdminPanel() {
                                         onClick={() =>
                                           openConfirmation({
                                             title: "Approve Registration",
-                                            message: `Approve registration for ${user!.username}?`,
+                                            message: `Approve registration for ${pu.username}?`,
                                             buttonText: "Approve",
                                             action: () =>
                                               handleDecision(
-                                                user!.id,
+                                                pu.id,
                                                 "approve"
                                               ),
                                           })
@@ -816,6 +796,8 @@ function AdminPanel() {
                       )}
                     </motion.div>
                   )}
+
+
                 </AnimatePresence>
               </div>
             </motion.div>
@@ -981,11 +963,7 @@ function AdminPanel() {
           setPendingAction(null);
         }}
       />
-      <AddAccidentModal
-        open={addAccidentOpen}
-        onClose={() => setAddAccidentOpen(false)}
-        onSuccess={handleAccidentAdded}
-      />
+
     </div>
   );
 }
