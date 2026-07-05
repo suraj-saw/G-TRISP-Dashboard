@@ -19,6 +19,7 @@ from shapely.geometry import shape as shapely_shape
 from app.database import Base, engine, SessionLocal
 from app.models.gujarat_boundary import GujaratBoundary
 from app.core.config import POSTGIS_SRID
+from app.seed.geojson_geometry import SOI_SOURCE_SRID, normalize_gujarat_geometry
 
 # ---------------------------------------------------------------------------
 # Resolve file paths
@@ -32,9 +33,12 @@ _BACKEND_DIR = _APP_DIR.parent                         # backend/
 BOUNDARY_GEOJSON = Path(
     os.getenv(
         "GUJARAT_BOUNDARY_GEOJSON",
-        str(_BACKEND_DIR / "data" / "gujarat_boundary.geojson"),
+        str(_BACKEND_DIR / "data" / "gujarat_boundary_soi.geojson"),
     )
 ).resolve()
+BOUNDARY_SOURCE_SRID = int(
+    os.getenv("GUJARAT_BOUNDARY_SOURCE_SRID", str(SOI_SOURCE_SRID))
+)
 
 
 # ---------------------------------------------------------------------------
@@ -92,16 +96,25 @@ def seed_gujarat_boundary(force: bool = False) -> None:
         geom_dict  = feature["geometry"]
 
         # Convert to Shapely then to PostGIS WKBElement
-        shp_geom   = shapely_shape(geom_dict)
+        shp_geom = normalize_gujarat_geometry(
+            shapely_shape(geom_dict), source_srid=BOUNDARY_SOURCE_SRID
+        )
         postgis_geom = from_shape(shp_geom, srid=POSTGIS_SRID)
 
         record = GujaratBoundary(
-            shape_name  = props.get("shapeName",  "Gujarāt"),
-            shape_iso   = props.get("shapeISO",   "IN-GJ"),
-            shape_id    = props.get("shapeID",    None),
-            shape_group = props.get("shapeGroup", "IND"),
-            shape_type  = props.get("shapeType",  "ADM1"),
-            geometry    = postgis_geom,
+            shape_name=(
+                props.get("shapeName")
+                or props.get("STATE")
+                or "GUJARAT"
+            ),
+            shape_iso=props.get("shapeISO", "IN-GJ"),
+            shape_id=(
+                props.get("shapeID")
+                or props.get("OBJECTID")
+            ),
+            shape_group=props.get("shapeGroup", "IND"),
+            shape_type=props.get("shapeType", "ADM1"),
+            geometry=postgis_geom,
         )
 
         db.add(record)

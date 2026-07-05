@@ -2,9 +2,8 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { geoMercator, geoPath } from "d3-geo";
-import { scaleLinear } from "d3-scale";
 import { scaleSqrt } from "d3-scale";
-import { Loader2, AlertCircle, MousePointerClick } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { fetchAllGujaratDistricts } from "../../api/geoApi";
 import { fetchGujaratDistrictSummary } from "../../api/gujaratDashboardApi";
 import { buildDistrictDashboardPath } from "../../config/constants";
@@ -29,7 +28,6 @@ export default function GujaratChoroplethMap() {
   const hoveredSlugRef = useRef<string | null>(null);
 
   const [districts, setDistricts] = useState<DistrictFeature[]>([]);
-  const [maxCount, setMaxCount] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,22 +66,51 @@ export default function GujaratChoroplethMap() {
           .domain([0, maxVal])
           .range(["#EAF0FE", "#1E3A8A"]);
 
-        const reverseCoords = (coords: any[]): any[] => {
-          if (typeof coords[0] === "number") return coords;
-          if (typeof coords[0][0] === "number") return [...coords].reverse();
-          return coords.map(reverseCoords);
+        // D3's spherical projections require clockwise exterior rings and
+        // counter-clockwise holes. The legacy data had the opposite winding,
+        // while the SOI data is already clockwise; blindly reversing every
+        // ring therefore makes D3 draw the complement of Gujarat (a world-
+        // sized rectangle). Normalize by signed area instead.
+        const signedArea = (ring: GeoJSON.Position[]) => {
+          let area = 0;
+          for (let i = 0; i < ring.length; i++) {
+            const current = ring[i];
+            const next = ring[(i + 1) % ring.length];
+            area += current[0] * next[1] - next[0] * current[1];
+          }
+          return area / 2;
+        };
+
+        const orientRing = (
+          ring: GeoJSON.Position[],
+          clockwise: boolean
+        ): GeoJSON.Position[] => {
+          const isClockwise = signedArea(ring) < 0;
+          return isClockwise === clockwise ? ring : [...ring].reverse();
+        };
+
+        const orientPolygon = (rings: GeoJSON.Position[][]) =>
+          rings.map((ring, index) => orientRing(ring, index === 0));
+
+        const orientGeometry = (geometry: GeoJSON.Geometry): GeoJSON.Geometry => {
+          if (geometry.type === "Polygon") {
+            return { ...geometry, coordinates: orientPolygon(geometry.coordinates) };
+          }
+          if (geometry.type === "MultiPolygon") {
+            return {
+              ...geometry,
+              coordinates: geometry.coordinates.map(orientPolygon),
+            };
+          }
+          return geometry;
         };
 
         const collection: GeoJSON.FeatureCollection = {
           type: "FeatureCollection",
-          features: geoData.features.map((f) => {
-            const geom = f.geometry as any;
-            const newCoords =
-              geom.type === "Polygon" || geom.type === "MultiPolygon"
-                ? reverseCoords(geom.coordinates)
-                : geom.coordinates;
-            return { ...f, geometry: { ...geom, coordinates: newCoords } };
-          }),
+          features: geoData.features.map((feature) => ({
+            ...feature,
+            geometry: orientGeometry(feature.geometry),
+          })),
         };
 
         const projection = geoMercator();
@@ -110,7 +137,6 @@ export default function GujaratChoroplethMap() {
         }
 
         setDistricts(built);
-        setMaxCount(maxVal);
       })
       .catch((err) => {
         if (active)

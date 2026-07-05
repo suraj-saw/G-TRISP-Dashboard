@@ -17,6 +17,12 @@ export const GUJARAT_API_BASE = "/dashboard";
 /** Base path for the GeoJSON / boundary endpoints */
 export const GEO_API_BASE = "/geo";
 
+/**
+ * Cache key for the currently seeded boundary dataset. Change this whenever
+ * boundary rows are replaced so browsers do not reuse an older GeoJSON body.
+ */
+export const GEO_DATA_VERSION = "soi-2026-07-04";
+
 /** Base path for auth endpoints */
 export const AUTH_API_BASE = "/auth";
 

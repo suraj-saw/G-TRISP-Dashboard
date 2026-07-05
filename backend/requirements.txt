@@ -20,6 +20,7 @@ packaging==26.2
 pandas==3.0.3
 passlib==1.7.4
 psycopg2-binary==2.9.12
+pyproj==3.7.2
 pyasn1==0.6.3
 pycparser==3.0
 pydantic==2.13.4
