@@ -1,5 +1,5 @@
 // frontend/src/features/dashboard/DistrictDashboard.tsx
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import API from "../../api/axios";
@@ -30,7 +30,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 
-import { fetchDistrictBoundaryBySlug } from "../../api/geoApi";
+import { fetchDistrictBoundaryBySlug, fetchTalukasForDistrict } from "../../api/geoApi";
 import {
   fetchGujaratFilterOptions,
   fetchGujaratDashboardData,
@@ -164,6 +164,8 @@ type FilterId =
   | "weather_condition"
   | "light_condition"
   | "collision_type"
+  | "police_station" // NEW
+  | "taluka"
   | "date_from"
   | "date_to";
 
@@ -179,6 +181,8 @@ const MAP_FILTERS: FilterConfigItem[] = [
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
+  { id: "taluka", label: "Taluka" }, // NEW
+  { id: "police_station", label: "Police Station" }, // NEW
   { id: "severity", label: "Severity" },
   { id: "road_classification", label: "Road type" },
   { id: "weather_condition", label: "Weather" },
@@ -194,6 +198,8 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "month", label: "Month" },
   { id: "day", label: "Day" },
   { id: "time_period", label: "Time Period" },
+  { id: "taluka", label: "Taluka" }, // NEW
+  { id: "police_station", label: "Police Station" },
   { id: "severity", label: "Severity" },
   { id: "weather_condition", label: "Weather Condition" },
   { id: "light_condition", label: "Light Condition" },
@@ -215,6 +221,8 @@ const defaultDistrictFilters: DashboardFilters = {
   weather_condition: [],
   light_condition: [],
   collision_type: [],
+  police_station: [], // NEW
+  taluka: [],
   date_from: "",
   date_to: "",
   baseMap: DEFAULT_BASE_MAP,
@@ -265,6 +273,9 @@ export default function DistrictDashboard() {
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(
     null
   );
+  const [talukaOptions, setTalukaOptions] = useState<
+    { value: string; label: string }[]
+  >([]);
   const [openPanels, setOpenPanels] = useState({ map: true, data: true });
 
   const [allData, setAllData] = useState<DashboardData>(emptyDashboardData);
@@ -315,57 +326,63 @@ export default function DistrictDashboard() {
     };
   }, [districtSlug]);
 
-  // ── Global filter dropdown options ───────────────────────────────────────
+  // ── Filter dropdown options for this district ───────────────────────────
   useEffect(() => {
-    fetchGujaratFilterOptions()
+    if (!districtName) return;
+    fetchGujaratFilterOptions(districtName)
       .then(setFilterOptions)
       .catch(() => {});
-  }, []);
+  }, [districtName]);
 
-  // ── Unfiltered data for this district — powers year/severity dropdowns ──
+  useEffect(() => {
+    if (!districtSlug) return;
+    fetchTalukasForDistrict(districtSlug)
+      .then((rows) =>
+        setTalukaOptions(rows.map((r) => ({ value: r.name, label: r.name })))
+      )
+      .catch(() => setTalukaOptions([]));
+  }, [districtSlug]);
+
+  // ── Filtered data ─────────────────────────────────────────────────────────
+  // Use a ref-based generation counter to cancel stale in-flight requests.
+  const fetchGenRef = useRef(0);
+
+  useEffect(() => {
+    if (!districtName) return;
+    const generation = ++fetchGenRef.current;
+    setLoading(true);
+    setError(null);
+    fetchGujaratDashboardData(filters, districtName)
+      .then((result) => {
+        // Discard result if a newer request has been started
+        if (generation !== fetchGenRef.current) return;
+        setData(result);
+      })
+      .catch((err) => {
+        if (generation !== fetchGenRef.current) return;
+        setError(err.message || "Failed to fetch district data.");
+      })
+      .finally(() => {
+        if (generation === fetchGenRef.current) setLoading(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [districtName, filters.year, filters.severity, filters.road_classification,
+      filters.weather_condition, filters.light_condition, filters.collision_type,
+      filters.police_station, filters.taluka, filters.date_from, filters.date_to]);
+
+  // Fetch unfiltered data for this district to populate the year and severity dropdowns
   useEffect(() => {
     if (!districtName) return;
     let active = true;
     fetchGujaratDashboardData(defaultDistrictFilters, districtName)
-      .then((result) => {
-        if (active) setAllData(result);
+      .then((res) => {
+        if (active) setAllData(res);
       })
       .catch(() => {});
     return () => {
       active = false;
     };
   }, [districtName]);
-
-  // ── Filtered data ─────────────────────────────────────────────────────────
-  const filterKey = useMemo(
-    () =>
-      JSON.stringify({
-        year: filters.year,
-        severity: filters.severity,
-        road_classification: filters.road_classification,
-        weather_condition: filters.weather_condition,
-        light_condition: filters.light_condition,
-        collision_type: filters.collision_type,
-        date_from: filters.date_from,
-        date_to: filters.date_to,
-      }),
-    [filters]
-  );
-
-  const loadData = useCallback(() => {
-    if (!districtName) return;
-    setLoading(true);
-    setError(null);
-    fetchGujaratDashboardData(filters, districtName)
-      .then(setData)
-      .catch((err) => setError(err.message || "Failed to fetch district data."))
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [districtName, filterKey]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
 
   const logout = async () => {
     try {
@@ -388,10 +405,12 @@ export default function DistrictDashboard() {
     [allData]
   );
 
-  const datasetDateBounds = useMemo(
-    () => getDatasetDateBounds(allData.heatmap),
-    [allData.heatmap]
-  );
+  const datasetDateBounds = useMemo(() => {
+    return {
+      min: filterOptions?.min_date || "",
+      max: filterOptions?.max_date || "",
+    };
+  }, [filterOptions]);
 
   useEffect(() => {
     if (!datasetDateBounds.min && !datasetDateBounds.max) return;
@@ -451,6 +470,8 @@ export default function DistrictDashboard() {
     })
   );
 
+
+  
   const filterOptionsById: Record<
     FilterId,
     { value: string; label: string }[]
@@ -480,6 +501,11 @@ export default function DistrictDashboard() {
       value: c,
       label: c,
     })),
+    police_station: (filterOptions?.police_stations || []).map((p) => ({
+      value: p,
+      label: p,
+    })), // NEW
+    taluka: talukaOptions, // NEW
     date_from: [],
     date_to: [],
   };
@@ -538,7 +564,7 @@ export default function DistrictDashboard() {
 
     return (
       <div key={filter.id} className="flex flex-col gap-1.5">
-        <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-[#6B7299]">
+        <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#1e3a8a]">
           {filter.icon === "layers" && (
             <Layers size={12} className="text-[#1e3a8a]" />
           )}
@@ -792,7 +818,17 @@ export default function DistrictDashboard() {
                 {!loading &&
                   !error &&
                   !boundaryLoading &&
-                  data.summary.total_accidents === 0 && (
+                  data.summary.total_accidents === 0 &&
+                  !filters.taluka?.length &&
+                  !filters.police_station?.length &&
+                  !filters.severity?.length &&
+                  !filters.year?.length &&
+                  !filters.road_classification?.length &&
+                  !filters.weather_condition?.length &&
+                  !filters.light_condition?.length &&
+                  !filters.collision_type?.length &&
+                  !filters.date_from &&
+                  !filters.date_to && (
                     <div className="absolute inset-0 z-30 flex items-center justify-center p-6 bg-slate-900/10 backdrop-blur-[2px] rounded-2xl pointer-events-none">
                       <div className="flex flex-col items-center justify-center gap-3 rounded-2xl bg-white/95 p-8 shadow-2xl border border-slate-200 text-center max-w-sm pointer-events-auto">
                         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 border border-amber-100">

@@ -200,10 +200,12 @@ export default function Dashboard() {
     return unique;
   }, [allData]);
 
-  const datasetDateBounds = useMemo(
-    () => getDatasetDateBounds(allData?.heatmap),
-    [allData?.heatmap]
-  );
+  const datasetDateBounds = useMemo(() => {
+    return {
+      min: filterOptions?.min_date || "",
+      max: filterOptions?.max_date || "",
+    };
+  }, [filterOptions]);
 
   useEffect(() => {
     if (!datasetDateBounds.min && !datasetDateBounds.max) return;
@@ -348,7 +350,7 @@ export default function Dashboard() {
 
       return (
         <div key={filter.id} className="flex flex-col gap-1.5">
-          <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-[#6B7299]">
+          <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#1e3a8a]">
             {filter.label}
           </label>
           <DateFilterInput
@@ -388,7 +390,7 @@ export default function Dashboard() {
 
     return (
       <div key={filter.id} className="flex flex-col gap-1.5">
-        <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-[#6B7299]">
+        <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#1e3a8a]">
           {filter.icon === "layers" && (
             <Layers size={12} className="text-[#1e3a8a]" />
           )}

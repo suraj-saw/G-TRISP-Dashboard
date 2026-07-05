@@ -39,14 +39,27 @@ function getParams(
     filters.light_condition.forEach((l) => params.append("light_condition", l));
   if (filters.collision_type?.length)
     filters.collision_type.forEach((c) => params.append("collision_type", c));
+  // NEW
+  if (filters.police_station?.length)
+    filters.police_station.forEach((p) => params.append("police_station", p));
+  if (filters.taluka?.length)
+    filters.taluka.forEach((t) => params.append("taluka", t));
+
   if (filters.date_from) params.set("date_from", filters.date_from);
   if (filters.date_to) params.set("date_to", filters.date_to);
 
   return params;
 }
 
-export const fetchGujaratFilterOptions = async (): Promise<FilterOptions> => {
-  const { data } = await API.get(`${GUJARAT_API_BASE}/filter-options`);
+// Update to accept a district scope
+export const fetchGujaratFilterOptions = async (
+  district?: string
+): Promise<FilterOptions> => {
+  const params = new URLSearchParams();
+  if (district) params.append("district", district);
+  const { data } = await API.get(`${GUJARAT_API_BASE}/filter-options`, {
+    params,
+  });
   return data;
 };
 

@@ -9,6 +9,8 @@ export interface DashboardFilters {
   weather_condition: string[];
   light_condition: string[];
   collision_type: string[];
+  police_station?: string[]; // NEW
+  taluka?: string[]; // NEW
   baseMap?: string;
   visualization_type?: string;
   date_from?: string;
@@ -20,7 +22,9 @@ export interface FilterOptions {
   weather_conditions: string[];
   light_conditions: string[];
   collision_types: string[];
-  police_stations?: string[];
+  police_stations?: string[]; // NEW
+  min_date?: string;
+  max_date?: string;
 }
 
 export interface SummaryData {

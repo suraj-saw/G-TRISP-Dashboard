@@ -23,6 +23,7 @@ def apply_filters(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     taluka=None,
+    police_station=None, 
     db=None,
 ):
     """
@@ -79,6 +80,12 @@ def apply_filters(
             query = query.filter(Accident.accident_date_time <= dt_to)
         except ValueError:
             pass
+
+    if police_station:
+        if isinstance(police_station, list):
+            query = query.filter(Accident.police_station.in_(police_station))
+        else:
+            query = query.filter(Accident.police_station == police_station)
 
     if taluka and db is not None:
         query = apply_taluka_spatial_filter(query, Accident, Accident.location, taluka, db)

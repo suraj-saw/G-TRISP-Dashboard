@@ -45,3 +45,20 @@ export async function fetchDistrictList(): Promise<DistrictListItem[]> {
   );
   return res.data.districts;
 }
+
+export interface TalukaListItem {
+  id: number;
+  name: string;
+  slug: string;
+  district: string;
+}
+
+export async function fetchTalukasForDistrict(
+  districtSlug: string
+): Promise<TalukaListItem[]> {
+  const res = await API.get<{ talukas: TalukaListItem[]; count: number }>(
+    `${GEO_API_BASE}/district-boundary/${districtSlug}/talukas`,
+    GEO_REQUEST_CONFIG
+  );
+  return res.data.talukas;
+}

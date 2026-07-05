@@ -92,7 +92,7 @@ class HeatmapPoint(ResponseModel):
     latitude: float
     longitude: float
     severity: str
-    district: str
+    district: str   
     police_station: Optional[str] = None
     road_name: Optional[str] = None
     road_classification: Optional[str] = None
@@ -231,3 +231,7 @@ class FilterOptions(ResponseModel):
     weather_conditions: List[str]
     light_conditions: List[str]
     collision_types: List[str]
+    police_stations: List[str] = []
+    min_date: Optional[str] = None
+    max_date: Optional[str] = None
+
