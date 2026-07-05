@@ -180,6 +180,7 @@ def get_summary(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+        taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query     = apply_surat_filters(
@@ -187,6 +188,7 @@ def get_summary(
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
     accidents = query.all()
 
@@ -222,6 +224,7 @@ def get_by_police_station(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+        taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     """Breakdown of accidents by police station — main geo-grouping for Surat."""
@@ -230,6 +233,7 @@ def get_by_police_station(
         None, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
 
     station_map: dict = defaultdict(
@@ -274,6 +278,7 @@ def get_by_severity(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+        taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -281,6 +286,7 @@ def get_by_severity(
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
     rows = query.group_by(SuratAccident.severity).all()
 
@@ -306,6 +312,7 @@ def get_time_series(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     granularity: str = Query("month", enum=["month", "year"]),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -313,6 +320,7 @@ def get_time_series(
         police_station, None, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
 
     buckets: dict = defaultdict(lambda: {"count": 0, "fatalities": 0})
@@ -356,6 +364,7 @@ def get_by_collision(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+        taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -366,6 +375,7 @@ def get_by_collision(
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
     rows = (
         query
@@ -400,6 +410,7 @@ def get_heatmap(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+        taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -407,6 +418,7 @@ def get_heatmap(
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
     if severity:
         if isinstance(severity, list):
@@ -458,6 +470,7 @@ def get_temporal_analysis(
     light_condition: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+        taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = db.query(SuratAccident)
@@ -573,6 +586,7 @@ def get_by_violation(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+        taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -583,6 +597,7 @@ def get_by_violation(
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
     rows = (
         query
@@ -617,6 +632,7 @@ def get_by_road(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+        taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -624,6 +640,7 @@ def get_by_road(
         None, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
 
     road_map: dict = defaultdict(lambda: {"accident_count": 0, "fatalities": 0})
@@ -662,6 +679,7 @@ def get_by_weather(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+        taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -672,6 +690,7 @@ def get_by_weather(
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
     rows = (
         query
@@ -705,6 +724,7 @@ def get_by_light(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+        taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -715,6 +735,7 @@ def get_by_light(
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
     rows = (
         query
@@ -748,6 +769,7 @@ def get_casualty_breakdown(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+        taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     accidents = apply_surat_filters(
@@ -755,6 +777,7 @@ def get_casualty_breakdown(
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     ).all()
 
     totals = {
@@ -789,6 +812,7 @@ def get_top_dangerous(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+        taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     """Top N police stations ranked by fatal accidents."""
@@ -797,6 +821,7 @@ def get_top_dangerous(
         None, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
 
     ranking: dict = defaultdict(lambda: {"fatal_accidents": 0, "total_killed": 0})
@@ -837,6 +862,7 @@ def get_yearly_comparison(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+        taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -844,6 +870,7 @@ def get_yearly_comparison(
         police_station, None, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
 
     years: dict = defaultdict(
@@ -883,6 +910,7 @@ def get_blackspots(
     date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
     min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     """
@@ -895,6 +923,7 @@ def get_blackspots(
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
     if severity:
         if isinstance(severity, list):
@@ -937,6 +966,7 @@ def get_pedestrian_blackspots(
     date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
     min_crashes: int = Query(PEDESTRIAN_BLACKSPOT_MIN_CRASHES, ge=2, le=100),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     """
@@ -949,6 +979,7 @@ def get_pedestrian_blackspots(
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
     if severity:
         if isinstance(severity, list):
@@ -996,6 +1027,7 @@ def get_dbscan_blackspots(
     date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
     min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     """
@@ -1009,6 +1041,7 @@ def get_dbscan_blackspots(
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
     if severity:
         if isinstance(severity, list):
@@ -1051,6 +1084,7 @@ def get_kde_heatmap(
     date_to: Optional[str] = Query(None),
     radius_m: float = Query(KDE_RADIUS_METERS, ge=100, le=2000),
     pixel_m: float = Query(KDE_PIXEL_METERS, ge=10, le=200),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     """
@@ -1064,6 +1098,7 @@ def get_kde_heatmap(
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
     if severity:
         if isinstance(severity, list):
@@ -1116,6 +1151,7 @@ def export_blackspots(
     min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
     algorithm: str = Query("greedy", enum=["greedy", "dbscan"]),
     bs_id: Optional[int] = Query(None, description="Blackspot number to export accident details for"),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     from fastapi.responses import StreamingResponse
@@ -1130,6 +1166,7 @@ def export_blackspots(
         police_station, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to,
+        taluka=taluka, db=db,
     )
     if severity and "all" not in severity:
         query = query.filter(SuratAccident.severity.in_(severity))
@@ -1207,3 +1244,5 @@ def export_blackspots(
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )
+
+

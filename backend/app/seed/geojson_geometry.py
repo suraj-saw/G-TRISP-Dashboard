@@ -79,3 +79,63 @@ def normalize_gujarat_geometry(
         )
 
     return normalized
+
+
+from shapely.geometry import MultiPolygon, Polygon
+from shapely.validation import make_valid
+
+
+def repair_geometry(geometry: BaseGeometry) -> BaseGeometry | None:
+    """
+    Attempt to repair an invalid geometry using Shapely, without ever
+    touching the source file.
+
+    Strategy (first success wins):
+      1. Already valid → return as-is.
+      2. shapely.validation.make_valid() — handles self-intersections,
+         bowties, duplicate points, bad ring orientation, etc.
+      3. Classic buffer(0) fallback.
+      4. Unrepairable → return None so the caller can skip the feature.
+    """
+    if geometry.is_empty:
+        return None
+    if geometry.is_valid:
+        return geometry
+
+    try:
+        repaired = make_valid(geometry)
+        if repaired.is_valid and not repaired.is_empty:
+            return repaired
+    except Exception:
+        pass
+
+    try:
+        repaired = geometry.buffer(0)
+        if repaired.is_valid and not repaired.is_empty:
+            return repaired
+    except Exception:
+        pass
+
+    return None
+
+
+def to_multipolygon(geometry: BaseGeometry) -> MultiPolygon | None:
+    """
+    Normalise a Polygon / MultiPolygon / GeometryCollection into a single
+    MultiPolygon so every row in a boundary table has a consistent type.
+    Returns None if the geometry has no polygonal parts.
+    """
+    if isinstance(geometry, MultiPolygon):
+        return geometry
+    if isinstance(geometry, Polygon):
+        return MultiPolygon([geometry])
+
+    parts = [g for g in getattr(geometry, "geoms", []) if isinstance(g, (Polygon, MultiPolygon))]
+    if not parts:
+        return None
+
+    flat: list[Polygon] = []
+    for g in parts:
+        flat.extend(g.geoms if isinstance(g, MultiPolygon) else [g])
+
+    return MultiPolygon(flat) if flat else None

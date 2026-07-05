@@ -9,6 +9,7 @@ from typing import Optional
 
 from sqlalchemy import extract
 from app.models.accident import Accident
+from app.utils.taluka_utils import apply_taluka_spatial_filter
 
 
 def apply_filters(
@@ -21,6 +22,8 @@ def apply_filters(
     collision_type=None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    taluka=None,
+    db=None,
 ):
     """
     Apply common dashboard filters to a SQLAlchemy query.
@@ -77,6 +80,9 @@ def apply_filters(
         except ValueError:
             pass
 
+    if taluka and db is not None:
+        query = apply_taluka_spatial_filter(query, Accident, Accident.location, taluka, db)
+
     return query
 
 
@@ -106,3 +112,4 @@ def total_minor(accident) -> int:
         + (accident.passenger_minor_injury or 0)
         + (accident.pedestrian_minor_injury or 0)
     )
+
