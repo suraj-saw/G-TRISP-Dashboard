@@ -2030,4 +2030,106 @@ def get_district_insights(db: Session = Depends(get_db)):
 
     return {"gujarat": gujarat, "districts": raw}
 
+@router.get("/district-stats")
+def get_district_stats(
+    district: str,
+    year: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
+    police_station: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Return district statistics using the same filters as the spatial view."""
+    query = apply_filters(
+        db.query(Accident),
+        district=district,
+        year=year,
+        road_classification=road_classification,
+        weather_condition=weather_condition,
+        light_condition=light_condition,
+        collision_type=collision_type,
+        police_station=police_station,
+        taluka=taluka,
+        date_from=date_from,
+        date_to=date_to,
+        db=db,
+    )
+    if severity:
+        query = query.filter(Accident.severity.in_(severity))
 
+    accidents = query.all()
+    total = len(accidents)
+    severity_counts = defaultdict(int)
+    monthly = defaultdict(lambda: {"accidents": 0, "fatal": 0})
+    hourly = defaultdict(int)
+    road_counts = defaultdict(int)
+
+    for accident in accidents:
+        severity_name = safe_text(accident.severity)
+        severity_counts[severity_name] += 1
+        road_counts[safe_text(accident.road_classification)] += 1
+
+        occurred_at = accident.accident_date_time
+        if occurred_at:
+            month_key = occurred_at.strftime("%Y-%m")
+            monthly[month_key]["accidents"] += 1
+            monthly[month_key]["fatal"] += int(severity_name == SEVERITY_FATAL)
+            hourly[occurred_at.hour] += 1
+
+    monthly_trend = [
+        {
+            "month": datetime.strptime(key, "%Y-%m").strftime("%b %Y"),
+            **monthly[key],
+        }
+        for key in sorted(monthly)
+    ]
+    hourly_distribution = [
+        {"hour": hour, "accidents": hourly.get(hour, 0)}
+        for hour in range(HOURS_IN_DAY)
+    ]
+    peak_hour = max(hourly, key=hourly.get) if hourly else None
+    peak_month_key = (
+        max(monthly, key=lambda key: monthly[key]["accidents"])
+        if monthly
+        else None
+    )
+
+    return {
+        "total_accidents": total,
+        "total_fatalities": sum(total_fatalities(a) for a in accidents),
+        "total_injuries": sum(
+            total_grievous(a) + total_minor(a) for a in accidents
+        ),
+        "avg_per_month": round(total / len(monthly), 1) if monthly else 0,
+        "peak_hour": peak_hour,
+        "peak_month": (
+            datetime.strptime(peak_month_key, "%Y-%m").strftime("%b %Y")
+            if peak_month_key
+            else None
+        ),
+        "yoy_change": None,
+        "severity_breakdown": [
+            {
+                "label": label,
+                "count": count,
+                "percentage": round(count * 100 / total, 1) if total else 0,
+            }
+            for label, count in sorted(
+                severity_counts.items(), key=lambda item: item[1], reverse=True
+            )
+        ],
+        "monthly_trend": monthly_trend,
+        "hourly_distribution": hourly_distribution,
+        "road_type_breakdown": [
+            {"road_type": label, "count": count}
+            for label, count in sorted(
+                road_counts.items(), key=lambda item: item[1], reverse=True
+            )[:8]
+        ],
+    }

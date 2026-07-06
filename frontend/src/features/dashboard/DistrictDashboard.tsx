@@ -18,6 +18,10 @@ import FilterSelect from "../../components/layout/FilterSelect";
 import DistrictBaseMap from "../../components/maps/DistrictBaseMap";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
 import BlackspotExportButton from "../../components/layout/BlackspotExportButton";
+import DistrictAnalysisTabs, {
+  type AnalysisView,
+} from "../../components/maps/Districtanalysistabs";
+import DistrictStatisticalAnalysis from "../../components/dashboard/DistrictStatisticalAnalysis";
 
 import {
   Filter,
@@ -195,6 +199,7 @@ const MAP_FILTERS: FilterConfigItem[] = [
 ];
 
 const TEMPORAL_FILTERS: FilterConfigItem[] = [
+  { id: "baseMap", label: "Base Map", icon: "layers" },
   { id: "visualization_type", label: "Visualization Type" },
   { id: "visualization_variant", label: "Visualization Variant" },
   { id: "date_from", label: "Start Date" },
@@ -210,10 +215,9 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "light_condition", label: "Light Condition" },
 ];
 
-const getDistrictFilterConfig = (
-  visualizationType?: string
-): FilterConfigItem[] =>
-  visualizationType === "temporal_analysis" ? TEMPORAL_FILTERS : MAP_FILTERS;
+const DISTRICT_VISUALIZATION_OPTIONS = VISUALIZATION_OPTIONS.filter(
+  (option) => option.value !== "temporal_analysis"
+);
 
 const defaultDistrictFilters: DashboardFilters = {
   district: [],
@@ -259,6 +263,7 @@ const emptyDashboardData: DashboardData = {
 };
 
 export default function DistrictDashboard() {
+  const [analysisView, setAnalysisView] = useState<AnalysisView>("spatial");
   const navigate = useNavigate();
   const { districtSlug = "" } = useParams<{ districtSlug: string }>();
 
@@ -483,7 +488,7 @@ export default function DistrictDashboard() {
     { value: string; label: string }[]
   > = {
     baseMap: MAP_STYLES.map((s) => ({ value: s.id, label: s.label })),
-    visualization_type: VISUALIZATION_OPTIONS,
+    visualization_type: DISTRICT_VISUALIZATION_OPTIONS,
     visualization_variant: VISUALIZATION_VARIANT_OPTIONS,
     year: years.map((y) => ({ value: String(y), label: String(y) })),
     month: monthOptions,
@@ -517,10 +522,8 @@ export default function DistrictDashboard() {
     date_to: [],
   };
 
-  const activeFilterConfig = getDistrictFilterConfig(
-    filters.visualization_type
-  );
-  const isTemporalAnalysis = filters.visualization_type === "temporal_analysis";
+  const activeFilterConfig =
+    analysisView === "temporal" ? TEMPORAL_FILTERS : MAP_FILTERS;
   const isDensityHeatmap = filters.visualization_type === "density_heatmap";
   const isBlackspotDetection = filters.visualization_type === "blackspot";
   const isPedestrianVariant = filters.visualization_variant === "pedestrian";
@@ -683,7 +686,7 @@ export default function DistrictDashboard() {
 
             return (
               <>
-                {mapFilters.length > 0 && (
+                {analysisView === "spatial" && mapFilters.length > 0 && (
                   <section className="rounded-xl border border-[#E4E8F4] bg-white shadow-sm overflow-hidden">
                     <button
                       type="button"
@@ -743,7 +746,9 @@ export default function DistrictDashboard() {
             <RotateCcw size={13} />
             Reset filters
           </button>
-          {((isBlackspotDetection && !isPedestrianVariant) || isDbscanBlackspot) && (
+          {analysisView === "spatial" &&
+            ((isBlackspotDetection && !isPedestrianVariant) ||
+              isDbscanBlackspot) && (
             <BlackspotExportButton
               filters={filters}
               algorithm={isDbscanBlackspot ? "dbscan" : "greedy"}
@@ -775,19 +780,46 @@ export default function DistrictDashboard() {
             </div>
           )}
 
-          <motion.div
-            className="w-full"
+          <div
+            className="flex w-full flex-col overflow-hidden rounded-2xl border border-[#E4E8F4] bg-white shadow-xl"
             style={{ height: `calc(100vh - ${TOPBAR_HEIGHT_PX}px - 2rem)` }}
-            animate={{ opacity: loading ? 0.6 : 1 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
           >
-            {isTemporalAnalysis ? (
+            <DistrictAnalysisTabs
+              activeView={analysisView}
+              onViewChange={setAnalysisView}
+            />
+            <motion.div
+              className={`min-h-0 w-full flex-1 ${
+                analysisView === "temporal"
+                  ? "overflow-y-auto"
+                  : "overflow-hidden"
+              }`}
+              animate={{ opacity: loading ? 0.6 : 1 }}
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+            >
+            {analysisView === "statistical" ? (
+              <DistrictStatisticalAnalysis
+                filters={{
+                  district: districtName,
+                  year: filters.year,
+                  startDate: filters.date_from,
+                  endDate: filters.date_to,
+                  severity: filters.severity,
+                  taluka: filters.taluka,
+                  policeStation: filters.police_station,
+                  roadClassification: filters.road_classification,
+                  weatherCondition: filters.weather_condition,
+                  lightCondition: filters.light_condition,
+                  collisionType: filters.collision_type,
+                }}
+              />
+            ) : analysisView === "temporal" ? (
               <TemporalAnalysis
                 filters={filters}
                 fetchFn={(f) => fetchGujaratTemporalAnalysis(f, districtName)}
               />
             ) : (
-              <div className="h-full w-full rounded-2xl overflow-hidden shadow-xl border border-[#E4E8F4] relative">
+              <div className="h-full w-full overflow-hidden relative">
                 <DistrictBaseMap
                   height="100%"
                   sidebarOpen={sidebarOpen}
@@ -880,7 +912,8 @@ export default function DistrictDashboard() {
                   )}
               </div>
             )}
-          </motion.div>
+            </motion.div>
+          </div>
 
         </div>
       </main>

@@ -278,3 +278,90 @@ export const fetchDistrictInsights =
     const { data } = await API.get(`${GUJARAT_API_BASE}/district-insights`);
     return data;
   };
+
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+ 
+export interface DistrictStatsFilters {
+  district: string;
+  year?: string[];
+  startDate?: string;
+  endDate?: string;
+  severity?: string[];
+  taluka?: string[];
+  policeStation?: string[];
+  roadClassification?: string[];
+  weatherCondition?: string[];
+  lightCondition?: string[];
+  collisionType?: string[];
+}
+ 
+export interface SeverityBreakdown {
+  label: string;
+  count: number;
+  percentage: number;
+}
+ 
+export interface MonthlyTrend {
+  month: string;
+  accidents: number;
+  fatal: number;
+}
+ 
+export interface HourlyDistribution {
+  hour: number;
+  accidents: number;
+}
+ 
+export interface RoadTypeBreakdown {
+  road_type: string;
+  count: number;
+}
+ 
+export interface DistrictStats {
+  total_accidents: number;
+  total_fatalities: number;
+  total_injuries: number;
+  avg_per_month: number;
+  peak_hour: number | null;
+  peak_month: string | null;
+  yoy_change: number | null;
+  severity_breakdown: SeverityBreakdown[];
+  monthly_trend: MonthlyTrend[];
+  hourly_distribution: HourlyDistribution[];
+  road_type_breakdown: RoadTypeBreakdown[];
+}
+ 
+// ─── API call ─────────────────────────────────────────────────────────────────
+ 
+/**
+ * Fetch pre-aggregated statistical data for the Statistical Analysis tab.
+ * Backend endpoint: GET /api/district-stats/{district_slug}
+ */
+export async function getDistrictStats(
+  filters: DistrictStatsFilters
+): Promise<DistrictStats> {
+  const params = new URLSearchParams({ district: filters.district });
+  if (filters.startDate) params.set("date_from", filters.startDate);
+  if (filters.endDate) params.set("date_to", filters.endDate);
+
+  const listFilters: [string, string[] | undefined][] = [
+    ["year", filters.year],
+    ["severity", filters.severity],
+    ["taluka", filters.taluka],
+    ["police_station", filters.policeStation],
+    ["road_classification", filters.roadClassification],
+    ["weather_condition", filters.weatherCondition],
+    ["light_condition", filters.lightCondition],
+    ["collision_type", filters.collisionType],
+  ];
+  listFilters.forEach(([key, values]) =>
+    values?.forEach((value) => params.append(key, value))
+  );
+
+  const response = await API.get<DistrictStats>(
+    `${GUJARAT_API_BASE}/district-stats`,
+    { params }
+  );
+  return response.data;
+}
