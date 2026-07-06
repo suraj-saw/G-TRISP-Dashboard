@@ -102,7 +102,7 @@ export default function GujaratOverview({
             <div className="lg:col-span-3 relative rounded-2xl overflow-hidden shadow-xl border border-[#E4E8F4] bg-white min-h-[420px]">
               <GujaratChoroplethMap />
             </div>
-            <div className="lg:col-span-2 rounded-2xl border border-[#E4E8F4] bg-white shadow-xl p-4 min-h-0 overflow-y-auto no-scrollbar">
+            <div className="lg:col-span-2 rounded-2xl border border-[#E4E8F4] bg-white shadow-xl p-4 min-h-0 overflow-hidden">
               <GujaratInsightsPanel />
             </div>
           </div>

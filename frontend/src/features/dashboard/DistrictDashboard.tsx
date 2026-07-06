@@ -17,7 +17,6 @@ import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
 import DistrictBaseMap from "../../components/maps/DistrictBaseMap";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
-import LocationMarkersInsights from "../../components/charts/LocationMarkersInsights";
 import BlackspotExportButton from "../../components/layout/BlackspotExportButton";
 
 import {
@@ -883,16 +882,6 @@ export default function DistrictDashboard() {
             )}
           </motion.div>
 
-          {isLocationMarkers && data && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: loading ? 0.6 : 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-              className="mt-6 space-y-6"
-            >
-              <LocationMarkersInsights data={data} />
-            </motion.div>
-          )}
         </div>
       </main>
     </div>

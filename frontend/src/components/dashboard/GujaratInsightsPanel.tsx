@@ -325,7 +325,7 @@ export default function GujaratInsightsPanel() {
     : null;
 
   return (
-    <div className="flex flex-col gap-3 h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <AnimatePresence mode="wait">
         <motion.div
           key={title}
@@ -409,7 +409,7 @@ export default function GujaratInsightsPanel() {
       </AnimatePresence>
 
       {/* Severity Distribution — the ONLY chart, sized to always fit */}
-      <div className="rounded-2xl border border-[#E4E8F4] bg-white shadow-sm p-3.5 flex-1 min-h-0 flex flex-col">
+      <div className="rounded-2xl border border-[#E4E8F4] bg-white shadow-sm p-3.5 min-h-[250px] flex flex-col">
         <p className="text-[13px] font-bold text-slate-800">
           Severity Distribution
         </p>
@@ -426,9 +426,9 @@ export default function GujaratInsightsPanel() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={FADE}
-              className="flex-1 min-h-0 flex items-center gap-3 mt-1"
+              className="h-[180px] flex items-center gap-3 mt-1"
             >
-              <div className="w-[50%] h-full min-h-[100px]">
+              <div className="w-[50%] h-[170px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -491,7 +491,7 @@ export default function GujaratInsightsPanel() {
             Top 6 by fatal accident count
           </p>
           {topDangerous.length > 0 ? (
-            <div className="flex-1 min-h-[110px] mt-1">
+            <div className="h-[170px] mt-2">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={topDangerous}
