@@ -4,17 +4,15 @@ import { DEFAULT_BASE_MAP, GEO_FILTER_LABEL } from "../../config/constants";
 
 export type VisualizationType =
   | "location_markers"
-  | "pedestrian_accidents"
   | "density_heatmap"
   | "blackspot"
-  | "pedestrian_blackspot"
   | "dbscan_blackspot"
-  | "kde_density_heatmap"
   | "temporal_analysis";
 
 export type FilterId =
   | "baseMap"
   | "visualization_type"
+  | "visualization_variant"
   | "year"
   | "month"
   | "day"
@@ -35,19 +33,31 @@ export interface FilterConfigItem {
 }
 
 export const VISUALIZATION_OPTIONS = [
-  { value: "location_markers", label: "Location Markers" },
-  { value: "pedestrian_accidents", label: "Pedestrian Accidents" },
+  { value: "location_markers", label: "Markers" },
   { value: "density_heatmap", label: "Density Heatmap" },
   { value: "blackspot", label: "Blackspot Detection" },
-  { value: "pedestrian_blackspot", label: "Pedestrian Blackspot Detection" },
   { value: "dbscan_blackspot", label: "DBSCAN Blackspot Detection" },
-  { value: "kde_density_heatmap", label: "Accident Density Heatmap (KDE)" },
   { value: "temporal_analysis", label: "Temporal Analysis" },
 ];
+
+export const VISUALIZATION_VARIANT_OPTIONS = [
+  { value: "accident", label: "Accident" },
+  { value: "pedestrian", label: "Pedestrian" },
+];
+
+export const VISUALIZATION_VARIANT_LABELS: Record<string, string> = {
+  location_markers: "Marker Type",
+  density_heatmap: "Heatmap Type",
+  blackspot: "Blackspot Type",
+};
+
+export const hasVisualizationVariants = (visualizationType?: string): boolean =>
+  Boolean(visualizationType && VISUALIZATION_VARIANT_LABELS[visualizationType]);
 
 const MAP_FILTERS: FilterConfigItem[] = [
   { id: "baseMap", label: "Base Map", icon: "layers" },
   { id: "visualization_type", label: "Visualization Type" },
+  { id: "visualization_variant", label: "Visualization Variant" },
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
@@ -62,6 +72,7 @@ const MAP_FILTERS: FilterConfigItem[] = [
 
 const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "visualization_type", label: "Visualization Type" },
+  { id: "visualization_variant", label: "Visualization Variant" },
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
@@ -94,4 +105,5 @@ export const defaultFilters: DashboardFilters = {
   date_to : "",
   baseMap: DEFAULT_BASE_MAP,
   visualization_type: "location_markers",
+  visualization_variant: "accident",
 };

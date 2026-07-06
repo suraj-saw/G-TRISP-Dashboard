@@ -12,7 +12,6 @@ import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
 import ExportButton from "../../components/layout/ExportButton";
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
-import AccidentDensityHeatmapLayers from "../../components/maps/AccidentDensityHeatmapLayers";
 import BlackspotExportButton from "../../components/layout/BlackspotExportButton";
 
 import {
@@ -49,6 +48,9 @@ import {
   defaultFilters,
   getFilterConfig,
   VISUALIZATION_OPTIONS,
+  VISUALIZATION_VARIANT_LABELS,
+  VISUALIZATION_VARIANT_OPTIONS,
+  hasVisualizationVariants,
   type FilterId,
 } from "./filterConfig";
 
@@ -275,6 +277,7 @@ export default function Dashboard() {
   > = {
     baseMap: MAP_STYLES.map((s) => ({ value: s.id, label: s.label })),
     visualization_type: VISUALIZATION_OPTIONS,
+    visualization_variant: VISUALIZATION_VARIANT_OPTIONS,
     year: years.map((y) => ({
       value: String(y),
       label: String(y),
@@ -316,14 +319,19 @@ export default function Dashboard() {
   const isTemporalAnalysis = filters.visualization_type === "temporal_analysis";
   const isDensityHeatmap = filters.visualization_type === "density_heatmap";
   const isBlackspotDetection = filters.visualization_type === "blackspot";
-  const isPedestrianBlackspot =
-    filters.visualization_type === "pedestrian_blackspot";
+  const isPedestrianVariant = filters.visualization_variant === "pedestrian";
+  const isPedestrianBlackspot = isBlackspotDetection && isPedestrianVariant;
   const isDbscanBlackspot = filters.visualization_type === "dbscan_blackspot";
-  const isKdeDensityHeatmap =
-    filters.visualization_type === "kde_density_heatmap";
   const isLocationMarkers =
     filters.visualization_type === "location_markers" ||
     !filters.visualization_type;
+  const displayHeatmapData = isPedestrianVariant
+    ? data?.heatmap.filter(isPedestrianAccident)
+    : data?.heatmap;
+  const visualizationLayerType =
+    isLocationMarkers && isPedestrianVariant
+      ? "pedestrian_accidents"
+      : filters.visualization_type || "location_markers";
 
   // Build a human-readable subtitle for the overlay
   const overlaySubtitle = useMemo(() => {
@@ -336,6 +344,12 @@ export default function Dashboard() {
 
   const renderFilter = (filter: (typeof activeFilterConfig)[number]) => {
     const isDateFilter = filter.id === "date_from" || filter.id === "date_to";
+    const variantLabel =
+      VISUALIZATION_VARIANT_LABELS[filters.visualization_type || ""];
+
+    if (filter.id === "visualization_variant" && !variantLabel) {
+      return null;
+    }
 
     if (isDateFilter) {
       const value = (filters[filter.id] as string | undefined) ?? "";
@@ -371,14 +385,20 @@ export default function Dashboard() {
 
     const value = filters[filter.id] ?? [];
     const isMultiSelect =
-      filter.id !== "baseMap" && filter.id !== "visualization_type";
+      filter.id !== "baseMap" &&
+      filter.id !== "visualization_type" &&
+      filter.id !== "visualization_variant";
 
     const handleChange = (nextValue: string | string[]) => {
       setFilters((current) => {
         if (filter.id === "visualization_type") {
+          const visualizationType = nextValue as string;
           return {
             ...current,
-            visualization_type: nextValue as string,
+            visualization_type: visualizationType,
+            visualization_variant: hasVisualizationVariants(visualizationType)
+              ? current.visualization_variant || "accident"
+              : "accident",
             month: [],
             day: [],
             time_period: [],
@@ -394,7 +414,7 @@ export default function Dashboard() {
           {filter.icon === "layers" && (
             <Layers size={12} className="text-[#1e3a8a]" />
           )}
-          {filter.label}
+          {filter.id === "visualization_variant" ? variantLabel : filter.label}
         </label>
         <FilterSelect
           value={value as string | string[]}
@@ -452,7 +472,11 @@ export default function Dashboard() {
           </div>
 
           {(() => {
-            const MAP_FILTER_IDS = ["baseMap", "visualization_type"];
+            const MAP_FILTER_IDS = [
+              "baseMap",
+              "visualization_type",
+              "visualization_variant",
+            ];
             const mapFilters = activeFilterConfig.filter((f) =>
               MAP_FILTER_IDS.includes(f.id)
             );
@@ -518,7 +542,7 @@ export default function Dashboard() {
           })()}
 
           <ExportButton filters={filters} />
-          {(isBlackspotDetection || isDbscanBlackspot) && (
+          {((isBlackspotDetection && !isPedestrianVariant) || isDbscanBlackspot) && (
             <BlackspotExportButton
               filters={filters}
               algorithm={isDbscanBlackspot ? "dbscan" : "greedy"}
@@ -574,7 +598,7 @@ export default function Dashboard() {
                   overlays={
                     isDensityHeatmap ? (
                       <DensityMapOverlays
-                        data={data?.heatmap}
+                        data={displayHeatmapData}
                         subtitle={overlaySubtitle}
                       />
                     ) : undefined
@@ -597,13 +621,11 @@ export default function Dashboard() {
                     />
                   ) : isDbscanBlackspot ? (
                     <DbscanBlackspotDetectionLayers filters={filters} />
-                  ) : isKdeDensityHeatmap ? (
-                    <AccidentDensityHeatmapLayers filters={filters} />
                   ) : (
                     <VisualizationLayers
-                      key={filters.visualization_type || "location_markers"}
-                      data={data?.heatmap}
-                      type={filters.visualization_type || "location_markers"}
+                      key={`${visualizationLayerType}-${filters.visualization_variant || "accident"}`}
+                      data={displayHeatmapData}
+                      type={visualizationLayerType}
                       selectedSeverity={filters.severity}
                     />
                   )}

@@ -12,7 +12,6 @@ import {
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
-import AccidentDensityHeatmapLayers from "../../components/maps/AccidentDensityHeatmapLayers";
 import { DensityMapOverlays } from "../../components/maps/MapOverlays";
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
@@ -37,7 +36,6 @@ import {
   fetchGujaratBlackspots,
   fetchGujaratPedestrianBlackspots,
   fetchGujaratDbscanBlackspots,
-  fetchGujaratKdeHeatmap,
   fetchGujaratTemporalAnalysis,
 } from "../../api/gujaratDashboardApi";
 import type {
@@ -54,7 +52,12 @@ import {
   TOPBAR_Z_INDEX,
   SIDEBAR_TRANSITION,
 } from "../../config/layout";
-import { VISUALIZATION_OPTIONS } from "./filterConfig";
+import {
+  VISUALIZATION_OPTIONS,
+  VISUALIZATION_VARIANT_LABELS,
+  VISUALIZATION_VARIANT_OPTIONS,
+  hasVisualizationVariants,
+} from "./filterConfig";
 import { MAP_STYLES } from "../../components/maps/mapStyles";
 
 const pedestrianCasualtyTotal = (point: HeatmapPoint): number =>
@@ -155,6 +158,7 @@ function DateFilterInput({
 type FilterId =
   | "baseMap"
   | "visualization_type"
+  | "visualization_variant"
   | "year"
   | "month"
   | "day"
@@ -178,6 +182,7 @@ interface FilterConfigItem {
 const MAP_FILTERS: FilterConfigItem[] = [
   { id: "baseMap", label: "Base Map", icon: "layers" },
   { id: "visualization_type", label: "Visualization Type" },
+  { id: "visualization_variant", label: "Visualization Variant" },
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
@@ -192,6 +197,7 @@ const MAP_FILTERS: FilterConfigItem[] = [
 
 const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "visualization_type", label: "Visualization Type" },
+  { id: "visualization_variant", label: "Visualization Variant" },
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
@@ -227,6 +233,7 @@ const defaultDistrictFilters: DashboardFilters = {
   date_to: "",
   baseMap: DEFAULT_BASE_MAP,
   visualization_type: "location_markers",
+  visualization_variant: "accident",
 };
 
 const emptyDashboardData: DashboardData = {
@@ -478,6 +485,7 @@ export default function DistrictDashboard() {
   > = {
     baseMap: MAP_STYLES.map((s) => ({ value: s.id, label: s.label })),
     visualization_type: VISUALIZATION_OPTIONS,
+    visualization_variant: VISUALIZATION_VARIANT_OPTIONS,
     year: years.map((y) => ({ value: String(y), label: String(y) })),
     month: monthOptions,
     day: dayOptions,
@@ -516,14 +524,19 @@ export default function DistrictDashboard() {
   const isTemporalAnalysis = filters.visualization_type === "temporal_analysis";
   const isDensityHeatmap = filters.visualization_type === "density_heatmap";
   const isBlackspotDetection = filters.visualization_type === "blackspot";
-  const isPedestrianBlackspot =
-    filters.visualization_type === "pedestrian_blackspot";
+  const isPedestrianVariant = filters.visualization_variant === "pedestrian";
+  const isPedestrianBlackspot = isBlackspotDetection && isPedestrianVariant;
   const isDbscanBlackspot = filters.visualization_type === "dbscan_blackspot";
-  const isKdeDensityHeatmap =
-    filters.visualization_type === "kde_density_heatmap";
   const isLocationMarkers =
     filters.visualization_type === "location_markers" ||
     !filters.visualization_type;
+  const displayHeatmapData = isPedestrianVariant
+    ? data.heatmap.filter(isPedestrianAccident)
+    : data.heatmap;
+  const visualizationLayerType =
+    isLocationMarkers && isPedestrianVariant
+      ? "pedestrian_accidents"
+      : filters.visualization_type || "location_markers";
 
   const overlaySubtitle = useMemo(() => {
     const parts: string[] = [districtName || "District"];
@@ -533,17 +546,30 @@ export default function DistrictDashboard() {
   }, [districtName, filters.year, filters.severity]);
 
   const renderFilter = (filter: FilterConfigItem) => {
+    const variantLabel =
+      VISUALIZATION_VARIANT_LABELS[filters.visualization_type || ""];
+
+    if (filter.id === "visualization_variant" && !variantLabel) {
+      return null;
+    }
+
     const value = filters[filter.id] ?? [];
     const isMultiSelect =
-      filter.id !== "baseMap" && filter.id !== "visualization_type";
+      filter.id !== "baseMap" &&
+      filter.id !== "visualization_type" &&
+      filter.id !== "visualization_variant";
     const isDateFilter = filter.id === "date_from" || filter.id === "date_to";
 
     const handleChange = (nextValue: string | string[]) => {
       setFilters((current) => {
         if (filter.id === "visualization_type") {
+          const visualizationType = nextValue as string;
           return {
             ...current,
-            visualization_type: nextValue as string,
+            visualization_type: visualizationType,
+            visualization_variant: hasVisualizationVariants(visualizationType)
+              ? current.visualization_variant || "accident"
+              : "accident",
             month: [],
             day: [],
             time_period: [],
@@ -568,7 +594,7 @@ export default function DistrictDashboard() {
           {filter.icon === "layers" && (
             <Layers size={12} className="text-[#1e3a8a]" />
           )}
-          {filter.label}
+          {filter.id === "visualization_variant" ? variantLabel : filter.label}
         </label>
         {isDateFilter ? (
           <DateFilterInput
@@ -642,7 +668,11 @@ export default function DistrictDashboard() {
           </div>
 
           {(() => {
-            const MAP_FILTER_IDS = ["baseMap", "visualization_type"];
+            const MAP_FILTER_IDS = [
+              "baseMap",
+              "visualization_type",
+              "visualization_variant",
+            ];
             const mapFilters = activeFilterConfig.filter((f) =>
               MAP_FILTER_IDS.includes(f.id)
             );
@@ -714,7 +744,7 @@ export default function DistrictDashboard() {
             <RotateCcw size={13} />
             Reset filters
           </button>
-          {(isBlackspotDetection || isDbscanBlackspot) && (
+          {((isBlackspotDetection && !isPedestrianVariant) || isDbscanBlackspot) && (
             <BlackspotExportButton
               filters={filters}
               algorithm={isDbscanBlackspot ? "dbscan" : "greedy"}
@@ -770,7 +800,7 @@ export default function DistrictDashboard() {
                   overlays={
                     isDensityHeatmap ? (
                       <DensityMapOverlays
-                        data={data.heatmap}
+                        data={displayHeatmapData}
                         subtitle={overlaySubtitle}
                       />
                     ) : undefined
@@ -801,16 +831,11 @@ export default function DistrictDashboard() {
                         fetchGujaratDbscanBlackspots(f, districtName)
                       }
                     />
-                  ) : isKdeDensityHeatmap ? (
-                    <AccidentDensityHeatmapLayers
-                      filters={filters}
-                      fetchFn={(f) => fetchGujaratKdeHeatmap(f, districtName)}
-                    />
                   ) : (
                     <VisualizationLayers
-                      key={filters.visualization_type || "location_markers"}
-                      data={data.heatmap}
-                      type={filters.visualization_type || "location_markers"}
+                      key={`${visualizationLayerType}-${filters.visualization_variant || "accident"}`}
+                      data={displayHeatmapData}
+                      type={visualizationLayerType}
                       selectedSeverity={filters.severity}
                     />
                   )}

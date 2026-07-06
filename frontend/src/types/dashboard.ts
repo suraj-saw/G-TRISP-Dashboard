@@ -13,6 +13,7 @@ export interface DashboardFilters {
   taluka?: string[]; // NEW
   baseMap?: string;
   visualization_type?: string;
+  visualization_variant?: string;
   date_from?: string;
   date_to?: string;
 }
