@@ -479,7 +479,7 @@ function BlackspotPopup({ hovered }: { hovered: NonNullable<HoverState> }) {
 export function VisualizationLayers({
   data,
   type,
-  selectedSeverity = [],
+  // selectedSeverity = [],
 }: Props) {
   const { current: mapRef } = useMap();
   const [selected, setSelected] = useState<SelectedAccident | null>(null);

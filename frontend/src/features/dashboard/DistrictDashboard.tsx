@@ -70,28 +70,28 @@ type DateBounds = {
   max?: string;
 };
 
-const toDateInputValue = (value?: string | null): string | null => {
-  if (!value) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return value.slice(0, 10);
+// const toDateInputValue = (value?: string | null): string | null => {
+//   if (!value) return null;
+//   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+//   if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return value.slice(0, 10);
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
-};
+//   const date = new Date(value);
+//   if (Number.isNaN(date.getTime())) return null;
+//   return date.toISOString().slice(0, 10);
+// };
 
-const getDatasetDateBounds = (points?: HeatmapPoint[]): DateBounds => {
-  const dates =
-    points
-      ?.map((point) => toDateInputValue(point.accident_date_time))
-      .filter((value): value is string => Boolean(value))
-      .sort() || [];
+// const getDatasetDateBounds = (points?: HeatmapPoint[]): DateBounds => {
+//   const dates =
+//     points
+//       ?.map((point) => toDateInputValue(point.accident_date_time))
+//       .filter((value): value is string => Boolean(value))
+//       .sort() || [];
 
-  return {
-    min: dates[0],
-    max: dates[dates.length - 1],
-  };
-};
+//   return {
+//     min: dates[0],
+//     max: dates[dates.length - 1],
+//   };
+// };
 
 const clampDateValue = (value: string, bounds: DateBounds): string => {
   if (!value) return "";

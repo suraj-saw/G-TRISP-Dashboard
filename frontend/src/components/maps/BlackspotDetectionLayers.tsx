@@ -1,17 +1,14 @@
 // frontend/src/components/maps/BlackspotDetectionLayers.tsx
-//
-// IRC SP:88-2019 / IRC:99-2018 compliant blackspot visualisation layer.
-//
-// Key changes from pre-IRC version:
-//  • Tooltips display ASI, fatal/grievous/minor breakdown, and the IRC
-//    criterion (§4.2a / §4.2b / §4.2c) that triggered the classification.
-//  • Circle and centroid colours are driven by `asi` (not raw crash count).
-//  • Status badge shows IRC radius (500 m) and min-ASI (15) to orient users.
-//  • IRC risk-tier labels replace generic "Low/Medium/High Risk Zone" copy.
 
 import { useEffect, useState } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
-import { Loader2, AlertCircle } from "lucide-react";
+import {
+  Loader2,
+  AlertCircle,
+  Skull,
+  AlertTriangle,
+  ShieldAlert,
+} from "lucide-react";
 import { fetchBlackspots, type BlackspotData } from "../../api/dashboardApi";
 import type { DashboardFilters, HeatmapPoint } from "../../types/dashboard";
 import {
@@ -26,7 +23,6 @@ import {
 interface Props {
   filters: DashboardFilters;
   fetchFn?: (filters: DashboardFilters) => Promise<BlackspotData>;
-  /** Raw accident points for individual markers at high zoom */
   heatmapData?: HeatmapPoint[];
   analysisLabel?: string;
   crashLabel?: string;
@@ -35,7 +31,6 @@ interface Props {
 interface HoveredBlackspot {
   longitude: number;
   latitude: number;
-  // Blackspot cluster fields
   bs_id?: number;
   crash_count?: number;
   fatal_count?: number;
@@ -44,7 +39,6 @@ interface HoveredBlackspot {
   asi?: number;
   risk_label?: string;
   qualifies_by?: string;
-  // Individual point fields
   severity?: string;
   police_station?: string | null;
   road_name?: string | null;
@@ -274,7 +268,7 @@ export default function BlackspotDetectionLayers({
 
   const StatusBadge = ({ children }: { children: React.ReactNode }) => (
     <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 z-20">
-      <div className="pointer-events-auto rounded-xl border border-[#E4E8F4] bg-white/95 px-4 py-2.5 shadow-lg backdrop-blur-sm text-xs font-semibold text-slate-600 flex items-center gap-2">
+      <div className="pointer-events-auto rounded-full border border-slate-200/50 bg-white/90 px-5 py-3 shadow-xl backdrop-blur-md text-sm font-medium text-slate-700 flex items-center gap-3 transition-all duration-300 hover:bg-white/95">
         {children}
       </div>
     </div>
@@ -283,7 +277,7 @@ export default function BlackspotDetectionLayers({
   if (loading) {
     return (
       <StatusBadge>
-        <Loader2 size={14} className="animate-spin text-[#2C6EF2]" />
+        <Loader2 size={16} className="animate-spin text-blue-600" />
         Running {analysisLabel}…
       </StatusBadge>
     );
@@ -292,8 +286,8 @@ export default function BlackspotDetectionLayers({
   if (error) {
     return (
       <StatusBadge>
-        <AlertCircle size={14} className="text-red-500" />
-        <span className="text-red-600">{error}</span>
+        <AlertCircle size={16} className="text-red-500" />
+        <span className="text-red-600 font-semibold">{error}</span>
       </StatusBadge>
     );
   }
@@ -301,24 +295,26 @@ export default function BlackspotDetectionLayers({
   if (!data || data.circles.features.length === 0) {
     return (
       <StatusBadge>
-        <AlertCircle size={14} className="text-amber-500" />
-        No IRC blackspots found — criteria: ≥{IRC_MIN_CRASHES} {crashLabel} or
-        ASI ≥{IRC_MIN_ASI} within {data?.radius_m ?? IRC_RADIUS_M} m. Total{" "}
-        {crashLabel} considered: {data?.total_crashes ?? 0}.
+        <AlertCircle size={16} className="text-amber-500" />
+        <span>
+          No IRC blackspots found — criteria:{" "}
+          <span className="font-bold text-amber-600">≥{IRC_MIN_CRASHES}</span>{" "}
+          {crashLabel} or ASI{" "}
+          <span className="font-bold text-amber-600">≥{IRC_MIN_ASI}</span>{" "}
+          within {data?.radius_m ?? IRC_RADIUS_M} m.
+        </span>
       </StatusBadge>
     );
   }
 
   return (
     <>
-      {/* ── Individual accident points — fade in at zoom 13+ ─────────────── */}
       {accidentGeojson.features.length > 0 && (
         <Source
           id="blackspot-accident-source"
           type="geojson"
           data={accidentGeojson as any}
         >
-          {/* Outer glow halo */}
           <Layer
             id="blackspot-accident-halo"
             type="circle"
@@ -349,7 +345,6 @@ export default function BlackspotDetectionLayers({
               "circle-blur": 0.8,
             }}
           />
-          {/* Core point */}
           <Layer
             id="blackspot-accident-points"
             type="circle"
@@ -375,13 +370,13 @@ export default function BlackspotDetectionLayers({
                 12,
                 0,
                 13,
-                0.55,
+                0.65,
                 14,
-                0.75,
+                0.85,
                 15,
-                0.92,
+                0.95,
               ],
-              "circle-stroke-width": 1.2,
+              "circle-stroke-width": 1.5,
               "circle-stroke-color": "#FFFFFF",
               "circle-stroke-opacity": [
                 "interpolate",
@@ -390,7 +385,7 @@ export default function BlackspotDetectionLayers({
                 12,
                 0,
                 13,
-                0.5,
+                0.6,
                 15,
                 0.9,
               ],
@@ -399,7 +394,6 @@ export default function BlackspotDetectionLayers({
         </Source>
       )}
 
-      {/* ── Blackspot influence circles (IRC 500 m radius) ────────────────── */}
       <Source
         id="blackspot-circles-source"
         type="geojson"
@@ -415,11 +409,11 @@ export default function BlackspotDetectionLayers({
               ["linear"],
               ["zoom"],
               10,
-              0.3,
+              0.15,
               13,
-              0.2,
-              15,
               0.1,
+              15,
+              0.05,
             ],
           }}
         />
@@ -433,28 +427,27 @@ export default function BlackspotDetectionLayers({
               ["linear"],
               ["zoom"],
               10,
-              2,
-              14,
               1.5,
-              16,
+              14,
               1,
+              16,
+              0.5,
             ],
             "line-opacity": [
               "interpolate",
               ["linear"],
               ["zoom"],
               10,
-              1,
+              0.8,
               15,
-              0.6,
+              0.5,
               17,
-              0.3,
+              0.2,
             ],
           }}
         />
       </Source>
 
-      {/* ── Blackspot anchor centroids ────────────────────────────────────── */}
       <Source
         id="blackspot-centroids-source"
         type="geojson"
@@ -487,13 +480,13 @@ export default function BlackspotDetectionLayers({
               10,
               0.95,
               14,
-              0.8,
+              0.85,
               15,
-              0.55,
+              0.65,
               16,
-              0.2,
+              0.3,
             ],
-            "circle-stroke-width": 2,
+            "circle-stroke-width": 2.5,
             "circle-stroke-color": "#FFFFFF",
             "circle-stroke-opacity": [
               "interpolate",
@@ -502,54 +495,32 @@ export default function BlackspotDetectionLayers({
               10,
               1,
               15,
-              0.55,
+              0.7,
               16,
-              0.15,
-            ],
-          }}
-        />
-        <Layer
-          id="blackspot-centroids-label"
-          type="symbol"
-          layout={{
-            // Show ASI value at low zoom, crash count at high zoom
-            "text-field": [
-              "step",
-              ["zoom"],
-              ["concat", "ASI ", ["to-string", ["get", "asi"]]],
-              14,
-              ["to-string", ["get", "crash_count"]],
-            ],
-            "text-size": 11,
-            "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-            "text-allow-overlap": true,
-          }}
-          paint={{
-            "text-color": "#FFFFFF",
-            "text-halo-color": "rgba(0,0,0,0.4)",
-            "text-halo-width": 1,
-            "text-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              10,
-              1,
-              15,
-              0.55,
-              16,
-              0.1,
+              0.2,
             ],
           }}
         />
       </Source>
 
       <StatusBadge>
-        {data.total_blackspots} IRC blackspots · {data.total_crashes}{" "}
-        {crashLabel} analyzed · {data.isolated_crashes} isolated · IRC
-        SP:88-2019 ({IRC_RADIUS_M} m radius, ASI ≥ {IRC_MIN_ASI})
+        <span className="flex items-center gap-1.5">
+          <span className="text-blue-600 font-bold">
+            {data.total_blackspots}
+          </span>{" "}
+          IRC Blackspots
+        </span>
+        <span className="text-slate-300">|</span>
+        <span className="flex items-center gap-1.5">
+          <span className="font-bold text-slate-800">{data.total_crashes}</span>{" "}
+          {crashLabel}
+        </span>
+        <span className="text-slate-300">|</span>
+        <span className="text-slate-500 text-xs">
+          SP:88-2019 ({IRC_RADIUS_M}m)
+        </span>
       </StatusBadge>
 
-      {/* ── Hover tooltip — IRC blackspot cluster ────────────────────────── */}
       {hovered && !hovered.isPoint && (
         <Popup
           longitude={hovered.longitude}
@@ -558,139 +529,135 @@ export default function BlackspotDetectionLayers({
           closeButton={false}
           closeOnClick={false}
           offset={12}
+          className="z-50"
         >
-          <div style={{ minWidth: 210, fontFamily: "inherit" }}>
-            {/* IRC risk tier header */}
+          <div className="w-64 overflow-hidden rounded-xl bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div
-              style={{
-                background: getIrcRiskColor(hovered.asi ?? 0),
-                color: "#fff",
-                padding: "6px 10px",
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.04em",
-                textTransform: "uppercase",
-                borderRadius: "6px 6px 0 0",
-              }}
+              className="px-4 py-2 text-[10px] font-bold tracking-widest text-white uppercase"
+              style={{ backgroundColor: getIrcRiskColor(hovered.asi ?? 0) }}
             >
               {hovered.risk_label ?? getIrcRiskLabel(hovered.asi ?? 0)}
             </div>
-
-            <div
-              style={{
-                padding: "8px 10px 6px",
-                fontSize: 12,
-                color: "#1e293b",
-              }}
-            >
-              {/* Blackspot ID + IRC ASI */}
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
-                Blackspot #{hovered.bs_id}
-                <span
-                  style={{
-                    marginLeft: 6,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: getIrcRiskColor(hovered.asi ?? 0),
-                  }}
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-sm font-extrabold text-slate-800">
+                  Cluster #{hovered.bs_id}
+                </div>
+                <div
+                  className="px-2 py-0.5 text-xs font-bold rounded-full bg-slate-100"
+                  style={{ color: getIrcRiskColor(hovered.asi ?? 0) }}
                 >
                   ASI {hovered.asi ?? "—"}
-                </span>
-              </div>
-
-              {/* Severity breakdown */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: "2px 8px",
-                  fontSize: 11,
-                  marginBottom: 5,
-                }}
-              >
-                <span style={{ color: "#4C1D1D", fontWeight: 600 }}>
-                  ☠ Fatal: {hovered.fatal_count ?? "—"}
-                </span>
-                <span style={{ color: "#DC2626", fontWeight: 600 }}>
-                  ⚠ Grievous: {hovered.grievous_count ?? "—"}
-                </span>
-                <span style={{ color: "#EA580C", fontWeight: 600 }}>
-                  ▲ Minor: {hovered.minor_count ?? "—"}
-                </span>
-              </div>
-
-              <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>
-                {(hovered.crash_count ?? 0).toLocaleString()} total crashes
-                within {IRC_RADIUS_M} m
-              </div>
-
-              {/* IRC qualifying criteria */}
-              {hovered.qualifies_by && (
-                <div
-                  style={{
-                    borderTop: "1px solid #E2E8F0",
-                    paddingTop: 5,
-                    marginTop: 4,
-                    fontSize: 10,
-                    color: "#475569",
-                    fontStyle: "italic",
-                  }}
-                >
-                  {hovered.qualifies_by.split(" | ").map((criterion, idx) => (
-                    <div key={idx}>✓ {criterion}</div>
-                  ))}
                 </div>
-              )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="flex flex-col items-center p-1.5 rounded-lg bg-red-50 border border-red-100">
+                  <Skull size={14} className="text-[#4C1D1D] mb-1" />
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                    Fatal
+                  </span>
+                  <span className="text-sm font-bold text-[#4C1D1D]">
+                    {hovered.fatal_count ?? "—"}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center p-1.5 rounded-lg bg-orange-50 border border-orange-100">
+                  <AlertTriangle size={14} className="text-[#DC2626] mb-1" />
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                    Grievous
+                  </span>
+                  <span className="text-sm font-bold text-[#DC2626]">
+                    {hovered.grievous_count ?? "—"}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center p-1.5 rounded-lg bg-amber-50 border border-amber-100">
+                  <ShieldAlert size={14} className="text-[#EA580C] mb-1" />
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                    Minor
+                  </span>
+                  <span className="text-sm font-bold text-[#EA580C]">
+                    {hovered.minor_count ?? "—"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-xs text-slate-500 mb-3 text-center">
+                <span className="font-bold text-slate-700">
+                  {hovered.crash_count?.toLocaleString()}
+                </span>{" "}
+                total crashes within {IRC_RADIUS_M}m
+              </div>
+
+              {/* {hovered.qualifies_by && (
+                <div className="pt-3 border-t border-slate-100">
+                  <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Qualifying Criteria
+                  </div>
+                  <div className="text-xs text-slate-600 space-y-1">
+                    {hovered.qualifies_by.split(" | ").map((criterion, idx) => (
+                      <div key={idx} className="flex items-start gap-1.5">
+                        <span className="text-blue-500 mt-0.5">•</span>
+                        <span>{criterion}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )} */}
             </div>
           </div>
         </Popup>
       )}
 
-      {/* ── Click popup — individual accident point ───────────────────────── */}
       {selected && selected.isPoint && (
         <Popup
           longitude={selected.longitude}
           latitude={selected.latitude}
           anchor="top"
-          closeButton={true}
+          closeButton={false}
           closeOnClick={false}
           onClose={() => setSelected(null)}
           offset={12}
+          className="z-50"
         >
-          <div style={{ minWidth: 200, fontFamily: "inherit" }}>
+          <div className="w-56 overflow-hidden rounded-xl bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div
+              className="px-4 py-2 text-[10px] font-bold tracking-widest text-white uppercase flex justify-between items-center"
               style={{
-                background:
+                backgroundColor:
                   SEVERITY_COLORS[selected.severity ?? ""] ?? "#64748b",
-                color: "#fff",
-                padding: "6px 10px",
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.04em",
-                borderRadius: "6px 6px 0 0",
               }}
             >
-              {safeText(selected.severity)}
+              <span>{safeText(selected.severity)}</span>
+              <button
+                onClick={() => setSelected(null)}
+                className="opacity-70 hover:opacity-100 transition-opacity"
+              >
+                ✕
+              </button>
             </div>
-            <div
-              style={{
-                padding: "8px 10px 6px",
-                fontSize: 12,
-                color: "#1e293b",
-              }}
-            >
-              <p style={{ marginBottom: 3 }}>
-                <b>Station:</b> {safeText(selected.police_station)}
-              </p>
+            <div className="p-4 text-xs text-slate-700 space-y-2">
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase text-slate-400 font-semibold">
+                  Police Station
+                </span>
+                <span className="font-medium text-slate-800">
+                  {safeText(selected.police_station)}
+                </span>
+              </div>
               {selected.road_name &&
                 safeText(selected.road_name) !== UNKNOWN_LABEL && (
-                  <p style={{ marginBottom: 3 }}>
-                    <b>Road:</b> {safeText(selected.road_name)}
-                  </p>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase text-slate-400 font-semibold">
+                      Road
+                    </span>
+                    <span className="font-medium text-slate-800">
+                      {safeText(selected.road_name)}
+                    </span>
+                  </div>
                 )}
-              <p style={{ color: "#64748b", marginTop: 4, fontSize: 11 }}>
+              <div className="pt-2 mt-2 border-t border-slate-100 text-slate-500 font-medium">
                 {formatDate(selected.accident_date_time)}
-              </p>
+              </div>
             </div>
           </div>
         </Popup>
