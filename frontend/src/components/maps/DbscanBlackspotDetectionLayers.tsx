@@ -1,4 +1,14 @@
 // frontend/src/components/maps/DbscanBlackspotDetectionLayers.tsx
+//
+// IRC SP:88-2019 / IRC:99-2018 compliant DBSCAN blackspot visualisation.
+//
+// Key changes from pre-IRC version:
+//  • Colour steps driven by `asi` (Accident Severity Index) per IRC §4.2c.
+//  • Tooltips show ASI, fatal/grievous/minor breakdown, and qualifying IRC
+//    criteria.
+//  • IRC radius constant (500 m) used in status badge.
+//  • Risk labels reflect IRC tier names, not generic density labels.
+
 import { useEffect, useState } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -7,6 +17,11 @@ import {
   type BlackspotData,
 } from "../../api/dashboardApi";
 import type { DashboardFilters } from "../../types/dashboard";
+import {
+  IRC_RADIUS_M,
+  IRC_MIN_CRASHES,
+  IRC_MIN_ASI,
+} from "../../config/blackspotConfig";
 
 interface Props {
   filters: DashboardFilters;
@@ -18,48 +33,65 @@ interface HoveredBlackspot {
   latitude: number;
   bs_id: number;
   crash_count: number;
+  fatal_count?: number;
+  grievous_count?: number;
+  minor_count?: number;
+  asi?: number;
+  risk_label?: string;
+  qualifies_by?: string;
 }
 
 // ── Distinct palette so DBSCAN circles read differently from greedy ones ──
+// Colours still align with IRC ASI tier severity — blue-purple family so
+// DBSCAN circles are visually distinct from the greedy red-orange family.
 const DC_COLORS = {
-  veryLow: "#0EA5E9", // Sky
-  low: "#3B82F6", // Blue
-  medium: "#6366F1", // Indigo
-  high: "#7C3AED", // Violet
-  critical: "#4C1D95", // Deep Purple
+  potential: "#0EA5E9", // sky          — sub-threshold / potential
+  low: "#3B82F6", // blue         — Low Risk Blackspot   (ASI 15–29)
+  medium: "#6366F1", // indigo       — Medium Risk Blackspot (ASI 30–59)
+  high: "#7C3AED", // violet       — High Risk Blackspot   (ASI 60–99)
+  veryHigh: "#5B21B6", // deep violet  — Very High Risk        (ASI 100–199)
+  critical: "#4C1D95", // deep purple  — Critical              (ASI ≥ 200)
 } as const;
 
+// IRC ASI-driven colour step expression for DBSCAN layers
 const DC_COLOR_EXPR = [
   "step",
-  ["get", "crash_count"],
-  DC_COLORS.veryLow,
+  ["get", "asi"],
+  DC_COLORS.potential, // default — sub-threshold
   15,
   DC_COLORS.low,
-  50,
+  30,
   DC_COLORS.medium,
-  150,
+  60,
   DC_COLORS.high,
-  350,
+  100,
+  DC_COLORS.veryHigh,
+  200,
   DC_COLORS.critical,
 ] as const;
 
-function getDcRiskLabel(count: number): string {
-  if (count >= 350) return "Critical Density Zone";
-  if (count >= 150) return "High Density Zone";
-  if (count >= 50) return "Medium Density Zone";
-  if (count >= 15) return "Low Density Zone";
-  return "Very Low Density Zone";
+function getDcRiskLabel(asi: number): string {
+  if (asi >= 200) return "Critical Blackspot";
+  if (asi >= 100) return "Very High Risk Blackspot";
+  if (asi >= 60) return "High Risk Blackspot";
+  if (asi >= 30) return "Medium Risk Blackspot";
+  if (asi >= 15) return "Low Risk Blackspot";
+  return "Potential Blackspot";
 }
 
-function getDcRiskColor(count: number): string {
-  if (count >= 350) return DC_COLORS.critical;
-  if (count >= 150) return DC_COLORS.high;
-  if (count >= 50) return DC_COLORS.medium;
-  if (count >= 15) return DC_COLORS.low;
-  return DC_COLORS.veryLow;
+function getDcRiskColor(asi: number): string {
+  if (asi >= 200) return DC_COLORS.critical;
+  if (asi >= 100) return DC_COLORS.veryHigh;
+  if (asi >= 60) return DC_COLORS.high;
+  if (asi >= 30) return DC_COLORS.medium;
+  if (asi >= 15) return DC_COLORS.low;
+  return DC_COLORS.potential;
 }
 
-export default function DbscanBlackspotDetectionLayers({ filters, fetchFn }: Props) {
+export default function DbscanBlackspotDetectionLayers({
+  filters,
+  fetchFn,
+}: Props) {
   const { current: mapRef } = useMap();
   const [data, setData] = useState<BlackspotData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,6 +156,12 @@ export default function DbscanBlackspotDetectionLayers({ filters, fetchFn }: Pro
           latitude: e.lngLat.lat,
           bs_id: f.properties?.bs_id,
           crash_count: f.properties?.crash_count,
+          fatal_count: f.properties?.fatal_count,
+          grievous_count: f.properties?.grievous_count,
+          minor_count: f.properties?.minor_count,
+          asi: f.properties?.asi,
+          risk_label: f.properties?.risk_label,
+          qualifies_by: f.properties?.qualifies_by,
         });
       } else {
         map.getCanvas().style.cursor = "";
@@ -150,7 +188,7 @@ export default function DbscanBlackspotDetectionLayers({ filters, fetchFn }: Pro
     return (
       <StatusBadge>
         <Loader2 size={14} className="animate-spin text-[#6366F1]" />
-        Running DBSCAN blackspot detection…
+        Running IRC SP:88-2019 DBSCAN blackspot detection…
       </StatusBadge>
     );
   }
@@ -168,16 +206,16 @@ export default function DbscanBlackspotDetectionLayers({ filters, fetchFn }: Pro
     return (
       <StatusBadge>
         <AlertCircle size={14} className="text-amber-500" />
-        No DBSCAN blackspots found for the current filters (min{" "}
-        {data?.min_crashes ?? 5} crashes within {data?.radius_m ?? 250}m,
-        non-overlapping). Total crashes considered: {data?.total_crashes ?? 0}.
+        No IRC blackspots found — criteria: ≥{IRC_MIN_CRASHES} crashes or ASI ≥
+        {IRC_MIN_ASI} within {data?.radius_m ?? IRC_RADIUS_M} m
+        (non-overlapping). Total crashes considered: {data?.total_crashes ?? 0}.
       </StatusBadge>
     );
   }
 
   return (
     <>
-      {/* dbscan_circles — fixed-radius, overlap-suppressed influence zones */}
+      {/* ── DBSCAN influence circles — IRC 500 m radius ───────────────────── */}
       <Source
         id="dbscan-circles-source"
         type="geojson"
@@ -188,7 +226,7 @@ export default function DbscanBlackspotDetectionLayers({ filters, fetchFn }: Pro
           type="fill"
           paint={{
             "fill-color": DC_COLOR_EXPR as any,
-            "fill-opacity": 0.25,
+            "fill-opacity": 0.22,
           }}
         />
         <Layer
@@ -202,7 +240,7 @@ export default function DbscanBlackspotDetectionLayers({ filters, fetchFn }: Pro
         />
       </Source>
 
-      {/* dbscan_centroids — densest non-overlapping anchor points */}
+      {/* ── DBSCAN centroids — densest non-overlapping IRC anchor points ───── */}
       <Source
         id="dbscan-centroids-source"
         type="geojson"
@@ -236,7 +274,14 @@ export default function DbscanBlackspotDetectionLayers({ filters, fetchFn }: Pro
           id="dbscan-centroids-label"
           type="symbol"
           layout={{
-            "text-field": ["get", "crash_count"],
+            // Show ASI at low zoom, crash count at high zoom
+            "text-field": [
+              "step",
+              ["zoom"],
+              ["concat", "ASI ", ["to-string", ["get", "asi"]]],
+              14,
+              ["to-string", ["get", "crash_count"]],
+            ],
             "text-size": 11,
             "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
             "text-allow-overlap": true,
@@ -250,10 +295,12 @@ export default function DbscanBlackspotDetectionLayers({ filters, fetchFn }: Pro
       </Source>
 
       <StatusBadge>
-        {data.total_blackspots} non-overlapping blackspots ·{" "}
-        {data.total_crashes} crashes analyzed · {data.isolated_crashes} isolated
+        {data.total_blackspots} IRC blackspots (DBSCAN) · {data.total_crashes}{" "}
+        crashes analyzed · {data.isolated_crashes} isolated · IRC SP:88-2019 (
+        {IRC_RADIUS_M} m, ASI ≥ {IRC_MIN_ASI})
       </StatusBadge>
 
+      {/* ── Hover tooltip — IRC DBSCAN blackspot ─────────────────────────── */}
       {hovered && (
         <Popup
           longitude={hovered.longitude}
@@ -263,10 +310,11 @@ export default function DbscanBlackspotDetectionLayers({ filters, fetchFn }: Pro
           closeOnClick={false}
           offset={12}
         >
-          <div style={{ minWidth: 170, fontFamily: "inherit" }}>
+          <div style={{ minWidth: 210, fontFamily: "inherit" }}>
+            {/* IRC risk tier header */}
             <div
               style={{
-                background: getDcRiskColor(hovered.crash_count),
+                background: getDcRiskColor(hovered.asi ?? 0),
                 color: "#fff",
                 padding: "6px 10px",
                 fontSize: 11,
@@ -276,8 +324,9 @@ export default function DbscanBlackspotDetectionLayers({ filters, fetchFn }: Pro
                 borderRadius: "6px 6px 0 0",
               }}
             >
-              {getDcRiskLabel(hovered.crash_count)}
+              {hovered.risk_label ?? getDcRiskLabel(hovered.asi ?? 0)}
             </div>
+
             <div
               style={{
                 padding: "8px 10px 6px",
@@ -285,13 +334,64 @@ export default function DbscanBlackspotDetectionLayers({ filters, fetchFn }: Pro
                 color: "#1e293b",
               }}
             >
-              <div style={{ fontWeight: 700, fontSize: 13 }}>
+              {/* Blackspot ID + ASI */}
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
                 DBSCAN Blackspot #{hovered.bs_id}
+                <span
+                  style={{
+                    marginLeft: 6,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: getDcRiskColor(hovered.asi ?? 0),
+                  }}
+                >
+                  ASI {hovered.asi ?? "—"}
+                </span>
               </div>
-              <div style={{ color: "#64748b", marginTop: 2 }}>
-                {hovered.crash_count.toLocaleString()} crashes within 250m
-                (non-overlapping)
+
+              {/* Severity breakdown */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: "2px 8px",
+                  fontSize: 11,
+                  marginBottom: 5,
+                }}
+              >
+                <span style={{ color: "#4C1D1D", fontWeight: 600 }}>
+                  ☠ Fatal: {hovered.fatal_count ?? "—"}
+                </span>
+                <span style={{ color: "#DC2626", fontWeight: 600 }}>
+                  ⚠ Grievous: {hovered.grievous_count ?? "—"}
+                </span>
+                <span style={{ color: "#EA580C", fontWeight: 600 }}>
+                  ▲ Minor: {hovered.minor_count ?? "—"}
+                </span>
               </div>
+
+              <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>
+                {hovered.crash_count.toLocaleString()} total crashes within{" "}
+                {IRC_RADIUS_M} m (non-overlapping)
+              </div>
+
+              {/* IRC qualifying criteria */}
+              {hovered.qualifies_by && (
+                <div
+                  style={{
+                    borderTop: "1px solid #E2E8F0",
+                    paddingTop: 5,
+                    marginTop: 4,
+                    fontSize: 10,
+                    color: "#475569",
+                    fontStyle: "italic",
+                  }}
+                >
+                  {hovered.qualifies_by.split(" | ").map((criterion, idx) => (
+                    <div key={idx}>✓ {criterion}</div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </Popup>

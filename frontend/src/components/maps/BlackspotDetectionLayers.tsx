@@ -1,13 +1,26 @@
 // frontend/src/components/maps/BlackspotDetectionLayers.tsx
+//
+// IRC SP:88-2019 / IRC:99-2018 compliant blackspot visualisation layer.
+//
+// Key changes from pre-IRC version:
+//  • Tooltips display ASI, fatal/grievous/minor breakdown, and the IRC
+//    criterion (§4.2a / §4.2b / §4.2c) that triggered the classification.
+//  • Circle and centroid colours are driven by `asi` (not raw crash count).
+//  • Status badge shows IRC radius (500 m) and min-ASI (15) to orient users.
+//  • IRC risk-tier labels replace generic "Low/Medium/High Risk Zone" copy.
+
 import { useEffect, useState } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
 import { Loader2, AlertCircle } from "lucide-react";
 import { fetchBlackspots, type BlackspotData } from "../../api/dashboardApi";
 import type { DashboardFilters, HeatmapPoint } from "../../types/dashboard";
 import {
-  getRiskColor,
-  getRiskLabel,
-  BS_COLOR_EXPR,
+  getIrcRiskColor,
+  getIrcRiskLabel,
+  IRC_COLOR_EXPR,
+  IRC_RADIUS_M,
+  IRC_MIN_CRASHES,
+  IRC_MIN_ASI,
 } from "../../config/blackspotConfig";
 
 interface Props {
@@ -22,9 +35,16 @@ interface Props {
 interface HoveredBlackspot {
   longitude: number;
   latitude: number;
+  // Blackspot cluster fields
   bs_id?: number;
   crash_count?: number;
-  // individual point fields
+  fatal_count?: number;
+  grievous_count?: number;
+  minor_count?: number;
+  asi?: number;
+  risk_label?: string;
+  qualifies_by?: string;
+  // Individual point fields
   severity?: string;
   police_station?: string | null;
   road_name?: string | null;
@@ -33,23 +53,23 @@ interface HoveredBlackspot {
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
-  Fatal: "#dc2626",
-  "Grievous Injury": "#f97316",
-  "Minor Injury": "#2563eb",
-  "Damage Only": "#22c55e",
+  Fatal: "#4C1D1D",
+  "Grievous Injury": "#DC2626",
+  "Minor Injury": "#EA580C",
+  "Damage Only": "#FBBF24",
 };
 
 const severityColorExpression = [
   "match",
   ["get", "severity"],
   "Fatal",
-  "#dc2626",
+  "#4C1D1D",
   "Grievous Injury",
-  "#f97316",
+  "#DC2626",
   "Minor Injury",
-  "#2563eb",
+  "#EA580C",
   "Damage Only",
-  "#22c55e",
+  "#FBBF24",
   "#64748b",
 ] as const;
 
@@ -107,7 +127,7 @@ export default function BlackspotDetectionLayers({
   filters,
   fetchFn,
   heatmapData,
-  analysisLabel = "greedy blackspot detection",
+  analysisLabel = "IRC SP:88-2019 blackspot detection",
   crashLabel = "crashes",
 }: Props) {
   const { current: mapRef } = useMap();
@@ -188,7 +208,6 @@ export default function BlackspotDetectionLayers({
         }
       }
 
-      // Fall back to blackspot circles/centroids
       const presentClusterLayers = clusterLayers.filter((id) =>
         map_.getLayer(id)
       );
@@ -204,6 +223,12 @@ export default function BlackspotDetectionLayers({
             latitude: e.lngLat.lat,
             bs_id: f.properties?.bs_id,
             crash_count: f.properties?.crash_count,
+            fatal_count: f.properties?.fatal_count,
+            grievous_count: f.properties?.grievous_count,
+            minor_count: f.properties?.minor_count,
+            asi: f.properties?.asi,
+            risk_label: f.properties?.risk_label,
+            qualifies_by: f.properties?.qualifies_by,
             isPoint: false,
           });
           return;
@@ -277,8 +302,8 @@ export default function BlackspotDetectionLayers({
     return (
       <StatusBadge>
         <AlertCircle size={14} className="text-amber-500" />
-        No blackspots found for the current filters (min{" "}
-        {data?.min_crashes ?? 5} {crashLabel} within {data?.radius_m ?? 250}m). Total
+        No IRC blackspots found — criteria: ≥{IRC_MIN_CRASHES} {crashLabel} or
+        ASI ≥{IRC_MIN_ASI} within {data?.radius_m ?? IRC_RADIUS_M} m. Total{" "}
         {crashLabel} considered: {data?.total_crashes ?? 0}.
       </StatusBadge>
     );
@@ -374,7 +399,7 @@ export default function BlackspotDetectionLayers({
         </Source>
       )}
 
-      {/* ── Blackspot influence circles ───────────────────────────────────── */}
+      {/* ── Blackspot influence circles (IRC 500 m radius) ────────────────── */}
       <Source
         id="blackspot-circles-source"
         type="geojson"
@@ -384,7 +409,7 @@ export default function BlackspotDetectionLayers({
           id="blackspot-circles-fill"
           type="fill"
           paint={{
-            "fill-color": BS_COLOR_EXPR as any,
+            "fill-color": IRC_COLOR_EXPR as any,
             "fill-opacity": [
               "interpolate",
               ["linear"],
@@ -402,7 +427,7 @@ export default function BlackspotDetectionLayers({
           id="blackspot-circles-outline"
           type="line"
           paint={{
-            "line-color": BS_COLOR_EXPR as any,
+            "line-color": IRC_COLOR_EXPR as any,
             "line-width": [
               "interpolate",
               ["linear"],
@@ -454,7 +479,7 @@ export default function BlackspotDetectionLayers({
               350,
               22,
             ],
-            "circle-color": BS_COLOR_EXPR as any,
+            "circle-color": IRC_COLOR_EXPR as any,
             "circle-opacity": [
               "interpolate",
               ["linear"],
@@ -487,7 +512,14 @@ export default function BlackspotDetectionLayers({
           id="blackspot-centroids-label"
           type="symbol"
           layout={{
-            "text-field": ["get", "crash_count"],
+            // Show ASI value at low zoom, crash count at high zoom
+            "text-field": [
+              "step",
+              ["zoom"],
+              ["concat", "ASI ", ["to-string", ["get", "asi"]]],
+              14,
+              ["to-string", ["get", "crash_count"]],
+            ],
             "text-size": 11,
             "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
             "text-allow-overlap": true,
@@ -512,10 +544,12 @@ export default function BlackspotDetectionLayers({
       </Source>
 
       <StatusBadge>
-        {data.total_blackspots} blackspots · {data.total_crashes} {crashLabel}
-        analyzed · {data.isolated_crashes} isolated
+        {data.total_blackspots} IRC blackspots · {data.total_crashes}{" "}
+        {crashLabel} analyzed · {data.isolated_crashes} isolated · IRC
+        SP:88-2019 ({IRC_RADIUS_M} m radius, ASI ≥ {IRC_MIN_ASI})
       </StatusBadge>
 
+      {/* ── Hover tooltip — IRC blackspot cluster ────────────────────────── */}
       {hovered && !hovered.isPoint && (
         <Popup
           longitude={hovered.longitude}
@@ -525,11 +559,11 @@ export default function BlackspotDetectionLayers({
           closeOnClick={false}
           offset={12}
         >
-          {/* Blackspot cluster popup */}
-          <div style={{ minWidth: 170, fontFamily: "inherit" }}>
+          <div style={{ minWidth: 210, fontFamily: "inherit" }}>
+            {/* IRC risk tier header */}
             <div
               style={{
-                background: getRiskColor(hovered.crash_count ?? 0),
+                background: getIrcRiskColor(hovered.asi ?? 0),
                 color: "#fff",
                 padding: "6px 10px",
                 fontSize: 11,
@@ -539,8 +573,9 @@ export default function BlackspotDetectionLayers({
                 borderRadius: "6px 6px 0 0",
               }}
             >
-              {getRiskLabel(hovered.crash_count ?? 0)}
+              {hovered.risk_label ?? getIrcRiskLabel(hovered.asi ?? 0)}
             </div>
+
             <div
               style={{
                 padding: "8px 10px 6px",
@@ -548,18 +583,70 @@ export default function BlackspotDetectionLayers({
                 color: "#1e293b",
               }}
             >
-              <div style={{ fontWeight: 700, fontSize: 13 }}>
+              {/* Blackspot ID + IRC ASI */}
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
                 Blackspot #{hovered.bs_id}
+                <span
+                  style={{
+                    marginLeft: 6,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: getIrcRiskColor(hovered.asi ?? 0),
+                  }}
+                >
+                  ASI {hovered.asi ?? "—"}
+                </span>
               </div>
-              <div style={{ color: "#64748b", marginTop: 2 }}>
-                {(hovered.crash_count ?? 0).toLocaleString()} crashes within
-                250m
+
+              {/* Severity breakdown */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: "2px 8px",
+                  fontSize: 11,
+                  marginBottom: 5,
+                }}
+              >
+                <span style={{ color: "#4C1D1D", fontWeight: 600 }}>
+                  ☠ Fatal: {hovered.fatal_count ?? "—"}
+                </span>
+                <span style={{ color: "#DC2626", fontWeight: 600 }}>
+                  ⚠ Grievous: {hovered.grievous_count ?? "—"}
+                </span>
+                <span style={{ color: "#EA580C", fontWeight: 600 }}>
+                  ▲ Minor: {hovered.minor_count ?? "—"}
+                </span>
               </div>
+
+              <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>
+                {(hovered.crash_count ?? 0).toLocaleString()} total crashes
+                within {IRC_RADIUS_M} m
+              </div>
+
+              {/* IRC qualifying criteria */}
+              {hovered.qualifies_by && (
+                <div
+                  style={{
+                    borderTop: "1px solid #E2E8F0",
+                    paddingTop: 5,
+                    marginTop: 4,
+                    fontSize: 10,
+                    color: "#475569",
+                    fontStyle: "italic",
+                  }}
+                >
+                  {hovered.qualifies_by.split(" | ").map((criterion, idx) => (
+                    <div key={idx}>✓ {criterion}</div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </Popup>
       )}
 
+      {/* ── Click popup — individual accident point ───────────────────────── */}
       {selected && selected.isPoint && (
         <Popup
           longitude={selected.longitude}
@@ -570,7 +657,6 @@ export default function BlackspotDetectionLayers({
           onClose={() => setSelected(null)}
           offset={12}
         >
-          {/* Individual accident point popup */}
           <div style={{ minWidth: 200, fontFamily: "inherit" }}>
             <div
               style={{

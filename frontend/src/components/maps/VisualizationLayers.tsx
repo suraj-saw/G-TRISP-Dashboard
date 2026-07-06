@@ -111,20 +111,50 @@ const isPedestrianAccident = (point: HeatmapPoint): boolean =>
 // ---------------------------------------------------------------------------
 
 const SEVERITY_COLORS = {
-  Fatal: "#dc2626",
-  "Grievous Injury": "#f97316",
-  "Minor Injury": "#2563eb",
-  "Damage Only": "#22c55e",
-  default: "#64748b",
+  Fatal: "#B91C1C",
+  "Grievous Injury": "#EA580C",
+  "Minor Injury Hospitalized": "#F59E0B",
+  "Minor Injury Non Hospitalized": "#FBBF24", // Lighter amber to distinguish from hospitalized
+  "No Injury": "#65A30D",
+  default: "#64748B",
   all: "#E8603A",
 } as const;
 
 const severityColorExpression = [
-  "match",
-  ["get", "severity"],
-  ...Object.entries(SEVERITY_COLORS)
-    .filter(([k]) => k !== "all" && k !== "default")
-    .flatMap(([k, v]) => [k, v]),
+  "case",
+  // Check if the lowercase severity string contains "fatal"
+  ["in", "fatal", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+  SEVERITY_COLORS.Fatal,
+
+  // Check for "grievous"
+  ["in", "grievous", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+  SEVERITY_COLORS["Grievous Injury"],
+
+  // Check for "minor injury hospitalized" (ensure this comes BEFORE non-hospitalized if strings overlap)
+  [
+    "in",
+    "minor injury hospitalized",
+    ["downcase", ["coalesce", ["get", "severity"], ""]],
+  ],
+  SEVERITY_COLORS["Minor Injury Hospitalized"],
+
+  // Check for "minor injury non"
+  [
+    "in",
+    "minor injury non",
+    ["downcase", ["coalesce", ["get", "severity"], ""]],
+  ],
+  SEVERITY_COLORS["Minor Injury Non Hospitalized"],
+
+  // Check for "no injury" or "damage only"
+  [
+    "any",
+    ["in", "no injury", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+    ["in", "damage only", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+  ],
+  SEVERITY_COLORS["No Injury"],
+
+  // Fallback color if none of the above match
   SEVERITY_COLORS.default,
 ] as const;
 
@@ -549,12 +579,7 @@ export function VisualizationLayers({
   }
 
   // ── Location markers ─────────────────────────────────────────────────────
-  const markerColor =
-    type === "pedestrian_accidents"
-      ? "#0F766E"
-      : selectedSeverity.length === 0
-      ? SEVERITY_COLORS.all
-      : (severityColorExpression as any);
+  const markerColor = severityColorExpression as any;
 
   return (
     <>

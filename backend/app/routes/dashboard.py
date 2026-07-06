@@ -638,7 +638,13 @@ def get_blackspots(
     accidents = query.all()
 
     points = [
-        CrashPoint(index=idx, accident_id=a.accident_id, lat=a.latitude, lon=a.longitude)
+        CrashPoint(
+            index=idx,
+            accident_id=a.accident_id,
+            lat=a.latitude,
+            lon=a.longitude,
+            severity=a.severity or "Unknown",
+        )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
     ]
@@ -698,7 +704,13 @@ def get_pedestrian_blackspots(
     ).all()
 
     points = [
-        CrashPoint(index=idx, accident_id=a.accident_id, lat=a.latitude, lon=a.longitude)
+        CrashPoint(
+            index=idx,
+            accident_id=a.accident_id,
+            lat=a.latitude,
+            lon=a.longitude,
+            severity=a.severity or "Unknown",
+        )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
     ]
@@ -752,7 +764,13 @@ def get_dbscan_blackspots(
     accidents = query.all()
 
     points = [
-        CrashPoint(index=idx, accident_id=a.accident_id, lat=a.latitude, lon=a.longitude)
+        CrashPoint(
+            index=idx,
+            accident_id=a.accident_id,
+            lat=a.latitude,
+            lon=a.longitude,
+            severity=a.severity or "Unknown",
+        )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
     ]
@@ -1255,7 +1273,13 @@ def export_blackspots(
 
     accidents = query.all()
     points = [
-        CrashPoint(index=idx, accident_id=a.accident_id, lat=a.latitude, lon=a.longitude)
+        CrashPoint(
+            index=idx,
+            accident_id=a.accident_id,
+            lat=a.latitude,
+            lon=a.longitude,
+            severity=a.severity or "Unknown",
+        )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
     ]
