@@ -19,6 +19,7 @@ import DistrictDashboard from "./features/dashboard/DistrictDashboard";
 import AdminDashboard from "./features/dashboard/AdminDashboard";
 import AdminPanel from "./features/dashboard/AdminPanel";
 import AccidentsPage from "./features/dashboard/AccidentsPage";
+import AboutPage from "./features/about/AboutPage";
 
 function RootHandler() {
   const navigate = useNavigate();
@@ -66,6 +67,7 @@ function App() {
         <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPassword />} />
         <Route path={ROUTES.RESET_PASSWORD} element={<ResetPassword />} />
         <Route path={ROUTES.DASHBOARD} element={<GujaratOverview />} />
+        <Route path={ROUTES.ABOUT} element={<AboutPage />} />
         <Route
           path={ROUTES.DISTRICT_DASHBOARD}
           element={<DistrictDashboard />}

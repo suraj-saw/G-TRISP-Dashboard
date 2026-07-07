@@ -7,12 +7,15 @@ import {
   LogOut,
   PanelLeft,
   Mail,
+  Info,
+  ShieldAlert,
 } from "lucide-react";
 
 import NotificationBell from "./NotificationBell";
 import type { User } from "../../types/user";
 import { TOPBAR_HEIGHT_PX, TOPBAR_Z_INDEX } from "../../config/layout";
 import ConfirmDialog from "../common/ConfirmDialog";
+import { ROUTES } from "../../config/constants";
 
 interface Props {
   appName: string;
@@ -62,6 +65,7 @@ function TopBar({
   const handleLogoutCancel = () => {
     setLogoutDialogOpen(false);
   };
+
   return (
     <header
       style={{ height: `${TOPBAR_HEIGHT_PX}px` }}
@@ -69,13 +73,13 @@ function TopBar({
         ${TOPBAR_Z_INDEX}
         w-full
         flex items-center justify-between
-        px-5
-        bg-white
-        border-b border-slate-200
+        px-6
+        bg-white/80 backdrop-blur-md
+        border-b border-slate-100
       `}
     >
       {/* LEFT SIDE */}
-      <div className="flex items-center gap-3.5">
+      <div className="flex items-center gap-4">
         {onToggleSidebar && (
           <button
             onClick={onToggleSidebar}
@@ -85,12 +89,12 @@ function TopBar({
               group
               h-9 w-9
               flex items-center justify-center
-              rounded-lg
+              rounded-xl
               border border-slate-200 bg-white
-              text-slate-500
-              hover:border-[#1e3a8a] hover:bg-[#1e3a8a] hover:text-white
+              text-slate-500 shadow-sm
+              hover:border-indigo-600 hover:bg-indigo-50 hover:text-indigo-600
               active:scale-95
-              transition-all duration-150
+              transition-all duration-200
             "
           >
             <PanelLeft
@@ -103,29 +107,53 @@ function TopBar({
           </button>
         )}
 
-        <span className="hidden sm:block h-6 w-px bg-slate-200" aria-hidden />
+        <span className="hidden sm:block h-5 w-px bg-slate-200" aria-hidden />
 
-        <h1 className="text-lg font-bold tracking-tight text-slate-900">
+        <h1 className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 to-indigo-950 bg-clip-text text-transparent">
           {appName}
         </h1>
       </div>
 
       {/* RIGHT SIDE */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-3">
+        {/* About Button */}
+        <button
+          onClick={() => navigate(ROUTES.ABOUT)}
+          className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium text-slate-600 transition-all hover:bg-slate-50 hover:text-indigo-600"
+          aria-label="About G-TRISP"
+        >
+          <Info
+            size={16}
+            className="text-slate-400 group-hover:text-indigo-600"
+          />
+          <span className="hidden lg:inline">About</span>
+        </button>
+
+        {/* Admin Panel Button (styled exactly like the target dashboard's pill buttons) */}
         {adminPanelPath && (
           <button
             onClick={() => navigate(adminPanelPath)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+            className="
+              flex items-center gap-2 px-4 py-1.5 
+              rounded-xl border border-slate-200 bg-white 
+              text-sm font-semibold text-slate-700 shadow-sm
+              hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900
+              transition-all active:scale-[0.98]
+            "
           >
-            {/* <ShieldCheck size={16} className="text-[#1e3a8a]" /> */}
             <span className="hidden sm:inline">Admin Panel</span>
           </button>
         )}
 
-        {showNotificationBell && <NotificationBell count={notificationCount} />}
+        {showNotificationBell && (
+          <div className="p-0.5 rounded-xl hover:bg-slate-50 transition-colors">
+            <NotificationBell count={notificationCount} />
+          </div>
+        )}
 
-        <span className="hidden sm:block h-6 w-px bg-slate-200" aria-hidden />
+        <span className="hidden sm:block h-5 w-px bg-slate-200" aria-hidden />
 
+        {/* User Profile Dropdown */}
         <div ref={dropdownRef} className="relative">
           <button
             onClick={() => setOpen((prev) => !prev)}
@@ -133,20 +161,20 @@ function TopBar({
             aria-expanded={open}
             className="
               flex items-center gap-2.5
-              pl-1.5 pr-2.5 py-1.5
+              p-1.5 pr-3
               rounded-full
               border border-transparent
-              hover:bg-slate-100 hover:border-slate-200
-              transition
+              hover:bg-slate-50 hover:border-slate-100
+              transition-all duration-200
             "
           >
             <div
               className="
                 h-8 w-8
-                rounded-full bg-[#1e3a8a]
+                rounded-full bg-gradient-to-tr from-indigo-600 to-violet-500
                 flex items-center justify-center
-                text-white text-sm font-semibold
-                ring-2 ring-white
+                text-white text-sm font-bold
+                shadow-sm shadow-indigo-200
               "
             >
               {user.username.charAt(0).toUpperCase()}
@@ -157,41 +185,42 @@ function TopBar({
             </span>
 
             <ChevronDown
-              size={16}
-              className={`text-slate-400 transition-transform ${
+              size={14}
+              className={`text-slate-400 transition-transform duration-200 ${
                 open ? "rotate-180" : ""
               }`}
             />
           </button>
 
-          {/* DROPDOWN */}
+          {/* DROPDOWN MENU */}
           {open && (
             <div
               role="menu"
               style={{
-                top: `${TOPBAR_HEIGHT_PX + 4}px`,
+                top: `${TOPBAR_HEIGHT_PX - 4}px`,
                 fontFamily: '"Public Sans", system-ui, sans-serif',
               }}
               className="
                 absolute right-0
-                w-80
+                w-80 mt-2
                 rounded-2xl
                 bg-white
-                border border-slate-200
-                shadow-[0_16px_48px_rgba(15,23,42,0.16)]
+                border border-slate-100
+                shadow-[0_20px_50px_rgba(79,70,229,0.12)]
                 overflow-hidden
                 z-50
+                animate-in fade-in slide-in-from-top-2 duration-200
               "
             >
-              {/* HEADER — institutional navy */}
-              <div className="px-5 pt-6 pb-5 bg-[#1e3a8a]">
+              {/* HEADER — Styled with target dashboard's rich Indigo theme */}
+              <div className="px-5 pt-6 pb-5 bg-gradient-to-br from-indigo-900 to-slate-900">
                 <div className="flex items-center gap-3.5">
                   <div
                     className="
                       h-12 w-12 shrink-0
                       rounded-full
-                      bg-white/15
-                      ring-2 ring-white/25
+                      bg-white/10
+                      ring-2 ring-white/20
                       flex items-center justify-center
                       text-lg font-bold text-white
                     "
@@ -206,9 +235,9 @@ function TopBar({
                       className="
                         mt-1 inline-flex items-center
                         rounded-full
-                        bg-white/15
+                        bg-indigo-500/30 backdrop-blur-md
                         px-2.5 py-0.5
-                        text-[11px] font-semibold uppercase tracking-wide text-white
+                        text-[11px] font-bold uppercase tracking-wider text-indigo-200
                       "
                     >
                       {user.role}
@@ -217,17 +246,17 @@ function TopBar({
                 </div>
               </div>
 
-              {/* BODY — info rows */}
-              <div className="p-3">
-                <div className="flex items-center gap-3 rounded-lg px-3 py-2.5">
-                  <div className="h-8 w-8 shrink-0 rounded-lg bg-blue-50 flex items-center justify-center">
-                    <Mail size={15} className="text-[#1e3a8a]" />
+              {/* BODY */}
+              <div className="p-2">
+                <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-slate-50 transition-colors">
+                  <div className="h-8 w-8 shrink-0 rounded-lg bg-indigo-50 flex items-center justify-center">
+                    <Mail size={15} className="text-indigo-600" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                      Email
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Email Address
                     </p>
-                    <p className="text-sm text-slate-700 truncate">
+                    <p className="text-sm font-medium text-slate-700 truncate">
                       {user.email}
                     </p>
                   </div>
@@ -239,13 +268,13 @@ function TopBar({
                 <button
                   onClick={() => setLogoutDialogOpen(true)}
                   className="
-                    mt-1 w-full
+                    w-full
                     flex items-center gap-3
-                    rounded-lg
+                    rounded-xl
                     px-3 py-2.5
                     text-sm font-semibold text-red-600
-                    hover:bg-red-50 
-                    transition
+                    hover:bg-red-50/60
+                    transition-all
                   "
                 >
                   <div className="h-8 w-8 shrink-0 rounded-lg bg-red-50 flex items-center justify-center">
@@ -258,6 +287,7 @@ function TopBar({
           )}
         </div>
       </div>
+
       <ConfirmDialog
         open={logoutDialogOpen}
         title="Sign out"

@@ -99,6 +99,7 @@ export const ROUTES = {
   FORGOT_PASSWORD: "/forgot-password",
   RESET_PASSWORD: "/reset-password",
   DASHBOARD: "/dashboard",
+  ABOUT: "/about",
   DISTRICT_DASHBOARD: "/dashboard/district/:districtSlug",
   ADMIN: "/admin",
   ADMIN_PANEL: "/admin/panel",
