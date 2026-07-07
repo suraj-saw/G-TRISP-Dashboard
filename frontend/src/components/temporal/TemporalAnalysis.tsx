@@ -5,6 +5,21 @@ import type { DashboardFilters, TemporalAnalysisData } from "../../types/dashboa
 import HourDayHeatmap from "./HourDayHeatmap";
 import HourlyChart from "./HourlyChart";
 import MonthlyTrend from "./MonthlyTrend";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  LineChart,
+  Line,
+} from "recharts";
 
 interface Props {
   filters: DashboardFilters;
@@ -64,6 +79,35 @@ const toneClass = {
   amber: "from-[#F59E0B] to-[#B45309]",
   teal: "from-[#14B8A6] to-[#0F766E]",
   red: "from-[#EF4444] to-[#991B1B]",
+};
+
+const CHART_BLUE = "#3b82f6";
+const CHART_TEAL = "#14b8a6";
+const CHART_INDIGO = "#6366f1";
+const CHART_PURPLE = "#a855f7";
+const MUTED = "#6b7299";
+const GRID = "#e8ecf5";
+const SEVERITY_COLORS: Record<string, string> = {
+  Fatal: "#ef4444",
+  "Grievous Injury": "#f97316",
+  "Minor Injury": "#f59e0b",
+  "Damage Only": "#94a3b8",
+};
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white border border-slate-200 rounded-md p-2 shadow-lg text-xs">
+      {label && <div className="text-slate-500 mb-1">{label}</div>}
+      {payload.map((p: any, i: number) => (
+        <div key={i} className="flex items-center gap-1.5 leading-relaxed">
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: p.color }} />
+          <span className="text-slate-500">{p.name}:</span>
+          <span className="font-semibold">{p.value.toLocaleString()}</span>
+        </div>
+      ))}
+    </div>
+  );
 };
 
 export default function TemporalAnalysis({ filters, fetchFn }: Props) {
@@ -130,8 +174,21 @@ export default function TemporalAnalysis({ filters, fetchFn }: Props) {
   }
 
   return (
-    <div className="min-h-[calc(100vh-130px)] space-y-4">
-      <div className="rounded-2xl border border-[#E4E8F4] bg-white p-5 shadow-sm">
+    <div className="min-h-[calc(100vh-130px)] space-y-4 pb-10 p-4">
+      
+      {/* ── Key Insights Panel ── */}
+      {/* {data.temporal_insights && data.temporal_insights.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-800 mb-2 uppercase tracking-wide">Key Temporal Insights</h3>
+          <ul className="list-disc pl-5 space-y-1 text-sm text-slate-600">
+            {data.temporal_insights.map((insight, idx) => (
+              <li key={idx}>{insight}</li>
+            ))}
+          </ul>
+        </div>
+      )} */}
+
+      {/* <div className="rounded-2xl border border-[#E4E8F4] bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-[18px] font-bold text-slate-900">Temporal Analysis</p>
@@ -143,8 +200,9 @@ export default function TemporalAnalysis({ filters, fetchFn }: Props) {
             Peak month: <span className="text-slate-900">{data.summary.peak_month}</span>
           </div>
         </div>
-      </div>
+      </div> */}
 
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {cards(data).map((card) => {
           const Icon = card.icon;
@@ -165,11 +223,149 @@ export default function TemporalAnalysis({ filters, fetchFn }: Props) {
         })}
       </div>
 
+      {/* Hour vs Day Heatmap */}
       <HourDayHeatmap data={data.hour_day} />
 
+      {/* Hourly & Monthly (Existing) */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <HourlyChart data={data.hourly} />
         <MonthlyTrend data={data.monthly} />
+      </div>
+
+      {/* New Temporal Charts Row 1 */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Day of Week Distribution</p>
+          {data.day_of_week_distribution && data.day_of_week_distribution.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.day_of_week_distribution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid stroke={GRID} vertical={false} />
+                  <XAxis dataKey="day" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="count" name="Accidents" fill={CHART_BLUE} radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">No data</div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Time Period Distribution</p>
+          {data.time_period_distribution && data.time_period_distribution.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.time_period_distribution} layout="vertical" margin={{ top: 10, right: 10, left: 30, bottom: 0 }}>
+                  <CartesianGrid stroke={GRID} horizontal={false} />
+                  <XAxis type="number" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis dataKey="period" type="category" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="count" name="Accidents" fill={CHART_INDIGO} radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">No data</div>
+          )}
+        </div>
+      </div>
+
+      {/* New Temporal Charts Row 2 */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Monthly Seasonality</p>
+          {data.monthly_seasonality && data.monthly_seasonality.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.monthly_seasonality} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid stroke={GRID} vertical={false} />
+                  <XAxis dataKey="month" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} interval={0} angle={-45} textAnchor="end" height={50} />
+                  <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="count" name="Accidents" fill={CHART_TEAL} radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">No data</div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Annual Trend</p>
+          {data.annual_trend && data.annual_trend.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data.annual_trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid stroke={GRID} vertical={false} />
+                  <XAxis dataKey="year" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line type="monotone" dataKey="count" name="Accidents" stroke={CHART_PURPLE} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">No data</div>
+          )}
+        </div>
+      </div>
+
+      {/* New Temporal Charts Row 3 */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Weekend vs Weekday</p>
+          {data.weekend_vs_weekday && data.weekend_vs_weekday.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={data.weekend_vs_weekday}
+                    dataKey="count"
+                    nameKey="label"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                  >
+                    {data.weekend_vs_weekday.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? CHART_BLUE : CHART_TEAL} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: MUTED }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">No data</div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Fatality by Hour</p>
+          {data.severity_by_hour && data.severity_by_hour.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.severity_by_hour} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid stroke={GRID} vertical={false} />
+                  <XAxis dataKey="hour_label" tick={{ fill: MUTED, fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={20} />
+                  <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 10, color: MUTED, paddingTop: '10px' }} />
+                  <Bar dataKey="Fatal" stackId="a" fill={SEVERITY_COLORS["Fatal"]} />
+                  <Bar dataKey="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} />
+                  <Bar dataKey="Minor Injury" stackId="a" fill={SEVERITY_COLORS["Minor Injury"]} />
+                  <Bar dataKey="Damage Only" stackId="a" fill={SEVERITY_COLORS["Damage Only"]} radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">No data</div>
+          )}
+        </div>
       </div>
     </div>
   );

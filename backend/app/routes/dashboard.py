@@ -493,7 +493,7 @@ def get_heatmap(
 # simpler than the Surat string-based version)
 # ---------------------------------------------------------------------------
 
-@router.get("/temporal-analysis", response_model=TemporalAnalysisResponse)
+@router.get("/temporal-analysis")
 def get_temporal_analysis(
     district: Optional[List[str]] = Query(None),
     severity: Optional[List[str]] = Query(None),
@@ -505,7 +505,7 @@ def get_temporal_analysis(
     light_condition: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
 ):
@@ -549,7 +549,12 @@ def get_temporal_analysis(
     day_counts: dict      = defaultdict(int)
     period_counts: dict   = defaultdict(int)
 
-    for _accident, dt in accidents_with_dt:
+    month_only_counts = defaultdict(int)
+    year_only_counts = defaultdict(int)
+    weekend_counts = {"Weekday": 0, "Weekend": 0}
+    severity_by_hour = {h: {"Fatal": 0, "Grievous Injury": 0, "Minor Injury": 0, "Damage Only": 0} for h in range(HOURS_IN_DAY)}
+
+    for accident, dt in accidents_with_dt:
         hour     = dt.hour
         day_name = dt.strftime("%A")
         period   = _time_period_for_hour(hour)
@@ -559,6 +564,22 @@ def get_temporal_analysis(
         monthly_counts[(dt.year, dt.month)] += 1
         day_counts[day_name]              += 1
         period_counts[period]             += 1
+
+        month_only_counts[dt.month] += 1
+        year_only_counts[dt.year] += 1
+        
+        if day_name in ["Saturday", "Sunday"]:
+            weekend_counts["Weekend"] += 1
+        else:
+            weekend_counts["Weekday"] += 1
+            
+        sev = safe_text(accident.severity)
+        if sev in severity_by_hour[hour]:
+            severity_by_hour[hour][sev] += 1
+        elif sev == "Grievous":
+            severity_by_hour[hour]["Grievous Injury"] += 1
+        elif sev == "Minor":
+            severity_by_hour[hour]["Minor Injury"] += 1
 
     peak_hour,      peak_hour_count   = _peak_item(hourly_counts, 0)
     peak_day,       peak_day_count    = _peak_item(day_counts, UNKNOWN_LABEL)
@@ -570,37 +591,79 @@ def get_temporal_analysis(
         if peak_month_key != (0, 0)
         else UNKNOWN_LABEL
     )
+    
+    insights = []
+    if hourly_counts and max(hourly_counts.values()) > 0:
+        insights.append(f"Peak accident hour is {_format_hour_label(int(peak_hour))}.")
+    if day_counts:
+        top_day = max(day_counts, key=day_counts.get)
+        insights.append(f"{top_day} records the highest accident frequency.")
+    if period_counts:
+        top_period = max(period_counts, key=period_counts.get)
+        insights.append(f"{top_period} is the highest-risk time period.")
+    if month_only_counts:
+        top_month_num = max(month_only_counts, key=month_only_counts.get)
+        top_month_name = calendar.month_name[top_month_num]
+        insights.append(f"{top_month_name} has the highest accident count.")
+        
+    if not insights:
+        insights.append("Not enough data to generate temporal insights.")
 
-    return TemporalAnalysisResponse(
-        hour_day=[
-            HourDayCount(hour=hour, day=day_name, count=hour_day_counts[(hour, day_name)])
+    return {
+        "hour_day": [
+            {"hour": hour, "day": day_name, "count": hour_day_counts[(hour, day_name)]}
             for day_name in WEEKDAY_ORDER
             for hour in range(HOURS_IN_DAY)
         ],
-        hourly=[
-            HourlyAccidentCount(hour=h, count=hourly_counts[h])
+        "hourly": [
+            {"hour": h, "count": hourly_counts[h]}
             for h in range(HOURS_IN_DAY)
         ],
-        monthly=[
-            MonthlyAccidentCount(
-                year=yr, month=mo,
-                month_label=f"{calendar.month_abbr[mo]} {yr}",
-                count=count,
-            )
+        "monthly": [
+            {"year": yr, "month": mo, "month_label": f"{calendar.month_abbr[mo]} {yr}", "count": count}
             for (yr, mo), count in sorted(monthly_counts.items())
         ],
-        summary=PeakSummary(
-            peak_hour=_format_hour_label(int(peak_hour)),
-            peak_hour_count=peak_hour_count,
-            peak_day=peak_day,
-            peak_day_count=peak_day_count,
-            peak_month=peak_month_label,
-            peak_month_count=peak_month_count,
-            peak_time_period=peak_period,
-            peak_time_period_count=peak_period_count,
-            total_accidents=len(accidents_with_dt),
-        ),
-    )
+        "summary": {
+            "peak_hour": _format_hour_label(int(peak_hour)),
+            "peak_hour_count": peak_hour_count,
+            "peak_day": peak_day,
+            "peak_day_count": peak_day_count,
+            "peak_month": peak_month_label,
+            "peak_month_count": peak_month_count,
+            "peak_time_period": peak_period,
+            "peak_time_period_count": peak_period_count,
+            "total_accidents": len(accidents_with_dt),
+        },
+        "day_of_week_distribution": [
+            {"day": day_name, "count": day_counts.get(day_name, 0)}
+            for day_name in WEEKDAY_ORDER
+        ],
+        "time_period_distribution": [
+            {"period": period, "count": count}
+            for period, count in sorted(period_counts.items(), key=lambda item: item[1], reverse=True)
+        ],
+        "monthly_seasonality": [
+            {"month": calendar.month_name[mo], "count": count}
+            for mo, count in sorted(month_only_counts.items())
+        ],
+        "annual_trend": [
+            {"year": yr, "count": count}
+            for yr, count in sorted(year_only_counts.items())
+        ],
+        "weekend_vs_weekday": [
+            {"label": "Weekday", "count": weekend_counts["Weekday"]},
+            {"label": "Weekend", "count": weekend_counts["Weekend"]}
+        ],
+        "severity_by_hour": [
+            {
+                "hour": h,
+                "hour_label": _format_hour_label(h),
+                **severity_by_hour[h]
+            }
+            for h in range(HOURS_IN_DAY)
+        ],
+        "temporal_insights": insights
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -2066,70 +2129,111 @@ def get_district_stats(
     accidents = query.all()
     total = len(accidents)
     severity_counts = defaultdict(int)
-    monthly = defaultdict(lambda: {"accidents": 0, "fatal": 0})
-    hourly = defaultdict(int)
     road_counts = defaultdict(int)
+    collision_type_counts = defaultdict(int)
+    collision_nature_counts = defaultdict(int)
+    weather_counts = defaultdict(int)
+    light_counts = defaultdict(int)
+    visibility_counts = defaultdict(int)
+    
+    vehicle_involvement_counts = {"1 Vehicle": 0, "2 Vehicles": 0, "3 Vehicles": 0, "4+ Vehicles": 0}
+    victim_counts = {
+        "Drivers": {"Killed": 0, "Grievous Injury": 0, "Minor Injury": 0},
+        "Passengers": {"Killed": 0, "Grievous Injury": 0, "Minor Injury": 0},
+        "Pedestrians": {"Killed": 0, "Grievous Injury": 0, "Minor Injury": 0},
+    }
+
+    # For keeping peak hour backward compatibility in KPIs
+    hourly = defaultdict(int)
+    # To compute avg per month
+    monthly = defaultdict(int)
 
     for accident in accidents:
         severity_name = safe_text(accident.severity)
         severity_counts[severity_name] += 1
         road_counts[safe_text(accident.road_classification)] += 1
+        collision_type_counts[safe_text(accident.type_of_collision)] += 1
+        collision_nature_counts[safe_text(accident.collision_feature)] += 1
+        weather_counts[safe_text(accident.weather_condition)] += 1
+        light_counts[safe_text(accident.light_condition)] += 1
+        visibility_counts[safe_text(accident.visibility)] += 1
+
+        v_count = accident.number_of_vehicles or 0
+        if v_count == 1:
+            vehicle_involvement_counts["1 Vehicle"] += 1
+        elif v_count == 2:
+            vehicle_involvement_counts["2 Vehicles"] += 1
+        elif v_count == 3:
+            vehicle_involvement_counts["3 Vehicles"] += 1
+        elif v_count >= 4:
+            vehicle_involvement_counts["4+ Vehicles"] += 1
+
+        victim_counts["Drivers"]["Killed"] += accident.driver_killed or 0
+        victim_counts["Drivers"]["Grievous Injury"] += accident.driver_grievous_injury or 0
+        victim_counts["Drivers"]["Minor Injury"] += accident.driver_minor_injury or 0
+
+        victim_counts["Passengers"]["Killed"] += accident.passenger_killed or 0
+        victim_counts["Passengers"]["Grievous Injury"] += accident.passenger_grievous_injury or 0
+        victim_counts["Passengers"]["Minor Injury"] += accident.passenger_minor_injury or 0
+
+        victim_counts["Pedestrians"]["Killed"] += accident.pedestrian_killed or 0
+        victim_counts["Pedestrians"]["Grievous Injury"] += accident.pedestrian_grievous_injury or 0
+        victim_counts["Pedestrians"]["Minor Injury"] += accident.pedestrian_minor_injury or 0
 
         occurred_at = accident.accident_date_time
         if occurred_at:
             month_key = occurred_at.strftime("%Y-%m")
-            monthly[month_key]["accidents"] += 1
-            monthly[month_key]["fatal"] += int(severity_name == SEVERITY_FATAL)
+            monthly[month_key] += 1
             hourly[occurred_at.hour] += 1
 
-    monthly_trend = [
-        {
-            "month": datetime.strptime(key, "%Y-%m").strftime("%b %Y"),
-            **monthly[key],
-        }
-        for key in sorted(monthly)
-    ]
-    hourly_distribution = [
-        {"hour": hour, "accidents": hourly.get(hour, 0)}
-        for hour in range(HOURS_IN_DAY)
-    ]
     peak_hour = max(hourly, key=hourly.get) if hourly else None
-    peak_month_key = (
-        max(monthly, key=lambda key: monthly[key]["accidents"])
-        if monthly
-        else None
-    )
+
+    # Generate Statistical Insights
+    insights = []
+    if severity_counts:
+        top_severity = max(severity_counts, key=severity_counts.get)
+        if top_severity and top_severity != "Unknown":
+            insights.append(f"{top_severity} accidents account for the largest share of crashes.")
+            
+    if road_counts:
+        top_road = max(road_counts, key=road_counts.get)
+        if top_road and top_road != "Unknown":
+            insights.append(f"{top_road}s record the highest accident count.")
+            
+    if collision_type_counts:
+        top_collision = max(collision_type_counts, key=collision_type_counts.get)
+        if top_collision and top_collision != "Unknown":
+            insights.append(f"{top_collision} collisions are the dominant collision type.")
+            
+    if weather_counts:
+        top_weather = max(weather_counts, key=weather_counts.get)
+        if top_weather and top_weather != "Unknown":
+            insights.append(f"Most crashes occurred under {top_weather.lower()} weather.")
+            
+    # Calculate top victim type for fatalities
+    fatality_by_victim = {k: v["Killed"] for k, v in victim_counts.items()}
+    if any(fatality_by_victim.values()):
+        top_victim_fatal = max(fatality_by_victim, key=fatality_by_victim.get)
+        insights.append(f"{top_victim_fatal} represent the largest share of fatalities.")
+
+    if not insights:
+        insights.append("Not enough data to generate statistical insights.")
 
     return {
         "total_accidents": total,
         "total_fatalities": sum(total_fatalities(a) for a in accidents),
-        "total_injuries": sum(
-            total_grievous(a) + total_minor(a) for a in accidents
-        ),
+        "total_injuries": sum(total_grievous(a) + total_minor(a) for a in accidents),
         "avg_per_month": round(total / len(monthly), 1) if monthly else 0,
         "peak_hour": peak_hour,
-        "peak_month": (
-            datetime.strptime(peak_month_key, "%Y-%m").strftime("%b %Y")
-            if peak_month_key
-            else None
-        ),
         "yoy_change": None,
-        "severity_breakdown": [
-            {
-                "label": label,
-                "count": count,
-                "percentage": round(count * 100 / total, 1) if total else 0,
-            }
-            for label, count in sorted(
-                severity_counts.items(), key=lambda item: item[1], reverse=True
-            )
-        ],
-        "monthly_trend": monthly_trend,
-        "hourly_distribution": hourly_distribution,
-        "road_type_breakdown": [
-            {"road_type": label, "count": count}
-            for label, count in sorted(
-                road_counts.items(), key=lambda item: item[1], reverse=True
-            )[:8]
-        ],
+        "severity_breakdown": [{"label": k, "count": v, "percentage": round(v * 100 / total, 1) if total else 0} for k, v in sorted(severity_counts.items(), key=lambda item: item[1], reverse=True)],
+        "road_type_breakdown": [{"road_type": k, "count": v} for k, v in sorted(road_counts.items(), key=lambda item: item[1], reverse=True)[:8]],
+        "collision_type_breakdown": [{"label": k, "count": v} for k, v in sorted(collision_type_counts.items(), key=lambda item: item[1], reverse=True) if k != "Unknown"],
+        "collision_nature_breakdown": [{"label": k, "count": v} for k, v in sorted(collision_nature_counts.items(), key=lambda item: item[1], reverse=True) if k != "Unknown"],
+        "weather_breakdown": [{"label": k, "count": v} for k, v in sorted(weather_counts.items(), key=lambda item: item[1], reverse=True) if k != "Unknown"],
+        "light_breakdown": [{"label": k, "count": v} for k, v in sorted(light_counts.items(), key=lambda item: item[1], reverse=True) if k != "Unknown"],
+        "vehicle_involvement_breakdown": [{"label": k, "count": v} for k, v in vehicle_involvement_counts.items()],
+        "victim_composition": [{"type": k, **v} for k, v in victim_counts.items()],
+        "visibility_breakdown": [{"label": k, "count": v} for k, v in sorted(visibility_counts.items(), key=lambda item: item[1], reverse=True) if k != "Unknown"],
+        "statistical_insights": insights,
     }

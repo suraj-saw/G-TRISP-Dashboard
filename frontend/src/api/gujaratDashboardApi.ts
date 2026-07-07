@@ -324,16 +324,26 @@ export interface DistrictStats {
   total_injuries: number;
   avg_per_month: number;
   peak_hour: number | null;
-  peak_month: string | null;
   yoy_change: number | null;
   severity_breakdown: SeverityBreakdown[];
-  monthly_trend: MonthlyTrend[];
-  hourly_distribution: HourlyDistribution[];
   road_type_breakdown: RoadTypeBreakdown[];
+  collision_type_breakdown?: { label: string; count: number }[];
+  collision_nature_breakdown?: { label: string; count: number }[];
+  weather_breakdown?: { label: string; count: number }[];
+  light_breakdown?: { label: string; count: number }[];
+  vehicle_involvement_breakdown?: { label: string; count: number }[];
+  victim_composition?: {
+    type: string;
+    Killed: number;
+    "Grievous Injury": number;
+    "Minor Injury": number;
+  }[];
+  visibility_breakdown?: { label: string; count: number }[];
+  statistical_insights?: string[];
 }
- 
+
 // ─── API call ─────────────────────────────────────────────────────────────────
- 
+
 /**
  * Fetch pre-aggregated statistical data for the Statistical Analysis tab.
  * Backend endpoint: GET /api/district-stats/{district_slug}

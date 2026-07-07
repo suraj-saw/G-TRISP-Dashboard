@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -7,85 +7,87 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
   Legend,
+  LabelList,
 } from "recharts";
 import { getDistrictStats } from "../../api/gujaratDashboardApi";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface DistrictStatsFilters {
-  district: string;
-  year?: string[];
-  startDate?: string;
-  endDate?: string;
-  severity?: string[];
-  taluka?: string[];
-  policeStation?: string[];
-  roadClassification?: string[];
-  weatherCondition?: string[];
-  lightCondition?: string[];
-  collisionType?: string[];
-}
-
-interface SeverityBreakdown {
-  label: string;
-  count: number;
-  percentage: number;
-}
-
-interface MonthlyTrend {
-  month: string; // "Jan 2023"
-  accidents: number;
-  fatal: number;
-}
-
-interface HourlyDistribution {
-  hour: number; // 0–23
-  accidents: number;
-}
-
-interface RoadTypeBreakdown {
-  road_type: string;
-  count: number;
-}
-
-interface DistrictStats {
-  total_accidents: number;
-  total_fatalities: number;
-  total_injuries: number;
-  avg_per_month: number;
-  severity_breakdown: SeverityBreakdown[];
-  monthly_trend: MonthlyTrend[];
-  hourly_distribution: HourlyDistribution[];
-  road_type_breakdown: RoadTypeBreakdown[];
-  peak_hour: number | null;
-  peak_month: string | null;
-  yoy_change: number | null;
-}
+import type { DistrictStats, DistrictStatsFilters } from "../../api/gujaratDashboardApi";
+import { AlertCircle } from "lucide-react";
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 
 const SEVERITY_COLORS: Record<string, string> = {
   Fatal: "#ef4444",
+  "Grievous Injury": "#f97316",
+  "Minor Injury": "#f59e0b",
+  "Damage Only": "#94a3b8",
+  "No Injury": "#64748b",
   Grievous: "#f97316",
   Minor: "#eab308",
-  "Non-Injury": "#22c55e",
 };
 
 const CHART_BLUE = "#3b82f6";
-const CHART_RED = "#ef4444";
-const MUTED = "#6b7299";
-const GRID = "#e8ecf5";
+const CHART_TEAL = "#14b8a6";
+const CHART_INDIGO = "#6366f1";
+const CHART_PURPLE = "#a855f7";
+const MUTED = "#64748b";
+const GRID = "#cbd5e1";
+
+const INVOLVED_GRADIENT = ["#60a5fa", "#3b82f6", "#2563eb", "#1d4ed8"];
 
 const HOUR_LABELS = (h: number) => {
   if (h === 0) return "12am";
   if (h === 12) return "12pm";
   return h < 12 ? `${h}am` : `${h - 12}pm`;
+};
+
+// ─── Helper Functions ────────────────────────────────────────────────────────
+
+interface MetricDataPoint {
+  label?: string;
+  road_type?: string;
+  count: number;
+}
+
+interface ProcessedDataPoint {
+  name: string;
+  count: number;
+}
+
+const getTopCategories = (
+  data: MetricDataPoint[] | undefined,
+  limit: number,
+  key: "label" | "road_type" = "label"
+): ProcessedDataPoint[] => {
+  if (!data || data.length === 0) return [];
+
+  const sorted = [...data].sort((a, b) => b.count - a.count);
+
+  if (sorted.length <= limit) {
+    return sorted.map((item) => ({
+      name: item[key] || "Unknown",
+      count: item.count,
+    }));
+  }
+
+  const topItems = sorted.slice(0, limit).map((item) => ({
+    name: item[key] || "Unknown",
+    count: item.count,
+  }));
+
+  const othersCount = sorted.slice(limit).reduce((sum, item) => sum + item.count, 0);
+
+  if (othersCount > 0) {
+    topItems.push({
+      name: "Others",
+      count: othersCount,
+    });
+  }
+
+  return topItems;
 };
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -118,7 +120,7 @@ const ChartCard: React.FC<{
 
 const CustomTooltip: React.FC<{
   active?: boolean;
-  payload?: { name: string; value: number; color: string }[];
+  payload?: any[];
   label?: string;
 }> = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -127,54 +129,83 @@ const CustomTooltip: React.FC<{
       {label && <div className="ct-label">{label}</div>}
       {payload.map((p, i) => (
         <div key={i} className="ct-row">
-          <span className="ct-dot" style={{ background: p.color }} />
-          <span className="ct-name">{p.name}:</span>
-          <span className="ct-val">{p.value.toLocaleString()}</span>
+          <span className="ct-dot" style={{ background: p.fill || p.color }} />
+          <span className="ct-name">{p.name || p.dataKey}:</span>
+          <span className="ct-val">{Number(p.value).toLocaleString()}</span>
         </div>
       ))}
     </div>
   );
 };
 
-const LoadingState: React.FC = () => (
-  <div className="stat-loading">
-    <div className="stat-spinner" />
-    <p>Loading statistical data…</p>
-  </div>
-);
-
 const EmptyState: React.FC<{ message?: string }> = ({
-  message = "No data available for the selected filters.",
+  message = "No matching crash data isolated for the configured filters.",
 }) => (
   <div className="stat-empty">
-    <svg
-      width="40"
-      height="40"
-      viewBox="0 0 40 40"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <rect width="40" height="40" rx="8" fill="rgba(255,255,255,0.04)" />
-      <path
-        d="M12 28v-8M20 28V12M28 28v-5"
-        stroke="rgba(255,255,255,0.2)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-    </svg>
+    <AlertCircle size={24} className="text-slate-400" />
     <p>{message}</p>
   </div>
 );
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── Reusable Metric Chart Layout ────────────────────────────────────────────
+
+const HorizontalCategoryChartCard: React.FC<{
+  title: string;
+  data: ProcessedDataPoint[];
+  fillColor: string;
+  className?: string;
+  yAxisWidth?: number;
+}> = ({ title, data, fillColor, className = "", yAxisWidth = 110 }) => {
+  if (!data || data.length === 0) {
+    return (
+      <ChartCard title={title} className={className}>
+        <EmptyState />
+      </ChartCard>
+    );
+  }
+
+  return (
+    <ChartCard title={title} className={className}>
+      <ResponsiveContainer width="100%" height={240}>
+        <BarChart
+          data={data}
+          layout="vertical"
+          margin={{ top: 10, right: 40, left: 5, bottom: 5 }}
+          barCategoryGap="20%"
+        >
+          <CartesianGrid stroke={GRID} horizontal={false} strokeDasharray="3 3" opacity={0.4} />
+          <XAxis type="number" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis
+            dataKey="name"
+            type="category"
+            tick={{ fill: MUTED, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            width={yAxisWidth}
+            tickFormatter={(val) => (typeof val === "string" && val.length > 20 ? `${val.substring(0, 18)}...` : val)}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Bar dataKey="count" name="Accidents" fill={fillColor} radius={[0, 4, 4, 0]} barSize={14}>
+            <LabelList
+              dataKey="count"
+              position="right"
+              style={{ fill: "#475569", fontSize: 10, fontWeight: 600 }}
+              formatter={(val: any) => Number(val).toLocaleString()}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartCard>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 interface DistrictStatisticalAnalysisProps {
   filters: DistrictStatsFilters;
 }
 
-const DistrictStatisticalAnalysis: React.FC<
-  DistrictStatisticalAnalysisProps
-> = ({ filters }) => {
+const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = ({ filters }) => {
   const [stats, setStats] = useState<DistrictStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -209,376 +240,367 @@ const DistrictStatisticalAnalysis: React.FC<
     fetchStats();
   }, [fetchStats]);
 
-  if (loading) return <LoadingState />;
-  if (error) return <EmptyState message={error} />;
-  if (!stats) return <EmptyState />;
+  const processedRoadType = useMemo(() => getTopCategories(stats?.road_type_breakdown, 8, "road_type"), [stats?.road_type_breakdown]);
+  const processedCollisionType = useMemo(() => getTopCategories(stats?.collision_type_breakdown, 8, "label"), [stats?.collision_type_breakdown]);
+  const processedCollisionNature = useMemo(() => getTopCategories(stats?.collision_nature_breakdown, 10, "label"), [stats?.collision_nature_breakdown]);
+  const processedWeather = useMemo(() => getTopCategories(stats?.weather_breakdown, 8, "label"), [stats?.weather_breakdown]);
+  const processedLight = useMemo(() => getTopCategories(stats?.light_breakdown, 8, "label"), [stats?.light_breakdown]);
 
+  const totalAccidents = stats?.total_accidents ?? 0;
   const yoyLabel =
-    stats.yoy_change !== null
+    stats && stats.yoy_change !== null
       ? `${stats.yoy_change >= 0 ? "+" : ""}${stats.yoy_change.toFixed(1)}% vs last year`
       : undefined;
 
   return (
     <div className="district-statistical-analysis">
-      {/* ── KPI Row ── */}
-      <div className="kpi-row">
-        <KpiCard
-          label="Total Accidents"
-          value={stats.total_accidents.toLocaleString()}
-          sub={yoyLabel}
-          accent="#3b82f6"
-        />
-        <KpiCard
-          label="Fatalities"
-          value={stats.total_fatalities.toLocaleString()}
-          accent="#ef4444"
-        />
-        <KpiCard
-          label="Injuries"
-          value={stats.total_injuries.toLocaleString()}
-          accent="#f97316"
-        />
-        <KpiCard
-          label="Avg / Month"
-          value={stats.avg_per_month.toFixed(1)}
-          accent="#a78bfa"
-        />
-        <KpiCard
-          label="Peak Hour"
-          value={stats.peak_hour === null ? "—" : HOUR_LABELS(stats.peak_hour)}
-          sub="highest frequency"
-          accent="#22c55e"
-        />
-      </div>
-
-      {/* ── Row 1: Monthly Trend + Severity Breakdown ── */}
-      <div className="charts-row charts-row--two">
-        <ChartCard title="Monthly Accident Trend" className="chart--grow">
-          {stats.monthly_trend.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart
-                data={stats.monthly_trend}
-                margin={{ top: 4, right: 16, left: -10, bottom: 4 }}
-              >
-                <CartesianGrid stroke={GRID} vertical={false} />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fill: MUTED, fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  interval="preserveStartEnd"
-                />
-                <YAxis
-                  tick={{ fill: MUTED, fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend
-                  wrapperStyle={{ fontSize: 12, color: MUTED }}
-                  iconType="circle"
-                  iconSize={8}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="accidents"
-                  name="Accidents"
-                  stroke={CHART_BLUE}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="fatal"
-                  name="Fatal"
-                  stroke={CHART_RED}
-                  strokeWidth={1.5}
-                  dot={false}
-                  strokeDasharray="4 2"
-                  activeDot={{ r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-        <ChartCard title="Severity Breakdown">
-          {stats.severity_breakdown.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={stats.severity_breakdown}
-                  dataKey="count"
-                  nameKey="label"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={2}
-                >
-                  {stats.severity_breakdown.map((entry, i) => (
-                    <Cell
-                      key={i}
-                      fill={SEVERITY_COLORS[entry.label] ?? "#6b7280"}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value) => [
-                    typeof value === "number"
-                      ? `${value.toLocaleString()} accidents`
-                      : (value ?? ""),
-                  ]}
-                  contentStyle={{
-                    background: "#ffffff",
-                    border: "1px solid #e4e8f4",
-                    borderRadius: 6,
-                    color: "#1a1d2e",
-                    fontSize: 12,
-                    boxShadow: "0 8px 24px rgba(30,58,138,0.12)",
-                  }}
-                />
-                <Legend
-                  wrapperStyle={{ fontSize: 12, color: MUTED }}
-                  iconType="circle"
-                  iconSize={8}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-      </div>
-
-      {/* ── Row 2: Hourly Distribution ── */}
-      <div className="charts-row charts-row--one">
-        <ChartCard title="Accidents by Hour of Day" className="chart--full">
-          {stats.hourly_distribution.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart
-                data={stats.hourly_distribution.map((d) => ({
-                  ...d,
-                  label: HOUR_LABELS(d.hour),
-                }))}
-                margin={{ top: 4, right: 16, left: -10, bottom: 4 }}
-                barCategoryGap="20%"
-              >
-                <CartesianGrid stroke={GRID} vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fill: MUTED, fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                  interval={1}
-                />
-                <YAxis
-                  tick={{ fill: MUTED, fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar
-                  dataKey="accidents"
-                  name="Accidents"
-                  fill={CHART_BLUE}
-                  radius={[3, 3, 0, 0]}
-                >
-                  {stats.hourly_distribution.map((entry, i) => (
-                    <Cell
-                      key={i}
-                      fill={
-                        entry.hour === stats.peak_hour
-                          ? "#60a5fa"
-                          : "rgba(59,130,246,0.55)"
-                      }
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-      </div>
-
-      {/* ── Row 3: Road Type Breakdown ── */}
-      {stats.road_type_breakdown.length > 0 && (
-        <div className="charts-row charts-row--one">
-          <ChartCard title="Accidents by Road Type" className="chart--full">
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart
-                data={stats.road_type_breakdown}
-                layout="vertical"
-                margin={{ top: 4, right: 16, left: 80, bottom: 4 }}
-                barCategoryGap="25%"
-              >
-                <CartesianGrid stroke={GRID} horizontal={false} />
-                <XAxis
-                  type="number"
-                  tick={{ fill: MUTED, fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  dataKey="road_type"
-                  type="category"
-                  tick={{ fill: MUTED, fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={76}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar
-                  dataKey="count"
-                  name="Accidents"
-                  fill="rgba(167,139,250,0.7)"
-                  radius={[0, 3, 3, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
+      {loading ? (
+        <div className="stat-loading">
+          <div className="stat-spinner" />
         </div>
+      ) : error ? (
+        <EmptyState message={error} />
+      ) : !stats ? (
+        <EmptyState />
+      ) : (
+        <>
+          {/* ── Key Insights Panel ── */}
+          {/* {stats.statistical_insights && stats.statistical_insights.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h3 className="text-xs font-bold text-slate-800 mb-2 uppercase tracking-wider">Key Statistical Insights</h3>
+              <ul className="list-disc pl-5 space-y-1 text-sm text-slate-600">
+                {stats.statistical_insights.map((insight, idx) => (
+                  <li key={idx}>{insight}</li>
+                ))}
+              </ul>
+            </div>
+          )} */}
+
+          {/* ── KPI Row ── */}
+          <div className="kpi-row">
+            <KpiCard label="Total Accidents" value={totalAccidents.toLocaleString()} sub={yoyLabel} accent="#3b82f6" />
+            <KpiCard label="Fatalities" value={stats.total_fatalities.toLocaleString()} accent="#ef4444" />
+            <KpiCard label="Injuries" value={stats.total_injuries.toLocaleString()} accent="#f97316" />
+            <KpiCard label="Avg / Month" value={stats.avg_per_month.toFixed(1)} accent="#a855f7" />
+            <KpiCard label="Peak Hour" value={stats.peak_hour === null ? "—" : HOUR_LABELS(stats.peak_hour)} sub="highest frequency" accent="#10b981" />
+          </div>
+
+          {/* ── Dashboard Matrix ── */}
+
+          {/* Row 1: Severity Breakdown + Road Classification */}
+          <div className="charts-row charts-row--two">
+            <ChartCard title="Severity Distribution">
+              {!stats.severity_breakdown || stats.severity_breakdown.length === 0 ? (
+                <EmptyState />
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                    <Pie
+                      data={stats.severity_breakdown}
+                      dataKey="count"
+                      nameKey="label"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={3}
+                    >
+                      {stats.severity_breakdown.map((entry, i) => (
+                        <Cell key={i} fill={SEVERITY_COLORS[entry.label] ?? "#64748b"} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value) => [typeof value === "number" ? `${value.toLocaleString()} accidents` : value]}
+                      contentStyle={{
+                        background: "#ffffff",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 8,
+                        color: "#1e293b",
+                        fontSize: 12,
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                      }}
+                    />
+                    <Legend 
+                      iconType="circle" 
+                      iconSize={8} 
+                      align="center" 
+                      verticalAlign="bottom"
+                      content={(props) => {
+                        const { payload } = props;
+                        return (
+                          <div className="custom-legend-grid">
+                            {payload?.map((entry: any, index: number) => {
+                              const val = entry.payload?.count ?? 0;
+                              const pct = totalAccidents > 0 ? ((val / totalAccidents) * 100).toFixed(1) : "0";
+                              const formattedVal = val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val;
+                              return (
+                                <div key={index} className="legend-item">
+                                  <span className="legend-dot" style={{ backgroundColor: entry.color }} />
+                                  <span className="legend-label">
+                                    {entry.value}: <span className="legend-value">{formattedVal} ({pct}%)</span>
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
+
+            <HorizontalCategoryChartCard title="Road Classification" data={processedRoadType} fillColor="rgba(168, 85, 247, 0.75)" yAxisWidth={100} />
+          </div>
+
+          {/* Row 2: Collision Type + Vehicle Involved */}
+          <div className="charts-row charts-row--two">
+            <HorizontalCategoryChartCard title="Collision Type Distribution" data={processedCollisionType} fillColor={CHART_TEAL} yAxisWidth={110} />
+
+            <ChartCard title="Vehicles Involved">
+              {!stats.vehicle_involvement_breakdown || stats.vehicle_involvement_breakdown.length === 0 ? (
+                <EmptyState />
+              ) : (
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={stats.vehicle_involvement_breakdown} margin={{ top: 20, right: 15, left: -15, bottom: 5 }} barCategoryGap="30%">
+                    <CartesianGrid stroke={GRID} vertical={false} strokeDasharray="3 3" opacity={0.4} />
+                    <XAxis dataKey="label" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="count" name="Accidents" radius={[4, 4, 0, 0]} barSize={36}>
+                      {stats.vehicle_involvement_breakdown.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={INVOLVED_GRADIENT[index % INVOLVED_GRADIENT.length]} />
+                      ))}
+                      <LabelList
+                        dataKey="count"
+                        position="top"
+                        style={{ fill: "#475569", fontSize: 10, fontWeight: 600 }}
+                        formatter={(val: any) => Number(val).toLocaleString()}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
+          </div>
+
+          {/* Row 3: Victim Composition */}
+          <div className="charts-row charts-row--one">
+            <ChartCard title="Victim Composition (Drivers, Passengers, Pedestrians)" className="chart--full">
+              {!stats.victim_composition || stats.victim_composition.length === 0 ? (
+                <EmptyState />
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={stats.victim_composition} margin={{ top: 20, right: 20, left: -10, bottom: 5 }} barGap={8}>
+                    <CartesianGrid stroke={GRID} vertical={false} strokeDasharray="3 3" opacity={0.4} />
+                    <XAxis dataKey="type" tick={{ fill: MUTED, fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 12, color: MUTED, paddingTop: "12px" }} iconType="circle" iconSize={10} />
+                    <Bar dataKey="Killed" name="Fatal (Killed)" stackId="a" fill={SEVERITY_COLORS["Fatal"]} barSize={45} />
+                    <Bar dataKey="Grievous Injury" name="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} barSize={45} />
+                    <Bar dataKey="Minor Injury" name="Minor Injury" stackId="a" fill={SEVERITY_COLORS["Minor Injury"]} radius={[4, 4, 0, 0]} barSize={45} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
+          </div>
+
+          {/* Row 4: Weather Condition + Light Condition */}
+          <div className="charts-row charts-row--two">
+            <HorizontalCategoryChartCard title="Weather Condition Breakdown" data={processedWeather} fillColor={CHART_BLUE} yAxisWidth={110} />
+            <HorizontalCategoryChartCard title="Light Condition Analysis" data={processedLight} fillColor={CHART_PURPLE} yAxisWidth={110} />
+          </div>
+
+          {/* Row 5: Collision Nature */}
+          <div className="charts-row charts-row--one">
+            <HorizontalCategoryChartCard title="Collision Nature Analysis (Top 10)" data={processedCollisionNature} fillColor={CHART_INDIGO} yAxisWidth={150} />
+          </div>
+        </>
       )}
 
       <style>{`
         .district-statistical-analysis {
           display: flex;
           flex-direction: column;
-          gap: 16px;
-          padding: 16px;
-          background: #f7f9fd;
+          gap: 20px;
+          padding: 24px;
+          background: #f8fafc;
           overflow-y: auto;
           height: 100%;
           box-sizing: border-box;
         }
 
-        /* KPI Row */
+        /* Executive KPI Layout */
         .kpi-row {
           display: grid;
           grid-template-columns: repeat(5, 1fr);
-          gap: 10px;
+          gap: 16px;
         }
 
         @media (max-width: 1200px) {
           .kpi-row { grid-template-columns: repeat(3, 1fr); }
         }
+        @media (max-width: 640px) {
+          .kpi-row { grid-template-columns: 1fr; }
+        }
 
         .kpi-card {
           background: #ffffff;
-          border: 1px solid #e4e8f4;
+          border: 1px solid #e2e8f0;
           border-radius: 12px;
-          padding: 14px 16px;
+          padding: 16px 20px;
           display: flex;
           flex-direction: column;
           gap: 4px;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
         }
 
         .kpi-label {
           font-size: 11px;
-          font-weight: 500;
-          color: #7b84a5;
+          font-weight: 700;
+          color: #64748b;
           text-transform: uppercase;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.08em;
         }
 
         .kpi-value {
-          font-size: 24px;
-          font-weight: 700;
+          font-size: 28px;
+          font-weight: 800;
           line-height: 1.15;
           font-variant-numeric: tabular-nums;
         }
 
         .kpi-sub {
           font-size: 11px;
-          color: #8b93ad;
+          color: #64748b;
+          font-weight: 500;
         }
 
-        /* Chart layout rows */
+        /* Clean Matrix Layout Row Formats */
         .charts-row {
           display: grid;
-          gap: 10px;
+          gap: 16px;
         }
 
         .charts-row--two {
-          grid-template-columns: 1fr 320px;
-        }
-
-        @media (max-width: 1100px) {
-          .charts-row--two { grid-template-columns: 1fr; }
+          grid-template-columns: 1fr 1fr;
         }
 
         .charts-row--one {
           grid-template-columns: 1fr;
         }
 
+        @media (max-width: 1024px) {
+          .charts-row--two { grid-template-columns: 1fr; }
+        }
+
         .chart--grow { flex: 1; }
         .chart--full { width: 100%; }
 
-        /* Chart card */
+        /* Unified Card Containers */
         .chart-card {
           background: #ffffff;
-          border: 1px solid #e4e8f4;
+          border: 1px solid #e2e8f0;
           border-radius: 12px;
           overflow: hidden;
           display: flex;
           flex-direction: column;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
         }
 
         .chart-card-header {
           font-size: 12px;
-          font-weight: 600;
+          font-weight: 700;
           color: #1e3a8a;
           text-transform: uppercase;
-          letter-spacing: 0.07em;
-          padding: 12px 16px 8px;
-          border-bottom: 1px solid #edf0f7;
+          letter-spacing: 0.06em;
+          padding: 14px 20px;
+          border-bottom: 1px solid #f1f5f9;
+          background-color: #f8fafc;
         }
 
         .chart-card-body {
-          padding: 12px 8px 8px;
+          padding: 16px 12px;
           flex: 1;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
         }
 
-        /* Custom tooltip */
+        /* Polished Custom Tooltip Component */
         .custom-tooltip {
           background: #ffffff;
-          border: 1px solid #e4e8f4;
-          border-radius: 6px;
-          padding: 8px 12px;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          padding: 10px 14px;
           font-size: 12px;
-          color: #1a1d2e;
-          box-shadow: 0 8px 24px rgba(30, 58, 138, 0.12);
+          color: #1e293b;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
         }
 
         .ct-label {
-          color: #6b7299;
-          margin-bottom: 5px;
+          color: #64748b;
+          font-weight: 700;
+          margin-bottom: 6px;
           font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
         }
 
         .ct-row {
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 8px;
           line-height: 1.8;
         }
 
         .ct-dot {
-          width: 7px;
-          height: 7px;
+          width: 8px;
+          height: 8px;
           border-radius: 50%;
           flex-shrink: 0;
         }
 
-        .ct-name { color: #6b7299; }
-        .ct-val { font-weight: 600; margin-left: 2px; }
+        .ct-name { color: #475569; font-weight: 500; }
+        .ct-val { font-weight: 700; margin-left: auto; color: #0f172a; padding-left: 12px; }
 
-        /* Loading / Empty */
+        /* Multi-column High-Fidelity Pie Legend Layout */
+        .custom-legend-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 8px 12px;
+          padding-top: 12px;
+          margin: 0 auto;
+          max-width: 95%;
+        }
+
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .legend-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+
+        .legend-label {
+          font-size: 11px;
+          color: #475569;
+          white-space: nowrap;
+        }
+
+        .legend-value {
+          font-weight: 700;
+          color: #0f172a;
+        }
+
+        /* Loading / Unpopulated Screen States */
         .stat-loading,
         .stat-empty {
           display: flex;
@@ -587,18 +609,19 @@ const DistrictStatisticalAnalysis: React.FC<
           justify-content: center;
           gap: 12px;
           height: 100%;
-          min-height: 200px;
-          color: #6b7299;
+          min-height: 350px;
+          color: #64748b;
           font-size: 13px;
+          font-weight: 500;
         }
 
         .stat-spinner {
-          width: 28px;
-          height: 28px;
-          border: 2.5px solid #dfe5f2;
-          border-top-color: #1e3a8a;
+          width: 32px;
+          height: 32px;
+          border: 3px solid #e2e8f0;
+          border-top-color: #2563eb;
           border-radius: 50%;
-          animation: spin 0.8s linear infinite;
+          animation: spin 0.75s cubic-bezier(0.4, 0, 0.2, 1) infinite;
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }

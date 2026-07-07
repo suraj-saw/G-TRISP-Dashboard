@@ -163,4 +163,18 @@ export interface TemporalAnalysisData {
   hourly: HourlyAccidentCount[];
   monthly: MonthlyAccidentCount[];
   summary: PeakSummary;
+  day_of_week_distribution?: { day: string; count: number }[];
+  time_period_distribution?: { period: string; count: number }[];
+  monthly_seasonality?: { month: string; count: number }[];
+  annual_trend?: { year: number; count: number }[];
+  weekend_vs_weekday?: { label: string; count: number }[];
+  severity_by_hour?: {
+    hour: number;
+    hour_label: string;
+    Fatal: number;
+    "Grievous Injury": number;
+    "Minor Injury": number;
+    "Damage Only": number;
+  }[];
+  temporal_insights?: string[];
 }
