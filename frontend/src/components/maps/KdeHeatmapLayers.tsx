@@ -111,8 +111,26 @@ export default function KdeHeatmapLayers({ filters, fetchFn }: Props) {
           id="kde-heatmap-raster"
           type="raster"
           paint={{
-            "raster-opacity": 0.8,
-            "raster-fade-duration": 0,
+            "raster-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              8, 0.55,
+              10, 0.70,
+              12, 0.82,
+              15, 0.92,
+            ],
+
+            "raster-brightness-min": 0.04,
+            "raster-brightness-max": 1,
+
+            "raster-contrast": 0.35,
+
+            "raster-saturation": 0.35,
+
+            "raster-fade-duration": 250,
+
+            "raster-resampling": "linear",
           }}
         />
       </Source>

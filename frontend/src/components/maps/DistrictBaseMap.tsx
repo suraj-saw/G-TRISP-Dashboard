@@ -93,7 +93,7 @@ function maxZoomForBbox(bbox: [number, number, number, number]): number {
 const MASK_COLOR_SATELLITE = "#000000";
 const MASK_OPACITY_SATELLITE = 0.65;
 const MASK_COLOR_DEFAULT = "#F1F4FB";
-const MASK_OPACITY_DEFAULT = 0.8;
+const MASK_OPACITY_DEFAULT = 0.65;
 
 export interface DistrictBaseMapHandle {
   resize: () => void;
