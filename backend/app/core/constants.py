@@ -187,4 +187,4 @@ PEDESTRIAN_BLACKSPOT_MIN_CRASHES: int = 3
 # KDE density heatmap (quartic kernel — matches QGIS Heatmap tool)
 # ---------------------------------------------------------------------------
 KDE_RADIUS_METERS: float = 500.0
-KDE_PIXEL_METERS: float = 50.0
+KDE_PIXEL_METERS: float = 25.0

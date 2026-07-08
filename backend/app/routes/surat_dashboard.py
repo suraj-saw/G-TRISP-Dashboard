@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.surat_accident import SuratAccident
 import base64
-from app.utils.kde_utils import compute_kde_heatmap
+from app.utils.kde_utils import compute_kde_heatmap, compute_weighted_kde_heatmap
 from app.core.constants import KDE_RADIUS_METERS, KDE_PIXEL_METERS
 
 from app.schemas.dashboard_schema import (
@@ -90,6 +90,16 @@ from app.core.constants import (
     NIGHT_MORNING_CUTOFF,
     HOURS_IN_DAY,
 )
+
+SEVERITY_WEIGHTS_MAP = {
+    "fatal": 10.0,
+    "grievous injury": 5.0,
+    "minor injury hospitalized": 3.0,
+    "minor injury not hospitalized": 2.0,
+    "non-injury": 1.0,
+    "non injury": 1.0,
+}
+DEFAULT_WEIGHT = 0.0
 
 router = APIRouter(
     prefix=SURAT_DASH_PREFIX,
@@ -1104,6 +1114,7 @@ def get_kde_heatmap(
     pixel_m: float = Query(KDE_PIXEL_METERS, ge=10, le=200),
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
+    is_pedestrian: bool = Query(False),
 ):
     """
     Continuous accident-density surface using a quartic kernel — identical
@@ -1124,11 +1135,103 @@ def get_kde_heatmap(
         else:
             query = query.filter(SuratAccident.severity == severity)
 
+    if is_pedestrian:
+        query = query.filter(
+            (
+                func.coalesce(SuratAccident.pedestrian_killed, 0) +
+                func.coalesce(SuratAccident.pedestrian_grievous_injury, 0) +
+                func.coalesce(SuratAccident.pedestrian_minor_injury, 0)
+            ) > 0
+        )
+
     accidents = query.all()
     lats = [a.latitude for a in accidents if a.latitude is not None and a.longitude is not None]
     lons = [a.longitude for a in accidents if a.latitude is not None and a.longitude is not None]
 
     result = compute_kde_heatmap(lats, lons, radius_m=radius_m, pixel_m=pixel_m)
+
+    if result is None:
+        return {
+            "total_crashes": 0,
+            "radius_m": radius_m,
+            "pixel_m": pixel_m,
+            "image": None,
+            "coordinates": None,
+        }
+
+    image_data_url = (
+        "data:image/png;base64," + base64.b64encode(result["png_bytes"]).decode("ascii")
+    )
+
+    return {
+        "total_crashes": len(lats),
+        "radius_m": radius_m,
+        "pixel_m": pixel_m,
+        "image": image_data_url,
+        "coordinates": result["coordinates"],
+        "width": result["width"],
+        "height": result["height"],
+    }
+
+
+@router.get("/weighted-kde-heatmap")
+def get_weighted_kde_heatmap(
+    police_station: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    radius_m: float = Query(KDE_RADIUS_METERS, ge=100, le=2000),
+    pixel_m: float = Query(KDE_PIXEL_METERS, ge=10, le=200),
+    taluka: Optional[List[str]] = Query(None),
+    db: Session = Depends(get_db),
+    is_pedestrian: bool = Query(False),
+):
+    query = apply_surat_filters(
+        db.query(SuratAccident),
+        police_station, year, road_classification,
+        weather_condition, light_condition, collision_type,
+        date_from, date_to,
+        taluka=taluka, db=db,
+    )
+    if severity:
+        if isinstance(severity, list):
+            query = query.filter(SuratAccident.severity.in_(severity))
+        else:
+            query = query.filter(SuratAccident.severity == severity)
+
+    if is_pedestrian:
+        query = query.filter(
+            (
+                func.coalesce(SuratAccident.pedestrian_killed, 0) +
+                func.coalesce(SuratAccident.pedestrian_grievous_injury, 0) +
+                func.coalesce(SuratAccident.pedestrian_minor_injury, 0)
+            ) > 0
+        )
+
+    points = [
+        accident for accident in query.all()
+        if accident.latitude is not None and accident.longitude is not None
+    ]
+    lats = [accident.latitude for accident in points]
+    lons = [accident.longitude for accident in points]
+    weights = []
+    for accident in points:
+        severity_str = (accident.severity or "").lower()
+        weight = DEFAULT_WEIGHT
+        for keyword, severity_weight in SEVERITY_WEIGHTS_MAP.items():
+            if keyword in severity_str:
+                weight = severity_weight
+                break
+        weights.append(weight)
+
+    result = compute_weighted_kde_heatmap(
+        lats, lons, weights, radius_m=radius_m, pixel_m=pixel_m
+    )
 
     if result is None:
         return {
@@ -1268,5 +1371,3 @@ def export_blackspots(
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )
-
-

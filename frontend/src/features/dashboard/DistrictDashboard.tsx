@@ -12,6 +12,8 @@ import {
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
+import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
+import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
 import { DensityMapOverlays } from "../../components/maps/MapOverlays";
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
@@ -42,6 +44,8 @@ import {
   fetchGujaratPedestrianBlackspots,
   fetchGujaratDbscanBlackspots,
   fetchGujaratTemporalAnalysis,
+  fetchGujaratKdeHeatmap,
+  fetchGujaratWeightedKdeHeatmap,
 } from "../../api/gujaratDashboardApi";
 import type {
   DashboardFilters,
@@ -580,6 +584,8 @@ export default function DistrictDashboard() {
   const displayHeatmapData = isPedestrianVariant
     ? data.heatmap.filter(isPedestrianAccident)
     : data.heatmap;
+  const isKdeHeatmap = filters.visualization_type === "kde_heatmap";
+  const isWeightedKdeHeatmap = filters.visualization_type === "weighted_kde_heatmap";
   const visualizationLayerType =
     isLocationMarkers && isPedestrianVariant
       ? "pedestrian_accidents"
@@ -906,6 +912,18 @@ export default function DistrictDashboard() {
                       fetchFn={(f) =>
                         fetchGujaratDbscanBlackspots(f, districtName)
                       }
+                    />
+                  ) : isKdeHeatmap ? (
+                    <KdeHeatmapLayers
+                      key={`kde-heatmap-${filters.visualization_variant || "accident"}`}
+                      filters={filters}
+                      fetchFn={(f) => fetchGujaratKdeHeatmap(f, districtName)}
+                    />
+                  ) : isWeightedKdeHeatmap ? (
+                    <WeightedKdeHeatmapLayers
+                      key="weighted-kde-heatmap"
+                      filters={filters}
+                      fetchFn={(f) => fetchGujaratWeightedKdeHeatmap(f, districtName)}
                     />
                   ) : (
                     <VisualizationLayers

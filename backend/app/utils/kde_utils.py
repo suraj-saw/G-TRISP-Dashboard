@@ -53,7 +53,7 @@ def compute_kde_heatmap(
     lats: list[float],
     lons: list[float],
     radius_m: float = 500.0,
-    pixel_m: float = 50.0,
+    pixel_m: float = 25.0,
     max_pixels: int = 900_000,
 ) -> Optional[dict]:
     """
@@ -84,12 +84,6 @@ def compute_kde_heatmap(
 
     ncols = max(4, int(math.ceil((x1 - x0) / pixel_m)))
     nrows = max(4, int(math.ceil((y1 - y0) / pixel_m)))
-
-    # Keep the raster a sane size for the browser regardless of dataset extent
-    while ncols * nrows > max_pixels:
-        pixel_m *= 1.3
-        ncols = max(4, int(math.ceil((x1 - x0) / pixel_m)))
-        nrows = max(4, int(math.ceil((y1 - y0) / pixel_m)))
 
     gx = x0 + (np.arange(ncols) + 0.5) * pixel_m
     gy = y1 - (np.arange(nrows) + 0.5) * pixel_m  # row 0 = north (top), matches PNG row order
@@ -127,6 +121,108 @@ def compute_kde_heatmap(
     zmax = float(Z.max())
     if zmax > 0:
         Z = (Z / zmax) * 100.0
+
+    Z = Z.astype(np.float32)
+
+    rgba = _colorize(Z)
+    png_bytes = _encode_png(rgba)
+
+    lat_tl, lon_tl = _unproject_xy(x0, y1, ref_lat_rad)
+    lat_tr, lon_tr = _unproject_xy(x1, y1, ref_lat_rad)
+    lat_br, lon_br = _unproject_xy(x1, y0, ref_lat_rad)
+    lat_bl, lon_bl = _unproject_xy(x0, y0, ref_lat_rad)
+
+    return {
+        "png_bytes": png_bytes,
+        "coordinates": [
+            [lon_tl, lat_tl],   # top-left
+            [lon_tr, lat_tr],   # top-right
+            [lon_br, lat_br],   # bottom-right
+            [lon_bl, lat_bl],   # bottom-left
+        ],
+        "width": ncols,
+        "height": nrows,
+        "max_density": zmax,
+    }
+
+
+def compute_weighted_kde_heatmap(
+    lats: list[float],
+    lons: list[float],
+    weights: list[float],
+    radius_m: float = 500.0,
+    pixel_m: float = 25.0,
+    max_pixels: int = 900_000,
+) -> Optional[dict]:
+    """
+    Build a quartic-kernel KDE raster from accident coordinates.
+
+    radius_m : kernel bandwidth — every crash spreads its influence over
+               this radius (QGIS Heatmap "Radius" parameter; notebook
+               default 500 m).
+    pixel_m  : output raster cell size in metres.
+
+    Returns a dict with PNG bytes, the four geographic corner coordinates
+    (top-left, top-right, bottom-right, bottom-left — the order MapLibre's
+    ImageSource expects), and basic metadata. Returns None if no points.
+    """
+    n = len(lats)
+    if n == 0:
+        return None
+
+    w_arr = np.asarray(weights, dtype=np.float64)
+    w_arr = np.where(np.isfinite(w_arr) & (w_arr > 0), w_arr, 0.0)
+
+    ref_lat_rad = math.radians(sum(lats) / n)
+    xs = np.empty(n)
+    ys = np.empty(n)
+    for i in range(n):
+        xs[i], ys[i] = _project_xy(lats[i], lons[i], ref_lat_rad)
+
+    pad = radius_m
+    x0, x1 = float(xs.min() - pad), float(xs.max() + pad)
+    y0, y1 = float(ys.min() - pad), float(ys.max() + pad)
+
+    ncols = max(4, int(math.ceil((x1 - x0) / pixel_m)))
+    nrows = max(4, int(math.ceil((y1 - y0) / pixel_m)))
+
+    gx = x0 + (np.arange(ncols) + 0.5) * pixel_m
+    gy = y1 - (np.arange(nrows) + 0.5) * pixel_m  # row 0 = north (top), matches PNG row order
+
+    Z = np.zeros((nrows, ncols), dtype=np.float64)
+    r2 = radius_m ** 2
+    r_cells = int(math.ceil(radius_m / pixel_m))
+
+    # Windowed accumulation per point — same memory-safe technique as the
+    # notebook (touches only the bounding box of cells within radius_m,
+    # so cost is O(n * window) rather than O(n * grid)).
+    for i in range(n):
+        px, py = xs[i], ys[i]
+        col_f = (px - x0) / pixel_m - 0.5
+        row_f = (y1 - py) / pixel_m - 0.5
+
+        c0 = max(0, int(math.floor(col_f - r_cells)))
+        c1 = min(ncols, int(math.ceil(col_f + r_cells)) + 1)
+        r0 = max(0, int(math.floor(row_f - r_cells)))
+        r1 = min(nrows, int(math.ceil(row_f + r_cells)) + 1)
+        if c0 >= c1 or r0 >= r1:
+            continue
+
+        sub_gx = gx[c0:c1]
+        sub_gy = gy[r0:r1]
+        SGX, SGY = np.meshgrid(sub_gx, sub_gy)
+
+        d2 = (SGX - px) ** 2 + (SGY - py) ** 2
+        mask = d2 <= r2
+        u2 = np.where(mask, d2 / r2, 0.0)
+        # Quartic (biweight) kernel — identical to QGIS's built-in Heatmap tool
+        kernel = np.where(mask, (3.0 / math.pi) * (1.0 - u2) ** 2, 0.0)
+        Z[r0:r1, c0:c1] += kernel * w_arr[i]
+
+    zmax = float(Z.max())
+    if zmax > 0:
+        Z = (Z / zmax) * 100.0
+    Z = Z.astype(np.float32)
 
     rgba = _colorize(Z)
     png_bytes = _encode_png(rgba)

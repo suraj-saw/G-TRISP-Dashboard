@@ -5,6 +5,8 @@ import { DEFAULT_BASE_MAP, GEO_FILTER_LABEL } from "../../config/constants";
 export type VisualizationType =
   | "location_markers"
   | "density_heatmap"
+  | "kde_heatmap"
+  | "weighted_kde_heatmap"
   | "blackspot"
   | "dbscan_blackspot"
   | "temporal_analysis";
@@ -35,6 +37,8 @@ export interface FilterConfigItem {
 export const VISUALIZATION_OPTIONS = [
   { value: "location_markers", label: "Markers" },
   { value: "density_heatmap", label: "Density Heatmap" },
+  { value: "kde_heatmap", label: "Kernel Density Heatmap (KDE)" },
+  { value: "weighted_kde_heatmap", label: "Severity-Weighted KDE Heatmap" },
   { value: "blackspot", label: "Blackspot Detection" },
   { value: "dbscan_blackspot", label: "DBSCAN Blackspot Detection" },
   { value: "temporal_analysis", label: "Temporal Analysis" },
@@ -48,6 +52,8 @@ export const VISUALIZATION_VARIANT_OPTIONS = [
 export const VISUALIZATION_VARIANT_LABELS: Record<string, string> = {
   location_markers: "Marker Type",
   density_heatmap: "Heatmap Type",
+  kde_heatmap: "Heatmap Type",
+  weighted_kde_heatmap: "Heatmap Type",
   blackspot: "Blackspot Type",
 };
 

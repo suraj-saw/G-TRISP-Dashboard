@@ -18,3 +18,18 @@
   display: none;              /* Chrome / Safari */
 }
 
+/* --- Maplibre Popup Close Button Overrides --- */
+
+.maplibregl-popup-close-button {
+  font-size: 18px !important; /* Increases the 'x' size */
+  padding: 6px 10px !important; /* Increases the clickable area */
+  color: #64748b !important; /* Matches Tailwind's slate-500 */
+  outline: none !important;
+  border-radius: 0 8px 0 8px !important; /* Blends with the popup corners */
+  transition: color 0.2s ease;
+}
+
+.maplibregl-popup-close-button:hover {
+  color: #0f172a !important; /* Darkens to slate-900 on hover */
+  background-color: transparent !important; /* Removes default gray background on hover */
+}

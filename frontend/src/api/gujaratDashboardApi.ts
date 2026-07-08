@@ -186,7 +186,22 @@ export const fetchGujaratKdeHeatmap = async (
   district: string
 ): Promise<KdeHeatmapData> => {
   const params = getParams(filters, district);
+  if (filters.visualization_variant === "pedestrian") {
+    params.append("is_pedestrian", "true");
+  }
   const { data } = await API.get(`${GUJARAT_API_BASE}/kde-heatmap`, { params });
+  return data;
+};
+
+export const fetchGujaratWeightedKdeHeatmap = async (
+  filters: DashboardFilters,
+  district: string
+): Promise<KdeHeatmapData> => {
+  const params = getParams(filters, district);
+  if (filters.visualization_variant === "pedestrian") {
+    params.append("is_pedestrian", "true");
+  }
+  const { data } = await API.get(`${GUJARAT_API_BASE}/weighted-kde-heatmap`, { params });
   return data;
 };
 

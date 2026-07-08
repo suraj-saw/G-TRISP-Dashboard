@@ -1,8 +1,8 @@
-// frontend/src/components/maps/AccidentDensityHeatmapLayers.tsx
+// frontend/src/components/maps/WeightedKdeHeatmapLayers.tsx
 import { useEffect, useState } from "react";
 import { Source, Layer } from "react-map-gl/maplibre";
 import { Loader2, AlertCircle } from "lucide-react";
-import { fetchKdeHeatmap, type KdeHeatmapData } from "../../api/dashboardApi";
+import { fetchWeightedKdeHeatmap, type KdeHeatmapData } from "../../api/dashboardApi";
 import type { DashboardFilters } from "../../types/dashboard";
 
 interface Props {
@@ -10,17 +10,19 @@ interface Props {
   fetchFn?: (filters: DashboardFilters) => Promise<KdeHeatmapData>;
 }
 
-export default function AccidentDensityHeatmapLayers({ filters, fetchFn }: Props) {
+export default function WeightedKdeHeatmapLayers({ filters, fetchFn }: Props) {
   const [data, setData] = useState<KdeHeatmapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const isPedestrian = filters.visualization_variant === "pedestrian";
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError(null);
+    setData(null);
 
-    const loader = fetchFn ?? fetchKdeHeatmap;
+    const loader = fetchFn ?? fetchWeightedKdeHeatmap;
     loader(filters)
       .then((res) => {
         if (!active) return;
@@ -31,7 +33,7 @@ export default function AccidentDensityHeatmapLayers({ filters, fetchFn }: Props
         setError(
           err?.response?.status
             ? `Request failed (${err.response.status}): ${err.response.data?.detail || err.message}`
-            : err?.message || "Failed to load density heatmap."
+            : err?.message || "Failed to load severity-weighted KDE heatmap."
         );
         setData(null);
       })
@@ -52,6 +54,8 @@ export default function AccidentDensityHeatmapLayers({ filters, fetchFn }: Props
     filters.collision_type,
     filters.date_from,
     filters.date_to,
+    filters.visualization_variant,
+    fetchFn,
   ]);
 
   const StatusBadge = ({ children }: { children: React.ReactNode }) => (
@@ -66,7 +70,7 @@ export default function AccidentDensityHeatmapLayers({ filters, fetchFn }: Props
     return (
       <StatusBadge>
         <Loader2 size={14} className="animate-spin text-[#16A34A]" />
-        Computing KDE density surface…
+        Computing {isPedestrian ? "pedestrian " : ""}severity-weighted KDE surface…
       </StatusBadge>
     );
   }
@@ -84,23 +88,21 @@ export default function AccidentDensityHeatmapLayers({ filters, fetchFn }: Props
     return (
       <StatusBadge>
         <AlertCircle size={14} className="text-amber-500" />
-        No accident data available for the current filters.
+        No {isPedestrian ? "pedestrian accident" : "accident"} data available for the current filters.
       </StatusBadge>
     );
   }
 
   return (
     <>
-      {/* Georeferenced raster — quartic-kernel KDE, same algorithm as the
-          offline notebook's build_kde_raster() / QGIS Heatmap tool. */}
       <Source
-        id="kde-heatmap-source"
+        id="weighted-kde-heatmap-source"
         type="image"
         url={data.image}
         coordinates={data.coordinates as any}
       >
         <Layer
-          id="kde-heatmap-raster"
+          id="weighted-kde-heatmap-raster"
           type="raster"
           paint={{
             "raster-opacity": 0.8,
@@ -110,8 +112,8 @@ export default function AccidentDensityHeatmapLayers({ filters, fetchFn }: Props
       </Source>
 
       <StatusBadge>
-        KDE density surface · {data.total_crashes} crashes · {data.radius_m}m
-        bandwidth
+        {isPedestrian ? "Pedestrian severity-weighted KDE" : "Severity-weighted KDE"} ·{" "}
+        {data.total_crashes} crashes · {data.radius_m}m bandwidth
       </StatusBadge>
     </>
   );

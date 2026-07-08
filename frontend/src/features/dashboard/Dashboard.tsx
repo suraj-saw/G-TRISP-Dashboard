@@ -13,6 +13,17 @@ import FilterSelect from "../../components/layout/FilterSelect";
 import ExportButton from "../../components/layout/ExportButton";
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
 import BlackspotExportButton from "../../components/layout/BlackspotExportButton";
+import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
+import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
+
+import {
+  Filter,
+  Layers,
+  ChevronDown,
+  RotateCcw,
+  AlertTriangle,
+} from "lucide-react";
+
 
 import {
   Filter,
@@ -31,6 +42,8 @@ import type {
 import {
   fetchFilterOptions,
   fetchPedestrianBlackspots,
+  fetchKdeHeatmap,
+  fetchWeightedKdeHeatmap,
 } from "../../api/dashboardApi";
 import SuratBaseMap from "../../components/maps/SuratBaseMap";
 import { MAP_STYLES } from "../../components/maps/mapStyles";
@@ -316,7 +329,10 @@ export default function Dashboard() {
   };
 
   const activeFilterConfig = getFilterConfig(filters.visualization_type);
-  const isTemporalAnalysis = filters.visualization_type === "temporal_analysis";
+  const visualizationLayerType = filters.visualization_type || "location_markers";
+  const isKdeHeatmap = visualizationLayerType === "kde_heatmap";
+  const isWeightedKdeHeatmap = visualizationLayerType === "weighted_kde_heatmap";
+  const isTemporalAnalysis = visualizationLayerType === "temporal_analysis";
   const isDensityHeatmap = filters.visualization_type === "density_heatmap";
   const isBlackspotDetection = filters.visualization_type === "blackspot";
   const isPedestrianVariant = filters.visualization_variant === "pedestrian";
@@ -621,6 +637,18 @@ export default function Dashboard() {
                     />
                   ) : isDbscanBlackspot ? (
                     <DbscanBlackspotDetectionLayers filters={filters} />
+                  ) : isKdeHeatmap ? (
+                    <KdeHeatmapLayers
+                      key={`kde-heatmap-${filters.visualization_variant || "accident"}`}
+                      filters={filters}
+                      fetchFn={fetchKdeHeatmap}
+                    />
+                  ) : isWeightedKdeHeatmap ? (
+                    <WeightedKdeHeatmapLayers
+                      key="weighted-kde-heatmap"
+                      filters={filters}
+                      fetchFn={fetchWeightedKdeHeatmap}
+                    />
                   ) : (
                     <VisualizationLayers
                       key={`${visualizationLayerType}-${filters.visualization_variant || "accident"}`}

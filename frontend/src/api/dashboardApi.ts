@@ -233,6 +233,20 @@ export const fetchKdeHeatmap = async (
   filters: DashboardFilters
 ): Promise<KdeHeatmapData> => {
   const params = getParams(filters);
+  if (filters.visualization_variant === "pedestrian") {
+    params.append("is_pedestrian", "true");
+  }
   const { data } = await API.get(`${SURAT_API_BASE}/kde-heatmap`, { params });
+  return data;
+};
+
+export const fetchWeightedKdeHeatmap = async (
+  filters: DashboardFilters
+): Promise<KdeHeatmapData> => {
+  const params = getParams(filters);
+  if (filters.visualization_variant === "pedestrian") {
+    params.append("is_pedestrian", "true");
+  }
+  const { data } = await API.get(`${SURAT_API_BASE}/weighted-kde-heatmap`, { params });
   return data;
 };
