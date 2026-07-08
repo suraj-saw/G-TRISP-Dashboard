@@ -2284,10 +2284,19 @@ def export_dashboard_data(
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
     else:
+        charts_dict = None
+        if len(accidents) > 0:
+            try:
+                from app.utils.chart_utils import generate_all_charts
+                charts_dict = generate_all_charts(accidents)
+            except Exception:
+                pass # Fallback to no charts if matplotlib fails
+
         # Pass 0 for Blackspot # and basic meta rows
         excel_buffer = build_accident_excel(
             [(0, acc) for acc in accidents],
-            meta_rows=[("Export Source", "District Dashboard General Export"), ("Total Records", len(accidents))]
+            meta_rows=[("Export Source", "District Dashboard General Export"), ("Total Records", len(accidents))],
+            charts_dict=charts_dict
         )
         filename = f"{dist_str}_accidents_export.xlsx"
         return StreamingResponse(

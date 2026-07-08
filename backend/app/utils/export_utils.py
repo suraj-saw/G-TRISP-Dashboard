@@ -87,6 +87,7 @@ def build_accident_csv(accidents_with_bs: list[tuple[int, object]]) -> str:
 def build_accident_excel(
     accidents_with_bs: list[tuple[int, object]],
     meta_rows: list[tuple[str, object]],
+    charts_dict: dict = None,
 ) -> io.BytesIO:
     """Build a styled Excel workbook from (bs_id, accident_orm_obj) tuples.
     
@@ -146,6 +147,34 @@ def build_accident_excel(
         meta.cell(r, 2, str(value))
 
     buf = io.BytesIO()
+    
+    if charts_dict:
+        try:
+            from openpyxl.drawing.image import Image as OpenpyxlImage
+            viz_sheet = wb.create_sheet("Visualizations")
+            
+            # Map chart keys to cell positions
+            positions = {
+                "severity": "B2",
+                "road_type": "K2",
+                "collision_type": "T2",
+                "vehicles_involved": "B25",
+                "weather": "K25",
+                "light": "T25",
+                "collision_nature": "B48",
+                "time_of_day": "K48",
+                "monthly_seasonality": "B71",
+                "annual_trend": "K71",
+                "weekend_vs_weekday": "T71",
+            }
+            
+            for key, chart_buf in charts_dict.items():
+                if key in positions:
+                    img = OpenpyxlImage(chart_buf)
+                    viz_sheet.add_image(img, positions[key])
+        except ImportError:
+            pass # Pillow not installed
+
     wb.save(buf)
     buf.seek(0)
     return buf
