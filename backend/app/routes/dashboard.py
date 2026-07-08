@@ -2237,3 +2237,61 @@ def get_district_stats(
         "visibility_breakdown": [{"label": k, "count": v} for k, v in sorted(visibility_counts.items(), key=lambda item: item[1], reverse=True) if k != "Unknown"],
         "statistical_insights": insights,
     }
+
+@router.get("/export")
+def export_dashboard_data(
+    format: str = Query("csv", enum=["csv", "excel"]),
+    district: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
+    police_station: Optional[List[str]] = Query(None),
+    db: Session = Depends(get_db),
+):
+    from fastapi.responses import StreamingResponse
+    from app.utils.export_utils import build_accident_csv, build_accident_excel
+    
+    query = apply_filters(
+        db.query(Accident),
+        district, year, road_classification,
+        weather_condition, light_condition, collision_type,
+        date_from, date_to,
+        taluka=taluka, db=db,
+        police_station=police_station
+    )
+    if severity and "all" not in severity:
+        query = query.filter(Accident.severity.in_(severity))
+        
+    accidents = query.all()
+    
+    # Determine district string for filename
+    dist_str = district[0] if district else "gujarat"
+    dist_str = dist_str.lower().replace(" ", "_")
+    
+    if format == "csv":
+        # Pass 0 for Blackspot #
+        csv_buffer = build_accident_csv([(0, acc) for acc in accidents])
+        filename = f"{dist_str}_accidents_export.csv"
+        return StreamingResponse(
+            iter([csv_buffer]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    else:
+        # Pass 0 for Blackspot # and basic meta rows
+        excel_buffer = build_accident_excel(
+            [(0, acc) for acc in accidents],
+            meta_rows=[("Export Source", "District Dashboard General Export"), ("Total Records", len(accidents))]
+        )
+        filename = f"{dist_str}_accidents_export.xlsx"
+        return StreamingResponse(
+            excel_buffer,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )

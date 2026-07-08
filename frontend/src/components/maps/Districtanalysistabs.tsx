@@ -1,4 +1,5 @@
 import React from "react";
+import ExportAnalysisButton from "../layout/ExportAnalysisButton";
 
 export type AnalysisView = "spatial" | "statistical" | "temporal";
 
@@ -57,6 +58,10 @@ const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
             {activeView === tab.id && <span className="tab-indicator" />}
           </button>
         ))}
+      </div>
+
+      <div className="ml-auto h-full flex items-center py-1">
+        <ExportAnalysisButton />
       </div>
 
       <style>{`

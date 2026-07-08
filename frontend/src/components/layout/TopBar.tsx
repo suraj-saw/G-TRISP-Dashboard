@@ -8,7 +8,6 @@ import {
   PanelLeft,
   Mail,
   Info,
-  ShieldAlert,
 } from "lucide-react";
 
 import NotificationBell from "./NotificationBell";

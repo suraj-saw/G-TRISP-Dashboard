@@ -16,12 +16,14 @@ import { DensityMapOverlays } from "../../components/maps/MapOverlays";
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
 import DistrictBaseMap from "../../components/maps/DistrictBaseMap";
+import type { DistrictBaseMapHandle } from "../../components/maps/DistrictBaseMap";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
-import BlackspotExportButton from "../../components/layout/BlackspotExportButton";
 import DistrictAnalysisTabs, {
   type AnalysisView,
 } from "../../components/maps/Districtanalysistabs";
 import DistrictStatisticalAnalysis from "../../components/dashboard/DistrictStatisticalAnalysis";
+import { ExportProvider, useExportContext } from "../../context/ExportContext";
+import { downloadGujaratExport } from "../../api/exportApi";
 
 import {
   Filter,
@@ -262,9 +264,52 @@ const emptyDashboardData: DashboardData = {
   violations: [],
 };
 
+function SpatialExportRegistrar({
+  analysisView,
+  isBlackspotDetection,
+  isDbscanBlackspot,
+  filters,
+  districtName,
+  mapRef,
+}: any) {
+  const { registerExportHandler } = useExportContext();
+
+  useEffect(() => {
+    if (analysisView === "spatial") {
+      if (isBlackspotDetection || isDbscanBlackspot) {
+        registerExportHandler({
+          supportedFormats: ["csv", "excel"],
+          allowClusterSelection: true,
+          onExport: async (format, options) => {
+            if (format === "csv" || format === "excel") {
+              const isBlackspot = isBlackspotDetection || isDbscanBlackspot;
+              await downloadGujaratExport(filters, format, districtName, isBlackspot, options?.clusterId);
+            }
+          },
+        });
+      } else {
+        registerExportHandler({
+          supportedFormats: ["csv", "excel"],
+          onExport: async (format) => {
+            if (format === "csv" || format === "excel") {
+              await downloadGujaratExport(filters, format, districtName);
+            }
+          },
+        });
+      }
+    } else {
+      registerExportHandler(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysisView, isBlackspotDetection, isDbscanBlackspot, filters, districtName, registerExportHandler]);
+
+  return null;
+}
+
 export default function DistrictDashboard() {
   const [analysisView, setAnalysisView] = useState<AnalysisView>("spatial");
   const navigate = useNavigate();
+  const mapRef = useRef<DistrictBaseMapHandle>(null);
   const { districtSlug = "" } = useParams<{ districtSlug: string }>();
 
   const [user, setUser] = useState<User | null>(null);
@@ -627,6 +672,15 @@ export default function DistrictDashboard() {
   }
 
   return (
+    <ExportProvider>
+      <SpatialExportRegistrar
+        analysisView={analysisView}
+        isBlackspotDetection={isBlackspotDetection}
+        isDbscanBlackspot={isDbscanBlackspot}
+        filters={filters}
+        districtName={districtName}
+        mapRef={mapRef}
+      />
     <div className="min-h-screen bg-[#F1F4FB]">
       <div className={`fixed left-0 right-0 top-0 ${TOPBAR_Z_INDEX}`}>
         <TopBar
@@ -746,27 +800,17 @@ export default function DistrictDashboard() {
             <RotateCcw size={13} />
             Reset filters
           </button>
-          {analysisView === "spatial" &&
-            ((isBlackspotDetection && !isPedestrianVariant) ||
-              isDbscanBlackspot) && (
-            <BlackspotExportButton
-              filters={filters}
-              algorithm={isDbscanBlackspot ? "dbscan" : "greedy"}
-              isSurat={false}
-              districtName={districtName}
-            />
-          )}
         </div>
       </aside>
 
-      <main
-        className="min-w-0 transition-[padding-left] duration-300 ease-in-out overflow-y-auto"
-        style={{
-          paddingTop: `${TOPBAR_HEIGHT_PX}px`,
-          paddingLeft: sidebarOpen ? `${SIDEBAR_WIDTH_PX}px` : "0px",
-          minHeight: "100vh",
-        }}
-      >
+        <main
+          className="min-w-0 transition-[padding-left] duration-300 ease-in-out overflow-y-auto"
+          style={{
+            paddingTop: `${TOPBAR_HEIGHT_PX}px`,
+            paddingLeft: sidebarOpen ? `${SIDEBAR_WIDTH_PX}px` : "0px",
+            minHeight: "100vh",
+          }}
+        >
         <div className="flex flex-col gap-4 p-4">
           {(error || boundaryError) && (
             <div className="flex items-start gap-3 rounded-xl border border-[#FECACA] bg-[#FFF5F5] px-4 py-3 text-sm text-[#B91C1C]">
@@ -821,6 +865,7 @@ export default function DistrictDashboard() {
             ) : (
               <div className="h-full w-full overflow-hidden relative">
                 <DistrictBaseMap
+                  ref={mapRef}
                   height="100%"
                   sidebarOpen={sidebarOpen}
                   baseMap={filters.baseMap || DEFAULT_BASE_MAP}
@@ -918,5 +963,6 @@ export default function DistrictDashboard() {
         </div>
       </main>
     </div>
+    </ExportProvider>
   );
 }

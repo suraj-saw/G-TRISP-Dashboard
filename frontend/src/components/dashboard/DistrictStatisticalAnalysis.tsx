@@ -16,6 +16,8 @@ import {
 import { getDistrictStats } from "../../api/gujaratDashboardApi";
 import type { DistrictStats, DistrictStatsFilters } from "../../api/gujaratDashboardApi";
 import { AlertCircle } from "lucide-react";
+import { useExportContext } from "../../context/ExportContext";
+import { downloadGujaratExport } from "../../api/exportApi";
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 
@@ -240,7 +242,52 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
     fetchStats();
   }, [fetchStats]);
 
+  // ── Export handler registration ──────────────────────────────────────────
+  const { registerExportHandler } = useExportContext();
+
+  useEffect(() => {
+    const dashboardFilters = {
+      district: filters.district ? [filters.district] : [],
+      year: filters.year ?? [],
+      severity: filters.severity ?? [],
+      road_classification: filters.roadClassification ?? [],
+      weather_condition: filters.weatherCondition ?? [],
+      light_condition: filters.lightCondition ?? [],
+      collision_type: filters.collisionType ?? [],
+      police_station: filters.policeStation ?? [],
+      taluka: filters.taluka ?? [],
+      date_from: filters.startDate ?? "",
+      date_to: filters.endDate ?? "",
+      month: [],
+      day: [],
+      time_period: [],
+    };
+    registerExportHandler({
+      supportedFormats: ["csv", "excel"],
+      onExport: async (format) => {
+        if (format === "csv" || format === "excel") {
+          await downloadGujaratExport(dashboardFilters, format, filters.district);
+        }
+      },
+    });
+    return () => { registerExportHandler(null); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    filters.district,
+    filters.year,
+    filters.startDate,
+    filters.endDate,
+    filters.severity,
+    filters.taluka,
+    filters.policeStation,
+    filters.roadClassification,
+    filters.weatherCondition,
+    filters.lightCondition,
+    filters.collisionType,
+  ]);
   const processedRoadType = useMemo(() => getTopCategories(stats?.road_type_breakdown, 8, "road_type"), [stats?.road_type_breakdown]);
+
+
   const processedCollisionType = useMemo(() => getTopCategories(stats?.collision_type_breakdown, 8, "label"), [stats?.collision_type_breakdown]);
   const processedCollisionNature = useMemo(() => getTopCategories(stats?.collision_nature_breakdown, 10, "label"), [stats?.collision_nature_breakdown]);
   const processedWeather = useMemo(() => getTopCategories(stats?.weather_breakdown, 8, "label"), [stats?.weather_breakdown]);

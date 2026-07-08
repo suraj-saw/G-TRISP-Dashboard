@@ -97,6 +97,7 @@ const MASK_OPACITY_DEFAULT = 0.8;
 
 export interface DistrictBaseMapHandle {
   resize: () => void;
+  getMap: () => MapRef | null;
 }
 
 interface Props {
@@ -196,6 +197,7 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
         mapRef.current?.getMap()?.resize();
         fitToBounds(MAP_FIT_DURATION_MS);
       },
+      getMap: () => mapRef.current,
     }));
 
     // React to a new boundary (e.g. navigating between districts, or the

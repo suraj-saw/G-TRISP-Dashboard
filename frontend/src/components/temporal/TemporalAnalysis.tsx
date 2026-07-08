@@ -5,6 +5,8 @@ import type { DashboardFilters, TemporalAnalysisData } from "../../types/dashboa
 import HourDayHeatmap from "./HourDayHeatmap";
 import HourlyChart from "./HourlyChart";
 import MonthlyTrend from "./MonthlyTrend";
+import { useExportContext } from "../../context/ExportContext";
+import { downloadGujaratExport } from "../../api/exportApi";
 import {
   BarChart,
   Bar,
@@ -138,6 +140,40 @@ export default function TemporalAnalysis({ filters, fetchFn }: Props) {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    filters.district,
+    filters.year,
+    filters.month,
+    filters.day,
+    filters.time_period,
+    filters.severity,
+    filters.weather_condition,
+    filters.light_condition,
+    filters.date_from,
+    filters.date_to,
+  ]);
+
+  // ── Export handler registration ──────────────────────────────────────────
+  const { registerExportHandler } = useExportContext();
+
+  useEffect(() => {
+    // Extract district name from filters (stored as array, use first element)
+    const district = Array.isArray(filters.district)
+      ? (filters.district[0] ?? "")
+      : (filters.district ?? "");
+
+    if (!district) return;
+
+    registerExportHandler({
+      supportedFormats: ["csv", "excel"],
+      onExport: async (format) => {
+        if (format === "csv" || format === "excel") {
+          await downloadGujaratExport(filters, format, district);
+        }
+      },
+    });
+    return () => { registerExportHandler(null); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filters.district,
     filters.year,
@@ -330,7 +366,7 @@ export default function TemporalAnalysis({ filters, fetchFn }: Props) {
                     cy="50%"
                     outerRadius={80}
                   >
-                    {data.weekend_vs_weekday.map((entry, index) => (
+                    {data.weekend_vs_weekday.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={index === 0 ? CHART_BLUE : CHART_TEAL} />
                     ))}
                   </Pie>

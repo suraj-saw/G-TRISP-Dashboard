@@ -362,11 +362,11 @@ export default function GujaratInsightsPanel() {
                   <YAxis type="category" dataKey="name" width={76}
                     tick={{ fontSize: 10, fill: "#334155" }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f8fafc" }}
-                    formatter={(v: number) => [v.toLocaleString("en-IN"), "Fatal accidents"]} />
+                    formatter={(v: any) => [v.toLocaleString("en-IN"), "Fatal accidents"]} />
                   <Bar dataKey="fatal" name="Fatal accidents" fill="#ef4444"
                     radius={[0, 4, 4, 0]} barSize={10}
                     label={{ position: "right", fontSize: 10, fontWeight: 700, fill: "#ef4444",
-                      formatter: (v: number) => v.toLocaleString("en-IN") }} />
+                      formatter: (v: any) => v.toLocaleString("en-IN") }} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
