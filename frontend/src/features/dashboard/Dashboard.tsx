@@ -334,6 +334,12 @@ export default function Dashboard() {
   const isWeightedKdeHeatmap = visualizationLayerType === "weighted_kde_heatmap";
   const isTemporalAnalysis = visualizationLayerType === "temporal_analysis";
   const isDensityHeatmap = filters.visualization_type === "density_heatmap";
+  const showDensityLegend = isDensityHeatmap || isKdeHeatmap || isWeightedKdeHeatmap;
+  const densityLegendTitle = isWeightedKdeHeatmap
+    ? "Severity-Weighted KDE"
+    : isKdeHeatmap
+      ? "KDE Density"
+      : "Accident Density";
   const isBlackspotDetection = filters.visualization_type === "blackspot";
   const isPedestrianVariant = filters.visualization_variant === "pedestrian";
   const isPedestrianBlackspot = isBlackspotDetection && isPedestrianVariant;
@@ -612,10 +618,11 @@ export default function Dashboard() {
                   sidebarOpen={sidebarOpen}
                   baseMap={filters.baseMap || DEFAULT_BASE_MAP}
                   overlays={
-                    isDensityHeatmap ? (
+                    showDensityLegend ? (
                       <DensityMapOverlays
                         data={displayHeatmapData}
                         subtitle={overlaySubtitle}
+                        title={densityLegendTitle}
                       />
                     ) : undefined
                   }
@@ -641,12 +648,14 @@ export default function Dashboard() {
                     <KdeHeatmapLayers
                       key={`kde-heatmap-${filters.visualization_variant || "accident"}`}
                       filters={filters}
+                      accidentPoints={displayHeatmapData}
                       fetchFn={fetchKdeHeatmap}
                     />
                   ) : isWeightedKdeHeatmap ? (
                     <WeightedKdeHeatmapLayers
                       key="weighted-kde-heatmap"
                       filters={filters}
+                      accidentPoints={displayHeatmapData}
                       fetchFn={fetchWeightedKdeHeatmap}
                     />
                   ) : (

@@ -222,11 +222,12 @@ export const fetchDbscanBlackspots = async (
 export interface KdeHeatmapData {
   total_crashes: number;
   radius_m: number;
-  pixel_m?: number;
-  image: string | null;
-  coordinates: [number, number][] | null;
-  width?: number;
-  height?: number;
+  pixel_m: number;
+  max_density: number;
+  sample_stride: number;
+  data: GeoJSON.FeatureCollection;
+  width: number;
+  height: number;
 }
 
 export const fetchKdeHeatmap = async (

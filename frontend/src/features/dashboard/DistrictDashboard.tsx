@@ -586,6 +586,12 @@ export default function DistrictDashboard() {
     : data.heatmap;
   const isKdeHeatmap = filters.visualization_type === "kde_heatmap";
   const isWeightedKdeHeatmap = filters.visualization_type === "weighted_kde_heatmap";
+  const showDensityLegend = isDensityHeatmap || isKdeHeatmap || isWeightedKdeHeatmap;
+  const densityLegendTitle = isWeightedKdeHeatmap
+    ? "Severity-Weighted KDE"
+    : isKdeHeatmap
+      ? "KDE Density"
+      : "Accident Density";
   const visualizationLayerType =
     isLocationMarkers && isPedestrianVariant
       ? "pedestrian_accidents"
@@ -880,10 +886,11 @@ export default function DistrictDashboard() {
                   boundaryError={boundaryError}
                   loadingLabel={`Loading ${districtName || "district"}…`}
                   overlays={
-                    isDensityHeatmap ? (
+                    showDensityLegend ? (
                       <DensityMapOverlays
                         data={displayHeatmapData}
                         subtitle={overlaySubtitle}
+                        title={densityLegendTitle}
                       />
                     ) : undefined
                   }
@@ -917,12 +924,14 @@ export default function DistrictDashboard() {
                     <KdeHeatmapLayers
                       key={`kde-heatmap-${filters.visualization_variant || "accident"}`}
                       filters={filters}
+                      accidentPoints={displayHeatmapData}
                       fetchFn={(f) => fetchGujaratKdeHeatmap(f, districtName)}
                     />
                   ) : isWeightedKdeHeatmap ? (
                     <WeightedKdeHeatmapLayers
                       key="weighted-kde-heatmap"
                       filters={filters}
+                      accidentPoints={displayHeatmapData}
                       fetchFn={(f) => fetchGujaratWeightedKdeHeatmap(f, districtName)}
                     />
                   ) : (

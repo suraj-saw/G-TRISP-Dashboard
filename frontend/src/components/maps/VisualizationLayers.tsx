@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
 import type { HeatmapPoint } from "../../types/dashboard";
+import GeoJsonHeatmapLayers from "./GeoJsonHeatmapLayers";
 import {
   NULL_TEXT_SENTINEL,
   UNKNOWN_LABEL,
@@ -10,15 +11,11 @@ import {
   SEVERITY_DEFAULT_WEIGHT,
 } from "../../config/constants";
 import {
-  HEATMAP_RADIUS,
-  HEATMAP_INTENSITY,
-  HEATMAP_OPACITY,
   POINT_OPACITY,
   POINT_STROKE_OPACITY,
   SEVERITY_HEATMAP_WEIGHTS,
   SEVERITY_WEIGHT_DEFAULT,
   zoomInterpolate,
-  buildHeatmapColorExpression,
   buildPointRadiusExpression,
 } from "../../config/Heapmapconfig";
 import {
@@ -214,63 +211,25 @@ function DensityHeatmapLayers({
 }: {
   geojsonData: GeoJSON.FeatureCollection;
 }) {
-  // Per-point severity contribution (fatal accidents weigh more)
-  const heatmapWeightExpr: any[] = [
-    "interpolate",
-    ["linear"],
-    ["coalesce", ["get", "heatmap_weight"], SEVERITY_WEIGHT_DEFAULT],
-    0,
-    0,
-    1,
-    1,
-  ];
-
-  const heatmapRadiusExpr = zoomInterpolate(HEATMAP_RADIUS);
-  const heatmapIntensityExpr = zoomInterpolate(HEATMAP_INTENSITY);
-  const heatmapOpacityExpr = zoomInterpolate(HEATMAP_OPACITY);
-  const heatmapColorExpr = buildHeatmapColorExpression();
-
   const pointRadiusExpr = buildPointRadiusExpression();
   const pointOpacityExpr = zoomInterpolate(POINT_OPACITY);
   const pointStrokeOpacityExpr = zoomInterpolate(POINT_STROKE_OPACITY);
 
   return (
-    <Source id="density-source" type="geojson" data={geojsonData as any}>
-      {/*
-        Layer 1 — Heatmap kernel density field.
-        Cool lead-in + compressed warm band means you read density structure
-        (corridors, clusters, hotspots) instead of a single filled shape.
-      */}
-      <Layer
-        id="density-heatmap"
-        type="heatmap"
-        paint={{
-          "heatmap-weight": heatmapWeightExpr as any,
-          "heatmap-radius": heatmapRadiusExpr as any,
-          "heatmap-intensity": heatmapIntensityExpr as any,
-          "heatmap-opacity": heatmapOpacityExpr as any,
-          "heatmap-color": heatmapColorExpr as any,
-        }}
-      />
-
-      {/*
-        Layer 2 — Graduated incident points (zoom 12+).
-        Severity-colored, radius graduated by severity, white halo for contrast
-        on the light Carto Positron basemap. Clickable for details.
-      */}
-      <Layer
-        id="density-points"
-        type="circle"
-        paint={{
-          "circle-color": severityColorExpression as any,
-          "circle-radius": pointRadiusExpr as any,
-          "circle-opacity": pointOpacityExpr as any,
-          "circle-stroke-width": 1.25,
-          "circle-stroke-color": "#FFFFFF",
-          "circle-stroke-opacity": pointStrokeOpacityExpr as any,
-        }}
-      />
-    </Source>
+    <GeoJsonHeatmapLayers
+      data={geojsonData}
+      sourceId="density-source"
+      layerIdPrefix="density"
+      weightProperty="heatmap_weight"
+      circlePaint={{
+        "circle-color": severityColorExpression as any,
+        "circle-radius": pointRadiusExpr as any,
+        "circle-opacity": pointOpacityExpr as any,
+        "circle-stroke-width": 1.25,
+        "circle-stroke-color": "#FFFFFF",
+        "circle-stroke-opacity": pointStrokeOpacityExpr as any,
+      }}
+    />
   );
 }
 

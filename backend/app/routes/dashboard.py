@@ -5,7 +5,6 @@ Dashboard API router — Gujarat-wide endpoints.
 All field references use the iRAD-aligned names from the main project.
 """
 
-import base64
 import calendar
 from collections import defaultdict
 from datetime import datetime
@@ -915,20 +914,18 @@ def get_kde_heatmap(
             "total_crashes": 0,
             "radius_m": radius_m,
             "pixel_m": pixel_m,
-            "image": None,
-            "coordinates": None,
+            "max_density": 0.0,
+            "sample_stride": 1,
+            "data": {"type": "FeatureCollection", "features": []},
         }
-
-    image_data_url = (
-        "data:image/png;base64," + base64.b64encode(result["png_bytes"]).decode("ascii")
-    )
 
     return {
         "total_crashes": len(lats),
         "radius_m": radius_m,
         "pixel_m": pixel_m,
-        "image": image_data_url,
-        "coordinates": result["coordinates"],
+        "max_density": result["max_density"],
+        "sample_stride": result["sample_stride"],
+        "data": result["data"],
         "width": result["width"],
         "height": result["height"],
     }
@@ -997,20 +994,18 @@ def get_weighted_kde_heatmap(
             "total_crashes": 0,
             "radius_m": radius_m,
             "pixel_m": pixel_m,
-            "image": None,
-            "coordinates": None,
+            "max_density": 0.0,
+            "sample_stride": 1,
+            "data": {"type": "FeatureCollection", "features": []},
         }
-
-    image_data_url = (
-        "data:image/png;base64," + base64.b64encode(result["png_bytes"]).decode("ascii")
-    )
 
     return {
         "total_crashes": len(lats),
         "radius_m": radius_m,
         "pixel_m": pixel_m,
-        "image": image_data_url,
-        "coordinates": result["coordinates"],
+        "max_density": result["max_density"],
+        "sample_stride": result["sample_stride"],
+        "data": result["data"],
         "width": result["width"],
         "height": result["height"],
     }

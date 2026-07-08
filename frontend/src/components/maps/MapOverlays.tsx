@@ -7,12 +7,12 @@ import { HEATMAP_LEGEND_GRADIENT } from "../../config/Heapmapconfig";
 // Density legend (bottom-left gradient bar)
 // ---------------------------------------------------------------------------
 
-export function DensityLegend() {
+export function DensityLegend({ title = "Accident Density" }: { title?: string }) {
   return (
     <div className="pointer-events-none absolute bottom-6 left-4 z-10 select-none">
       <div className="rounded-xl border border-[#E4E8F4] bg-white/90 px-4 py-3 shadow-lg backdrop-blur-sm">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          Accident Density
+          {title}
         </p>
         <div
           className="h-2.5 w-44 rounded-full"
@@ -35,9 +35,11 @@ export function DensityLegend() {
 export function DensityMapOverlays({
   data: _data,
   subtitle: _subtitle,
+  title = "Accident Density",
 }: {
   data?: unknown;
   subtitle?: string;
+  title?: string;
 }) {
-  return <DensityLegend />;
+  return <DensityLegend title={title} />;
 }

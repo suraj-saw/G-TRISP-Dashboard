@@ -21,7 +21,6 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.surat_accident import SuratAccident
-import base64
 from app.utils.kde_utils import compute_kde_heatmap, compute_weighted_kde_heatmap
 from app.core.constants import KDE_RADIUS_METERS, KDE_PIXEL_METERS
 
@@ -1155,20 +1154,18 @@ def get_kde_heatmap(
             "total_crashes": 0,
             "radius_m": radius_m,
             "pixel_m": pixel_m,
-            "image": None,
-            "coordinates": None,
+            "max_density": 0.0,
+            "sample_stride": 1,
+            "data": {"type": "FeatureCollection", "features": []},
         }
-
-    image_data_url = (
-        "data:image/png;base64," + base64.b64encode(result["png_bytes"]).decode("ascii")
-    )
 
     return {
         "total_crashes": len(lats),
         "radius_m": radius_m,
         "pixel_m": pixel_m,
-        "image": image_data_url,
-        "coordinates": result["coordinates"],
+        "max_density": result["max_density"],
+        "sample_stride": result["sample_stride"],
+        "data": result["data"],
         "width": result["width"],
         "height": result["height"],
     }
@@ -1238,20 +1235,18 @@ def get_weighted_kde_heatmap(
             "total_crashes": 0,
             "radius_m": radius_m,
             "pixel_m": pixel_m,
-            "image": None,
-            "coordinates": None,
+            "max_density": 0.0,
+            "sample_stride": 1,
+            "data": {"type": "FeatureCollection", "features": []},
         }
-
-    image_data_url = (
-        "data:image/png;base64," + base64.b64encode(result["png_bytes"]).decode("ascii")
-    )
 
     return {
         "total_crashes": len(lats),
         "radius_m": radius_m,
         "pixel_m": pixel_m,
-        "image": image_data_url,
-        "coordinates": result["coordinates"],
+        "max_density": result["max_density"],
+        "sample_stride": result["sample_stride"],
+        "data": result["data"],
         "width": result["width"],
         "height": result["height"],
     }
