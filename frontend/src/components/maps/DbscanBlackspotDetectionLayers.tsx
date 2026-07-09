@@ -295,7 +295,7 @@ export default function DbscanBlackspotDetectionLayers({
           closeButton={false}
           closeOnClick={false}
           offset={12}
-          className="z-50"
+          className="z-50 accident-popup"
         >
           <div className="w-64 overflow-hidden rounded-xl bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div

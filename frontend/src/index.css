@@ -33,3 +33,20 @@
   color: #0f172a !important; /* Darkens to slate-900 on hover */
   background-color: transparent !important; /* Removes default gray background on hover */
 }
+
+.maplibregl-popup.accident-popup .maplibregl-popup-content {
+  padding: 0;
+  background: transparent;
+  border-radius: 0.5rem;
+  box-shadow: none;
+}
+ 
+/* Keep the default tip/arrow but tint it white */
+.maplibregl-popup.accident-popup .maplibregl-popup-tip {
+  border-top-color: #ffffff;
+}
+ 
+/* Remove the default × button that MapLibre renders — we draw our own */
+.maplibregl-popup.accident-popup .maplibregl-popup-close-button {
+  display: none;
+}

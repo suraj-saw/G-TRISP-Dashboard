@@ -246,9 +246,14 @@ type HoverState = {
   road_name?: string | null;
 } | null;
 
-function BlackspotLayers({ geojsonData }: { geojsonData: GeoJSON.FeatureCollection }) {
+function BlackspotLayers({
+  geojsonData,
+}: {
+  geojsonData: GeoJSON.FeatureCollection;
+}) {
   const { current: mapRef } = useMap();
   const [hovered, setHovered] = useState<HoverState>(null);
+  const [selected, setSelected] = useState<SelectedAccident | null>(null);
 
   useEffect(() => {
     const map = mapRef?.getMap();
@@ -258,7 +263,10 @@ function BlackspotLayers({ geojsonData }: { geojsonData: GeoJSON.FeatureCollecti
     const pointLayers = ["blackspot-single-point"];
 
     const onMove = (e: any) => {
-      const clusters = map.queryRenderedFeatures(e.point, { layers: clusterLayers });
+      if (selected) return;
+      const clusters = map.queryRenderedFeatures(e.point, {
+        layers: clusterLayers,
+      });
       if (clusters.length) {
         map.getCanvas().style.cursor = "pointer";
         const f = clusters[0];
@@ -269,7 +277,9 @@ function BlackspotLayers({ geojsonData }: { geojsonData: GeoJSON.FeatureCollecti
         });
         return;
       }
-      const points = map.queryRenderedFeatures(e.point, { layers: pointLayers });
+      const points = map.queryRenderedFeatures(e.point, {
+        layers: pointLayers,
+      });
       if (points.length) {
         map.getCanvas().style.cursor = "pointer";
         const f = points[0];
@@ -286,19 +296,38 @@ function BlackspotLayers({ geojsonData }: { geojsonData: GeoJSON.FeatureCollecti
       setHovered(null);
     };
 
+    const onClick = (e: any) => {
+      const points = map.queryRenderedFeatures(e.point, {
+        layers: pointLayers,
+      });
+      if (points.length) {
+        const f = points[0];
+        setSelected({
+          longitude: e.lngLat.lng,
+          latitude: e.lngLat.lat,
+          ...f.properties,
+        });
+        setHovered(null);
+        return;
+      }
+      setSelected(null);
+    };
+
     const onLeave = () => {
       map.getCanvas().style.cursor = "";
       setHovered(null);
     };
 
     map.on("mousemove", onMove);
+    map.on("click", onClick);
     map.on("mouseout", onLeave);
     return () => {
       map.off("mousemove", onMove);
+      map.off("click", onClick);
       map.off("mouseout", onLeave);
       map.getCanvas().style.cursor = "";
     };
-  }, [mapRef]);
+  }, [mapRef, selected]);
 
   return (
     <>
@@ -362,7 +391,15 @@ function BlackspotLayers({ geojsonData }: { geojsonData: GeoJSON.FeatureCollecti
           filter={["!", ["has", "point_count"]]}
           paint={{
             "circle-color": "rgba(220,38,38,0.18)",
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 7, 17, 14],
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              13,
+              7,
+              17,
+              14,
+            ],
             "circle-blur": 0.65,
           }}
         />
@@ -374,7 +411,15 @@ function BlackspotLayers({ geojsonData }: { geojsonData: GeoJSON.FeatureCollecti
           filter={["!", ["has", "point_count"]]}
           paint={{
             "circle-color": BS_SINGLE_COLOR_EXPR as any,
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 4, 17, 7],
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              13,
+              4,
+              17,
+              7,
+            ],
             "circle-opacity": 0.9,
             "circle-stroke-width": 1.2,
             "circle-stroke-color": "#FFFFFF",
@@ -383,7 +428,7 @@ function BlackspotLayers({ geojsonData }: { geojsonData: GeoJSON.FeatureCollecti
       </Source>
 
       {/* ── Hover tooltip ───────────────────────────────────────────────── */}
-      {hovered && (
+      {hovered && !selected && (
         <Popup
           longitude={hovered.longitude}
           latitude={hovered.latitude}
@@ -391,8 +436,27 @@ function BlackspotLayers({ geojsonData }: { geojsonData: GeoJSON.FeatureCollecti
           closeButton={false}
           closeOnClick={false}
           offset={12}
+          className="accident-popup"
         >
           <BlackspotPopup hovered={hovered} />
+        </Popup>
+      )}
+
+      {/* ── Accident popup ───────────────────────────────────────────────── */}
+      {selected && (
+        <Popup
+          longitude={selected.longitude}
+          latitude={selected.latitude}
+          closeOnClick={true}
+          offset={12}
+          closeButton
+          className="accident-popup"
+          onClose={() => setSelected(null)}
+        >
+          <AccidentPopupBody
+            selected={selected}
+            showPedestrianCasualties={false}
+          />
         </Popup>
       )}
     </>
@@ -405,28 +469,65 @@ function BlackspotPopup({ hovered }: { hovered: NonNullable<HoverState> }) {
     const risk = getRiskLabel(count);
     const color = getRiskColor(count);
     return (
-      <div style={{ minWidth: 170, fontFamily: "inherit" }}>
-        <div style={{
-          background: color, color: "#fff",
-          padding: "6px 10px", borderRadius: "6px 6px 0 0",
-          fontSize: 11, fontWeight: 700, letterSpacing: "0.04em",
-          textTransform: "uppercase",
-        }}>
+      <div
+        className="bg-white rounded-lg shadow-xl overflow-hidden"
+        style={{ minWidth: 170, fontFamily: "inherit" }}
+      >
+        <div
+          style={{
+            background: color,
+            color: "#fff",
+            padding: "6px 10px",
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+          }}
+        >
           {risk}
         </div>
-        <div style={{ padding: "8px 10px 6px", fontSize: 12, color: "#1e293b" }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>{count.toLocaleString()}</div>
-          <div style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>Accidents in cluster</div>
+        <div
+          style={{ padding: "8px 10px 6px", fontSize: 12, color: "#1e293b" }}
+        >
+          <div style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>
+            {count.toLocaleString()}
+          </div>
+          <div style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>
+            Accidents in cluster
+          </div>
         </div>
       </div>
     );
   }
   return (
-    <div style={{ minWidth: 170, padding: "8px 10px", fontSize: 12, color: "#1e293b", fontFamily: "inherit" }}>
-      <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}>Accident Site</div>
-      {hovered.severity && <div><b>Severity:</b> {hovered.severity}</div>}
-      {hovered.police_station && <div><b>Station:</b> {safeText(hovered.police_station)}</div>}
-      {hovered.road_name && <div><b>Road:</b> {safeText(hovered.road_name)}</div>}
+    <div
+      className="bg-white rounded-lg shadow-xl"
+      style={{
+        minWidth: 170,
+        padding: "8px 10px",
+        fontSize: 12,
+        color: "#1e293b",
+        fontFamily: "inherit",
+      }}
+    >
+      <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}>
+        Accident Site
+      </div>
+      {hovered.severity && (
+        <div>
+          <b>Severity:</b> {hovered.severity}
+        </div>
+      )}
+      {hovered.police_station && (
+        <div>
+          <b>Station:</b> {safeText(hovered.police_station)}
+        </div>
+      )}
+      {hovered.road_name && (
+        <div>
+          <b>Road:</b> {safeText(hovered.road_name)}
+        </div>
+      )}
     </div>
   );
 }
@@ -521,19 +622,18 @@ export function VisualizationLayers({
             longitude={selected.longitude}
             latitude={selected.latitude}
             /* 1. Removed anchor="top" to enable Maplibre's smart auto-positioning.
-                 It will now automatically flip above/below depending on screen space.
-            */
+               It will now automatically flip above/below depending on screen space.
+          */
 
-            /* 2. Changed to true so clicking anywhere on the map closes the popup 
-            */
+            /* 2. Changed to true so clicking anywhere on the map closes the popup
+             */
             closeOnClick={true}
-
             /* 3. Added a slight offset so the popup doesn't cover the accident marker 
-                 when it auto-positions 
-            */
+               when it auto-positions 
+          */
             offset={12}
-
             closeButton
+            className="accident-popup"
             onClose={() => setSelected(null)}
           >
             <AccidentPopupBody
@@ -618,16 +718,15 @@ export function VisualizationLayers({
                It will now automatically flip above/below depending on screen space.
           */
 
-          /* 2. Changed to true so clicking anywhere on the map closes the popup 
-          */
+          /* 2. Changed to true so clicking anywhere on the map closes the popup
+           */
           closeOnClick={true}
-
           /* 3. Added a slight offset so the popup doesn't cover the accident marker 
                when it auto-positions 
           */
           offset={12}
-
           closeButton
+          className="accident-popup"
           onClose={() => setSelected(null)}
         >
           <AccidentPopupBody
@@ -646,11 +745,16 @@ export function VisualizationLayers({
 
 const getSeverityBadgeClasses = (severity?: string | null): string => {
   const s = (severity || "").toLowerCase();
-  if (s.includes("fatal")) return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20";
-  if (s.includes("grievous")) return "bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20";
-  if (s.includes("minor injury hospitalized")) return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20";
-  if (s.includes("minor injury non")) return "bg-yellow-50 text-yellow-700 ring-1 ring-inset ring-yellow-600/20";
-  if (s.includes("no injury") || s.includes("damage only")) return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20";
+  if (s.includes("fatal"))
+    return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20";
+  if (s.includes("grievous"))
+    return "bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20";
+  if (s.includes("minor injury hospitalized"))
+    return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20";
+  if (s.includes("minor injury non"))
+    return "bg-yellow-50 text-yellow-700 ring-1 ring-inset ring-yellow-600/20";
+  if (s.includes("no injury") || s.includes("damage only"))
+    return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20";
   return "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-600/20";
 };
 
@@ -668,8 +772,7 @@ function AccidentPopupBody({
     /* Added pr-5 (padding-right) to ensure content NEVER touches the Maplibre absolute close button.
       Switched to a more flexible min/max width system to allow vertical growth.
     */
-    <div className="flex flex-col w-full min-w-[250px] max-w-[320px] font-sans pt-1 pr-5">
-
+    <div className="bg-white rounded-lg shadow-xl p-4 flex flex-col w-full min-w-[250px] max-w-[320px] font-sans">
       {/* --- Header --- */}
       <div className="flex flex-col mb-4">
         {/* Badge is now isolated so it doesn't compete with the top-right close button */}
@@ -688,7 +791,9 @@ function AccidentPopupBody({
 
         {/* Meta Info: Grouped Date and ID dynamically. Uses flex-wrap so it drops to a new line if needed */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-slate-500">
-          <span className="shrink-0">{formatDate(selected.accident_date_time)}</span>
+          <span className="shrink-0">
+            {formatDate(selected.accident_date_time)}
+          </span>
           {selected.accident_id && (
             <>
               <span className="w-1 h-1 rounded-full bg-slate-300 shrink-0"></span>
@@ -700,7 +805,6 @@ function AccidentPopupBody({
 
       {/* --- Dashboard Metric Tiles --- */}
       <div className="grid grid-cols-2 gap-y-4 gap-x-4">
-
         {/* Full width to safely hold long collision type strings */}
         <div className="flex flex-col col-span-2">
           <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1 shrink-0">
@@ -730,8 +834,7 @@ function AccidentPopupBody({
         </div>
 
         {/* --- Pedestrian Casualty Metric --- */}
-        {showPedestrianCasualties && pedestrianTotal > 0 && (
-          /* Changed to items-start so if the text wraps to 3 lines, the icon stays at the top */
+        {/* {showPedestrianCasualties && pedestrianTotal > 0 && (
           <div className="col-span-2 mt-1 flex items-start bg-red-50/50 rounded-lg p-2.5 ring-1 ring-inset ring-red-100">
             <div className="h-8 w-8 bg-white rounded-full shadow-sm flex items-center justify-center mr-3 shrink-0 mt-0.5">
               <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -747,8 +850,7 @@ function AccidentPopupBody({
               </span>
             </div>
           </div>
-        )}
-
+        )} */}
       </div>
     </div>
   );
