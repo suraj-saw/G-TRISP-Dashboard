@@ -40,7 +40,7 @@ REFRESH_TOKEN_COOKIE = "refresh_token"
 # ---------------------------------------------------------------------------
 
 # Short-lived access token (minutes).  Override via ACCESS_TOKEN_EXPIRE_MINUTES env var.
-DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 20
+DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 40
 
 # Refresh token lifetime (hours).  Override via REFRESH_TOKEN_EXPIRE_HOURS env var.
 DEFAULT_REFRESH_TOKEN_EXPIRE_HOURS: int = 8

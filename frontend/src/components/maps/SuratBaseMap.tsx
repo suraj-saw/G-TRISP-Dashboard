@@ -26,6 +26,7 @@ import {
   MAP_FIT_PADDING_PX,
   MAP_RESIZE_LOOP_MS,
 } from "../../config/layout";
+import CoordinateStatusBar from "./CoordinateStatusBar";
 
 const WORLD_RING: GeoJSON.Position[] = [
   [-180, -90],
@@ -106,7 +107,7 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
     },
     ref
   ) => {
-    const mapRef = useRef<MapRef>(null);
+    const mapRef = useRef<MapRef | null>(null);
     const [mapLoaded, setMapLoaded] = useState(false);
     const [boundary, setBoundary] = useState<GeoJSON.FeatureCollection | null>(
       null
@@ -225,7 +226,7 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
               <Layer
                 id="surat-boundary-fill"
                 type="fill"
-                paint={{ "fill-color": "#2C6EF2", "fill-opacity": 0.05}}
+                paint={{ "fill-color": "#2C6EF2", "fill-opacity": 0.05 }}
               />
               <Layer
                 id="surat-boundary-glow"
@@ -282,6 +283,8 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
           )}
           {/* MapLibre children: Source / Layer / Popup etc. */}
           {children}
+          {/* Coordinate Status Bar */}
+          <CoordinateStatusBar />
         </Map>
 
         {/* Overlay UI: legend, stats badge, title chip — rendered OUTSIDE <Map> */}

@@ -217,14 +217,14 @@ export default function GujaratInsightsPanel() {
           className="flex items-start justify-between gap-2"
         >
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 mb-0.5">
+            {/* <div className="flex items-center gap-1.5 mb-0.5">
               {isDistrictView
                 ? <MapPinned size={11} className="text-[#2C6EF2] shrink-0" />
                 : <Users size={11} className="text-[#2C6EF2] shrink-0" />}
               <span className="text-[9px] font-bold uppercase tracking-widest text-[#2C6EF2]">
                 {isDistrictView ? "District View" : "State Overview"}
               </span>
-            </div>
+            </div> */}
             <h2 className="text-[14px] font-black text-slate-800 leading-tight truncate">{title}</h2>
             <p className="text-[10px] text-slate-400 mt-0.5">
               {isDistrictView ? "District-level summary" : "State-wide summary across all districts"}

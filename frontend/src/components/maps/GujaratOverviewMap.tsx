@@ -17,6 +17,7 @@ import {
   GUJARAT_MAP_CENTER,
   buildDistrictDashboardPath,
 } from "../../config/constants";
+import CoordinateStatusBar from "./CoordinateStatusBar";
 
 interface HoverInfo {
   longitude: number;
@@ -218,6 +219,8 @@ export default function GujaratOverviewMap() {
             </div>
           </Popup>
         )}
+        {/* Coordinate Status Bar */}
+        <CoordinateStatusBar />
       </MapGL>
 
       <div className="absolute bottom-1 right-2 z-10 text-[10px] text-slate-400 pointer-events-none">

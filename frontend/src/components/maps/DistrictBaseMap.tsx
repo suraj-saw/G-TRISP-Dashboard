@@ -25,6 +25,7 @@ import {
   MAP_FIT_PADDING_PX,
   MAP_RESIZE_LOOP_MS,
 } from "../../config/layout";
+import CoordinateStatusBar from "./CoordinateStatusBar";
 
 const WORLD_RING: GeoJSON.Position[] = [
   [-180, -90],
@@ -88,8 +89,6 @@ function maxZoomForBbox(bbox: [number, number, number, number]): number {
   return 9;
 }
 
-
-
 const MASK_COLOR_SATELLITE = "#000000";
 const MASK_OPACITY_SATELLITE = 0.65;
 const MASK_COLOR_DEFAULT = "#F1F4FB";
@@ -128,7 +127,7 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
     },
     ref
   ) => {
-    const mapRef = useRef<MapRef>(null);
+    const mapRef = useRef<MapRef | null>(null);
     const [mapLoaded, setMapLoaded] = useState(false);
     const [mask, setMask] = useState<GeoJSON.Feature | null>(null);
     const [maxBounds, setMaxBounds] = useState<LngLatBoundsLike | undefined>(
@@ -148,18 +147,21 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
         }
         const [w, s, e, n] = bbox;
         const container = map.getContainer();
-        const aspect = container && container.clientHeight > 0 ? container.clientWidth / container.clientHeight : 2.0;
-        
+        const aspect =
+          container && container.clientHeight > 0
+            ? container.clientWidth / container.clientHeight
+            : 2.0;
+
         const dw = e - w;
         const dh = n - s;
         // Ensure maxBounds has at least the aspect ratio of the screen to prevent forced zooming
         const target_w = Math.max(dw, dh * aspect);
         const target_h = Math.max(dh, dw / aspect);
-        
+
         // 0.1 degrees padding (~11km) for a tiny bit of breathing room
         const pad_w = (target_w - dw) / 2 + 0.1;
         const pad_h = (target_h - dh) / 2 + 0.1;
-        
+
         map.setMaxBounds([
           [w - pad_w, s - pad_h],
           [e + pad_w, n + pad_h],
@@ -336,6 +338,8 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
             </Source>
           )}
           {children}
+          {/* Coordinate Status Bar */}
+          <CoordinateStatusBar />
         </Map>
 
         {overlays}
