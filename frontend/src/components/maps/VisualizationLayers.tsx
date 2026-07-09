@@ -760,12 +760,12 @@ const getSeverityBadgeClasses = (severity?: string | null): string => {
 
 function AccidentPopupBody({
   selected,
-  showPedestrianCasualties = false,
+  // showPedestrianCasualties = false,
 }: {
   selected: SelectedAccident;
   showPedestrianCasualties?: boolean;
 }) {
-  const pedestrianTotal = pedestrianCasualtyTotal(selected);
+  // const pedestrianTotal = pedestrianCasualtyTotal(selected);
   const severityBadgeClass = getSeverityBadgeClasses(selected.severity);
 
   return (

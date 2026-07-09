@@ -76,7 +76,7 @@ export default function GeoJsonHeatmapLayers({
   const samplePointLayerId = `${layerIdPrefix}-points`;
   const accidentSourceId = `${sourceId}-accidents`;
   const accidentPointLayerId = `${layerIdPrefix}-accident-points`;
-  const densityValue = ["get", weightProperty];
+  // const densityValue = ["get", weightProperty];
   const normalizedDensityValue = [
     "coalesce",
     ["get", "normalized_density"],

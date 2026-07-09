@@ -46,12 +46,12 @@ interface HoveredBlackspot {
   isPoint?: boolean;
 }
 
-const SEVERITY_COLORS: Record<string, string> = {
-  Fatal: "#4C1D1D",
-  "Grievous Injury": "#DC2626",
-  "Minor Injury": "#EA580C",
-  "Damage Only": "#FBBF24",
-};
+// const SEVERITY_COLORS: Record<string, string> = {
+//   Fatal: "#4C1D1D",
+//   "Grievous Injury": "#DC2626",
+//   "Minor Injury": "#EA580C",
+//   "Damage Only": "#FBBF24",
+// };
 
 const severityColorExpression = [
   "match",

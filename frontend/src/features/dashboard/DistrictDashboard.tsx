@@ -14,7 +14,7 @@ import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLa
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
 import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
 import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
-import { DensityMapOverlays } from "../../components/maps/MapOverlays";
+// import { DensityMapOverlays } from "../../components/maps/MapOverlays";
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
 import DistrictBaseMap from "../../components/maps/DistrictBaseMap";
@@ -274,7 +274,7 @@ function SpatialExportRegistrar({
   isDbscanBlackspot,
   filters,
   districtName,
-  mapRef,
+  // mapRef,
 }: any) {
   const { registerExportHandler } = useExportContext();
 
@@ -573,7 +573,7 @@ export default function DistrictDashboard() {
 
   const activeFilterConfig =
     analysisView === "temporal" ? TEMPORAL_FILTERS : MAP_FILTERS;
-  const isDensityHeatmap = filters.visualization_type === "density_heatmap";
+  // const isDensityHeatmap = filters.visualization_type === "density_heatmap";
   const isBlackspotDetection = filters.visualization_type === "blackspot";
   const isPedestrianVariant = filters.visualization_variant === "pedestrian";
   const isPedestrianBlackspot = isBlackspotDetection && isPedestrianVariant;
@@ -586,23 +586,23 @@ export default function DistrictDashboard() {
     : data.heatmap;
   const isKdeHeatmap = filters.visualization_type === "kde_heatmap";
   const isWeightedKdeHeatmap = filters.visualization_type === "weighted_kde_heatmap";
-  const showDensityLegend = isDensityHeatmap || isKdeHeatmap || isWeightedKdeHeatmap;
-  const densityLegendTitle = isWeightedKdeHeatmap
-    ? "Severity-Weighted KDE"
-    : isKdeHeatmap
-      ? "KDE Density"
-      : "Accident Density";
+  // const showDensityLegend = isDensityHeatmap || isKdeHeatmap || isWeightedKdeHeatmap;
+  // const densityLegendTitle = isWeightedKdeHeatmap
+  //   ? "Severity-Weighted KDE"
+  //   : isKdeHeatmap
+  //     ? "KDE Density"
+  //     : "Accident Density";
   const visualizationLayerType =
     isLocationMarkers && isPedestrianVariant
       ? "pedestrian_accidents"
       : filters.visualization_type || "location_markers";
 
-  const overlaySubtitle = useMemo(() => {
-    const parts: string[] = [districtName || "District"];
-    if (filters.year?.length) parts.push(filters.year.join(", "));
-    if (filters.severity?.length) parts.push(filters.severity.join(", "));
-    return parts.join(" · ");
-  }, [districtName, filters.year, filters.severity]);
+  // const overlaySubtitle = useMemo(() => {
+  //   const parts: string[] = [districtName || "District"];
+  //   if (filters.year?.length) parts.push(filters.year.join(", "));
+  //   if (filters.severity?.length) parts.push(filters.severity.join(", "));
+  //   return parts.join(" · ");
+  // }, [districtName, filters.year, filters.severity]);
 
   const renderFilter = (filter: FilterConfigItem) => {
     const variantLabel =
@@ -885,15 +885,15 @@ export default function DistrictDashboard() {
                   boundaryLoading={boundaryLoading}
                   boundaryError={boundaryError}
                   loadingLabel={`Loading ${districtName || "district"}…`}
-                  overlays={
-                    showDensityLegend ? (
-                      <DensityMapOverlays
-                        data={displayHeatmapData}
-                        subtitle={overlaySubtitle}
-                        title={densityLegendTitle}
-                      />
-                    ) : undefined
-                  }
+                  // overlays={
+                  //   showDensityLegend ? (
+                  //     <DensityMapOverlays
+                  //       data={displayHeatmapData}
+                  //       subtitle={overlaySubtitle}
+                  //       title={densityLegendTitle}
+                  //     />
+                  //   ) : undefined
+                  // }
                 >
                   {isPedestrianBlackspot ? (
                     <BlackspotDetectionLayers

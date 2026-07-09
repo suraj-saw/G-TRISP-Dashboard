@@ -8,3 +8,4 @@ from app.models.surat_boundary    import SuratBoundary
 from app.models.surat_accident    import SuratAccident
 from app.models.accident          import Accident
 from app.models.gujarat_taluka import GujaratTaluka
+from app.models.gujarat_road import GujaratRoad

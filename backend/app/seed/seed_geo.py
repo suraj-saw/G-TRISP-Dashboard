@@ -34,6 +34,13 @@ from app.database import SessionLocal
 from app.seed.seed_surat_boundary import seed_surat_boundary
 from app.seed.seed_gujarat_talukas import seed_gujarat_talukas
 
+# Roads seeding is optional: the roads file may not exist in all deployments.
+try:
+    from app.seed.seed_gujarat_roads import seed_gujarat_roads
+except Exception:  # pragma: no cover
+    seed_gujarat_roads = None
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
@@ -103,6 +110,14 @@ def run_geo_seeds(
     # 3. Accident records
     logger.info("Step %s — seeding accident records …", "3/3" if not accidents_only else "1/1")
     seed_accidents(force=force, skip_validation=skip_validation)
+
+    # 4. Roads (optional)
+    if seed_gujarat_roads is not None:
+        try:
+            logger.info("Step 4/4 — seeding Gujarat roads …")
+            seed_gujarat_roads(force=force)
+        except FileNotFoundError:
+            logger.warning("⚠ Gujarat roads GeoJSONL not found — skipping roads seeding.")
 
     logger.info("=== Seed pipeline complete ===")
 

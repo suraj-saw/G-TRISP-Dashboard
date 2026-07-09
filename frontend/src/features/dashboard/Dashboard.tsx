@@ -7,7 +7,7 @@ import type { User } from "../../types/user";
 
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
-import { DensityMapOverlays } from "../../components/maps/MapOverlays";
+
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
 import ExportButton from "../../components/layout/ExportButton";
@@ -25,13 +25,13 @@ import {
 } from "lucide-react";
 
 
-import {
-  Filter,
-  Layers,
-  ChevronDown,
-  RotateCcw,
-  AlertTriangle,
-} from "lucide-react";
+// import {
+//   Filter,
+//   Layers,
+//   ChevronDown,
+//   RotateCcw,
+//   AlertTriangle,
+// } from "lucide-react";
 
 import { useDashboard } from "../../hooks/useDashboard";
 import type {
@@ -329,40 +329,46 @@ export default function Dashboard() {
   };
 
   const activeFilterConfig = getFilterConfig(filters.visualization_type);
-  const visualizationLayerType = filters.visualization_type || "location_markers";
-  const isKdeHeatmap = visualizationLayerType === "kde_heatmap";
-  const isWeightedKdeHeatmap = visualizationLayerType === "weighted_kde_heatmap";
-  const isTemporalAnalysis = visualizationLayerType === "temporal_analysis";
-  const isDensityHeatmap = filters.visualization_type === "density_heatmap";
-  const showDensityLegend = isDensityHeatmap || isKdeHeatmap || isWeightedKdeHeatmap;
-  const densityLegendTitle = isWeightedKdeHeatmap
-    ? "Severity-Weighted KDE"
-    : isKdeHeatmap
-      ? "KDE Density"
-      : "Accident Density";
-  const isBlackspotDetection = filters.visualization_type === "blackspot";
+
+  const visualizationType =
+    filters.visualization_type || "location_markers";
+
+  const isKdeHeatmap = visualizationType === "kde_heatmap";
+  const isWeightedKdeHeatmap = visualizationType === "weighted_kde_heatmap";
+  const isTemporalAnalysis = visualizationType === "temporal_analysis";
+
+  // const isDensityHeatmap = visualizationType === "density_heatmap";
+  // const showDensityLegend = isDensityHeatmap || isKdeHeatmap || isWeightedKdeHeatmap;
+  // const densityLegendTitle = isWeightedKdeHeatmap
+  //   ? "Severity-Weighted KDE"
+  //   : isKdeHeatmap
+  //     ? "KDE Density"
+  //     : "Accident Density";
+
+  const isBlackspotDetection = visualizationType === "blackspot";
   const isPedestrianVariant = filters.visualization_variant === "pedestrian";
   const isPedestrianBlackspot = isBlackspotDetection && isPedestrianVariant;
-  const isDbscanBlackspot = filters.visualization_type === "dbscan_blackspot";
-  const isLocationMarkers =
-    filters.visualization_type === "location_markers" ||
-    !filters.visualization_type;
+  const isDbscanBlackspot = visualizationType === "dbscan_blackspot";
+
+  const isLocationMarkers = visualizationType === "location_markers";
   const displayHeatmapData = isPedestrianVariant
     ? data?.heatmap.filter(isPedestrianAccident)
     : data?.heatmap;
+
   const visualizationLayerType =
     isLocationMarkers && isPedestrianVariant
       ? "pedestrian_accidents"
-      : filters.visualization_type || "location_markers";
+      : visualizationType;
+
 
   // Build a human-readable subtitle for the overlay
-  const overlaySubtitle = useMemo(() => {
-    const parts: string[] = ["Surat"];
-    if (filters.district?.length) parts.push(filters.district.join(", "));
-    if (filters.year?.length) parts.push(filters.year.join(", "));
-    if (filters.severity?.length) parts.push(filters.severity.join(", "));
-    return parts.join(" · ");
-  }, [filters.district, filters.year, filters.severity]);
+  // const overlaySubtitle = useMemo(() => {
+  //   const parts: string[] = ["Surat"];
+  //   if (filters.district?.length) parts.push(filters.district.join(", "));
+  //   if (filters.year?.length) parts.push(filters.year.join(", "));
+  //   if (filters.severity?.length) parts.push(filters.severity.join(", "));
+  //   return parts.join(" · ");
+  // }, [filters.district, filters.year, filters.severity]);
 
   const renderFilter = (filter: (typeof activeFilterConfig)[number]) => {
     const isDateFilter = filter.id === "date_from" || filter.id === "date_to";
@@ -618,13 +624,7 @@ export default function Dashboard() {
                   sidebarOpen={sidebarOpen}
                   baseMap={filters.baseMap || DEFAULT_BASE_MAP}
                   overlays={
-                    showDensityLegend ? (
-                      <DensityMapOverlays
-                        data={displayHeatmapData}
-                        subtitle={overlaySubtitle}
-                        title={densityLegendTitle}
-                      />
-                    ) : undefined
+                    undefined
                   }
                 >
                   {isPedestrianBlackspot ? (

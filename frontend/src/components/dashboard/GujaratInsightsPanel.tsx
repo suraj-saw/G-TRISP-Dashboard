@@ -7,7 +7,6 @@ import {
 } from "recharts";
 import {
   Loader2, AlertCircle, Skull, Car, ShieldCheck, MapPinOff,
-  Users, MapPinned,
 } from "lucide-react";
 import { useDistrictInsights } from "../../context/DistrictInsightsContext";
 import { useCountUp } from "../../hooks/useCountUp";
