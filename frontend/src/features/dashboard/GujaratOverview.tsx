@@ -1,4 +1,4 @@
-﻿// frontend/src/features/dashboard/GujaratOverview.tsx
+// frontend/src/features/dashboard/GujaratOverview.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin } from "lucide-react";
@@ -10,6 +10,49 @@ import GujaratChoroplethMap from "../../components/maps/GujaratChoroplethMap";
 import GujaratInsightsPanel from "../../components/dashboard/GujaratInsightsPanel";
 import { ROUTES } from "../../config/constants";
 import { DistrictInsightsProvider } from "../../context/DistrictInsightsContext";
+import { ExportProvider } from "../../context/ExportContext";
+import { useExportContext } from "../../context/ExportContext";
+import { downloadGujaratExport } from "../../api/exportApi";
+import { fetchGujaratTemporalAnalysis } from "../../api/gujaratDashboardApi";
+import DistrictStatisticalAnalysis from "../../components/dashboard/DistrictStatisticalAnalysis";
+import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
+import type { DashboardFilters } from "../../types/dashboard";
+
+const defaultFilters: DashboardFilters = {
+  district: [],
+  year: [],
+  month: [],
+  day: [],
+  time_period: [],
+  severity: [],
+  road_classification: [],
+  weather_condition: [],
+  light_condition: [],
+  collision_type: [],
+  police_station: [],
+  taluka: [],
+  date_from: "",
+  date_to: "",
+  baseMap: "",
+  visualization_type: "",
+  visualization_variant: "",
+};
+
+function GujaratExportRegistrar() {
+  const { registerExportHandler } = useExportContext();
+  useEffect(() => {
+    registerExportHandler({
+      supportedFormats: ["csv", "excel"],
+      onExport: async (format) => {
+        if (format === "csv" || format === "excel") {
+          await downloadGujaratExport(defaultFilters, format, "");
+        }
+      },
+    });
+    return () => registerExportHandler(null);
+  }, []);
+  return null;
+}
 
 interface Props {
   allowAdmin?: boolean;
@@ -72,75 +115,100 @@ export default function GujaratOverview({
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
-    <div
-      className="h-screen flex flex-col overflow-hidden"
-      style={{ background: "linear-gradient(160deg,#eef2fb 0%,#f5f7fd 60%,#eef2fb 100%)" }}
-    >
-      <TopBar
-        appName="G-TRISP"
-        user={user}
-        showNotificationBell={showAdminControls}
-        notificationCount={unreadCount}
-        adminPanelPath={showAdminControls ? ROUTES.ADMIN_PANEL : undefined}
-        onLogout={logout}
-      />
+    <ExportProvider>
+      <GujaratExportRegistrar />
+      <div
+        className="min-h-screen flex flex-col"
+        style={{
+          background:
+            "linear-gradient(160deg,#eef2fb 0%,#f5f7fd 60%,#eef2fb 100%)",
+        }}
+      >
+        <TopBar
+          appName="G-TRISP"
+          user={user}
+          showNotificationBell={showAdminControls}
+          notificationCount={unreadCount}
+          adminPanelPath={showAdminControls ? ROUTES.ADMIN_PANEL : undefined}
+          onLogout={logout}
+        />
 
-      <main className="flex-1 flex flex-col min-h-0 px-5 pb-4">
-        {/* -- Page header banner -- */}
-        <div
-          className="shrink-0 mt-3 mb-3 rounded-2xl px-5 py-3 flex items-center gap-3 shadow-md"
-          style={{
-            background: "linear-gradient(120deg,#1e3a8a 0%,#2c5fcc 55%,#1d4ed8 100%)",
-          }}
-        >
+        <main className="flex-1 flex flex-col p-5 gap-4">
+          {/* -- Page header banner -- */}
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-            style={{ background: "rgba(255,255,255,0.15)" }}
+            className="shrink-0 rounded-2xl px-5 py-3 flex items-center gap-3 shadow-md"
+            style={{
+              background:
+                "linear-gradient(120deg,#1e3a8a 0%,#2c5fcc 55%,#1d4ed8 100%)",
+            }}
           >
-            <MapPin size={18} className="text-white" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-base font-bold text-white leading-tight">
-              Gujarat Road Accident Overview
-            </h1>
-            <p className="text-[11px] text-blue-200 mt-0.5">
-              Hover a district to see its name &middot; Click to explore detailed analytics
-            </p>
-          </div>
-        </div>
-
-        {/* Main content grid: 60% map | 40% insights */}
-        <DistrictInsightsProvider>
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-5 gap-4">
-            {/* Map */}
             <div
-              className="lg:col-span-3 relative rounded-2xl overflow-hidden min-h-[420px]"
-              style={{
-                boxShadow: "0 4px 24px rgba(30,58,138,0.12)",
-                border: "1px solid #dde3f5",
-                background: "#fff",
-              }}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+              style={{ background: "rgba(255,255,255,0.15)" }}
             >
-              <GujaratChoroplethMap />
+              <MapPin size={18} className="text-white" />
             </div>
+            <div className="min-w-0">
+              <h1 className="text-base font-bold text-white leading-tight">
+                Gujarat Road Accident Overview
+              </h1>
+              <p className="text-[11px] text-blue-200 mt-0.5">
+                Hover a district to see its name · Click to explore detailed
+                analytics
+              </p>
+            </div>
+          </div>
 
-            {/* Insights panel — scrollable container */}
-            <div
-              className="lg:col-span-2 rounded-2xl min-h-0 overflow-hidden p-4"
-              style={{
-                boxShadow: "0 4px 24px rgba(30,58,138,0.10)",
-                border: "1px solid #dde3f5",
-                background: "#fff",
-              }}
-            >
-              <div className="p-4">
-                <GujaratInsightsPanel />
+          {/* Main content grid: map + insights */}
+          <DistrictInsightsProvider>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+              {/* Map */}
+              <div
+                className="lg:col-span-3 relative rounded-2xl overflow-hidden"
+                style={{
+                  height: "580px",
+                  boxShadow: "0 4px 24px rgba(30,58,138,0.12)",
+                  border: "1px solid #dde3f5",
+                  background: "#fff",
+                }}
+              >
+                <GujaratChoroplethMap />
+              </div>
+
+              {/* Insights panel — scrollable container */}
+              <div
+                className="lg:col-span-2 rounded-2xl overflow-hidden"
+                style={{
+                  height: "580px",
+                  boxShadow: "0 4px 24px rgba(30,58,138,0.10)",
+                  border: "1px solid #dde3f5",
+                  background: "#fff",
+                }}
+              >
+                <div className="p-4 h-full overflow-y-auto">
+                  <GujaratInsightsPanel />
+                </div>
               </div>
             </div>
+          </DistrictInsightsProvider>
+
+          {/* Combined Analysis Container */}
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{
+              boxShadow: "0 4px 24px rgba(30,58,138,0.12)",
+              border: "1px solid #dde3f5",
+              background: "#fff",
+            }}
+          >
+            <DistrictStatisticalAnalysis filters={{}} />
+            <TemporalAnalysis
+              filters={defaultFilters}
+              fetchFn={(f) => fetchGujaratTemporalAnalysis(f, "")}
+            />
           </div>
-        </DistrictInsightsProvider>
-      </main>
-    </div>
+        </main>
+      </div>
+    </ExportProvider>
   );
 }
-

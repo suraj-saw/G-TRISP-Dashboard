@@ -58,15 +58,15 @@ from typing import Optional
 EARTH_RADIUS_M = 6_371_000.0
 
 # ── IRC SP:88-2019 §4.2 constants ───────────────────────────────────────────
-IRC_RADIUS_M: float = 500.0          # standard blackspot radius (m)
+IRC_RADIUS_M: float = 250.0          # standard blackspot radius (m)
 IRC_MIN_CRASHES: int = 5             # min total (fatal+injury) accidents
 IRC_MIN_FATAL: int = 3               # alternate: min fatal accidents
 IRC_MIN_ASI: int = 15                # alternate: Accident Severity Index threshold
 
 # IRC severity weights (SP:88-2019 Annex A)
 IRC_SEVERITY_WEIGHTS: dict[str, int] = {
-    "Fatal": 3,
-    "Grievous Injury": 2,
+    "Fatal": 12,
+    "Grievous Injury": 3,
     "Minor Injury": 1,
     "Damage Only": 0,
 }

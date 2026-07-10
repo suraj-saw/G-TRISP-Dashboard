@@ -1,3 +1,5 @@
+
+
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   BarChart,
@@ -14,7 +16,10 @@ import {
   LabelList,
 } from "recharts";
 import { getDistrictStats } from "../../api/gujaratDashboardApi";
-import type { DistrictStats, DistrictStatsFilters } from "../../api/gujaratDashboardApi";
+import type {
+  DistrictStats,
+  DistrictStatsFilters,
+} from "../../api/gujaratDashboardApi";
 import { AlertCircle } from "lucide-react";
 import { useExportContext } from "../../context/ExportContext";
 import { downloadGujaratExport } from "../../api/exportApi";
@@ -80,7 +85,9 @@ const getTopCategories = (
     count: item.count,
   }));
 
-  const othersCount = sorted.slice(limit).reduce((sum, item) => sum + item.count, 0);
+  const othersCount = sorted
+    .slice(limit)
+    .reduce((sum, item) => sum + item.count, 0);
 
   if (othersCount > 0) {
     topItems.push({
@@ -175,8 +182,18 @@ const HorizontalCategoryChartCard: React.FC<{
           margin={{ top: 10, right: 40, left: 5, bottom: 5 }}
           barCategoryGap="20%"
         >
-          <CartesianGrid stroke={GRID} horizontal={false} strokeDasharray="3 3" opacity={0.4} />
-          <XAxis type="number" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+          <CartesianGrid
+            stroke={GRID}
+            horizontal={false}
+            strokeDasharray="3 3"
+            opacity={0.4}
+          />
+          <XAxis
+            type="number"
+            tick={{ fill: MUTED, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+          />
           <YAxis
             dataKey="name"
             type="category"
@@ -184,10 +201,20 @@ const HorizontalCategoryChartCard: React.FC<{
             axisLine={false}
             tickLine={false}
             width={yAxisWidth}
-            tickFormatter={(val) => (typeof val === "string" && val.length > 20 ? `${val.substring(0, 18)}...` : val)}
+            tickFormatter={(val) =>
+              typeof val === "string" && val.length > 20
+                ? `${val.substring(0, 18)}...`
+                : val
+            }
           />
           <Tooltip content={<CustomTooltip />} />
-          <Bar dataKey="count" name="Accidents" fill={fillColor} radius={[0, 4, 4, 0]} barSize={14}>
+          <Bar
+            dataKey="count"
+            name="Accidents"
+            fill={fillColor}
+            radius={[0, 4, 4, 0]}
+            barSize={14}
+          >
             <LabelList
               dataKey="count"
               position="right"
@@ -207,13 +234,14 @@ interface DistrictStatisticalAnalysisProps {
   filters: DistrictStatsFilters;
 }
 
-const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = ({ filters }) => {
+const DistrictStatisticalAnalysis: React.FC<
+  DistrictStatisticalAnalysisProps
+> = ({ filters }) => {
   const [stats, setStats] = useState<DistrictStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchStats = useCallback(async () => {
-    if (!filters.district) return;
     setLoading(true);
     setError(null);
     try {
@@ -225,7 +253,6 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
       setLoading(false);
     }
   }, [
-    filters.district,
     filters.year,
     filters.startDate,
     filters.endDate,
@@ -266,12 +293,18 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
       supportedFormats: ["csv", "excel"],
       onExport: async (format) => {
         if (format === "csv" || format === "excel") {
-          await downloadGujaratExport(dashboardFilters, format, filters.district);
+          await downloadGujaratExport(
+            dashboardFilters,
+            format,
+            filters.district
+          );
         }
       },
     });
-    return () => { registerExportHandler(null); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      registerExportHandler(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filters.district,
     filters.year,
@@ -285,13 +318,27 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
     filters.lightCondition,
     filters.collisionType,
   ]);
-  const processedRoadType = useMemo(() => getTopCategories(stats?.road_type_breakdown, 8, "road_type"), [stats?.road_type_breakdown]);
+  const processedRoadType = useMemo(
+    () => getTopCategories(stats?.road_type_breakdown, 8, "road_type"),
+    [stats?.road_type_breakdown]
+  );
 
-
-  const processedCollisionType = useMemo(() => getTopCategories(stats?.collision_type_breakdown, 8, "label"), [stats?.collision_type_breakdown]);
-  const processedCollisionNature = useMemo(() => getTopCategories(stats?.collision_nature_breakdown, 10, "label"), [stats?.collision_nature_breakdown]);
-  const processedWeather = useMemo(() => getTopCategories(stats?.weather_breakdown, 8, "label"), [stats?.weather_breakdown]);
-  const processedLight = useMemo(() => getTopCategories(stats?.light_breakdown, 8, "label"), [stats?.light_breakdown]);
+  const processedCollisionType = useMemo(
+    () => getTopCategories(stats?.collision_type_breakdown, 8, "label"),
+    [stats?.collision_type_breakdown]
+  );
+  const processedCollisionNature = useMemo(
+    () => getTopCategories(stats?.collision_nature_breakdown, 10, "label"),
+    [stats?.collision_nature_breakdown]
+  );
+  const processedWeather = useMemo(
+    () => getTopCategories(stats?.weather_breakdown, 8, "label"),
+    [stats?.weather_breakdown]
+  );
+  const processedLight = useMemo(
+    () => getTopCategories(stats?.light_breakdown, 8, "label"),
+    [stats?.light_breakdown]
+  );
 
   const totalAccidents = stats?.total_accidents ?? 0;
   const yoyLabel =
@@ -325,11 +372,35 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
 
           {/* ── KPI Row ── */}
           <div className="kpi-row">
-            <KpiCard label="Total Accidents" value={totalAccidents.toLocaleString()} sub={yoyLabel} accent="#3b82f6" />
-            <KpiCard label="Fatalities" value={stats.total_fatalities.toLocaleString()} accent="#ef4444" />
-            <KpiCard label="Injuries" value={stats.total_injuries.toLocaleString()} accent="#f97316" />
-            <KpiCard label="Avg / Month" value={stats.avg_per_month.toFixed(1)} accent="#a855f7" />
-            <KpiCard label="Peak Hour" value={stats.peak_hour === null ? "—" : HOUR_LABELS(stats.peak_hour)} sub="highest frequency" accent="#10b981" />
+            <KpiCard
+              label="Total Accidents"
+              value={totalAccidents.toLocaleString()}
+              sub={yoyLabel}
+              accent="#3b82f6"
+            />
+            <KpiCard
+              label="Fatalities"
+              value={stats.total_fatalities.toLocaleString()}
+              accent="#ef4444"
+            />
+            <KpiCard
+              label="Injuries"
+              value={stats.total_injuries.toLocaleString()}
+              accent="#f97316"
+            />
+            <KpiCard
+              label="Avg / Month"
+              value={stats.avg_per_month.toFixed(1)}
+              accent="#a855f7"
+            />
+            <KpiCard
+              label="Peak Hour"
+              value={
+                stats.peak_hour === null ? "—" : HOUR_LABELS(stats.peak_hour)
+              }
+              sub="highest frequency"
+              accent="#10b981"
+            />
           </div>
 
           {/* ── Dashboard Matrix ── */}
@@ -337,11 +408,14 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
           {/* Row 1: Severity Breakdown + Road Classification */}
           <div className="charts-row charts-row--two">
             <ChartCard title="Severity Distribution">
-              {!stats.severity_breakdown || stats.severity_breakdown.length === 0 ? (
+              {!stats.severity_breakdown ||
+              stats.severity_breakdown.length === 0 ? (
                 <EmptyState />
               ) : (
                 <ResponsiveContainer width="100%" height={280}>
-                  <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                  <PieChart
+                    margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                  >
                     <Pie
                       data={stats.severity_breakdown}
                       dataKey="count"
@@ -353,11 +427,18 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                       paddingAngle={3}
                     >
                       {stats.severity_breakdown.map((entry, i) => (
-                        <Cell key={i} fill={SEVERITY_COLORS[entry.label] ?? "#64748b"} />
+                        <Cell
+                          key={i}
+                          fill={SEVERITY_COLORS[entry.label] ?? "#64748b"}
+                        />
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value) => [typeof value === "number" ? `${value.toLocaleString()} accidents` : value]}
+                      formatter={(value) => [
+                        typeof value === "number"
+                          ? `${value.toLocaleString()} accidents`
+                          : value,
+                      ]}
                       contentStyle={{
                         background: "#ffffff",
                         border: "1px solid #e2e8f0",
@@ -367,10 +448,10 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                         boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                       }}
                     />
-                    <Legend 
-                      iconType="circle" 
-                      iconSize={8} 
-                      align="center" 
+                    <Legend
+                      iconType="circle"
+                      iconSize={8}
+                      align="center"
                       verticalAlign="bottom"
                       content={(props) => {
                         const { payload } = props;
@@ -378,13 +459,25 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                           <div className="custom-legend-grid">
                             {payload?.map((entry: any, index: number) => {
                               const val = entry.payload?.count ?? 0;
-                              const pct = totalAccidents > 0 ? ((val / totalAccidents) * 100).toFixed(1) : "0";
-                              const formattedVal = val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val;
+                              const pct =
+                                totalAccidents > 0
+                                  ? ((val / totalAccidents) * 100).toFixed(1)
+                                  : "0";
+                              const formattedVal =
+                                val >= 1000
+                                  ? `${(val / 1000).toFixed(1)}k`
+                                  : val;
                               return (
                                 <div key={index} className="legend-item">
-                                  <span className="legend-dot" style={{ backgroundColor: entry.color }} />
+                                  <span
+                                    className="legend-dot"
+                                    style={{ backgroundColor: entry.color }}
+                                  />
                                   <span className="legend-label">
-                                    {entry.value}: <span className="legend-value">{formattedVal} ({pct}%)</span>
+                                    {entry.value}:{" "}
+                                    <span className="legend-value">
+                                      {formattedVal} ({pct}%)
+                                    </span>
                                   </span>
                                 </div>
                               );
@@ -398,31 +491,74 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
               )}
             </ChartCard>
 
-            <HorizontalCategoryChartCard title="Road Classification" data={processedRoadType} fillColor="rgba(168, 85, 247, 0.75)" yAxisWidth={100} />
+            <HorizontalCategoryChartCard
+              title="Road Classification"
+              data={processedRoadType}
+              fillColor="rgba(168, 85, 247, 0.75)"
+              yAxisWidth={100}
+            />
           </div>
 
           {/* Row 2: Collision Type + Vehicle Involved */}
           <div className="charts-row charts-row--two">
-            <HorizontalCategoryChartCard title="Collision Type Distribution" data={processedCollisionType} fillColor={CHART_TEAL} yAxisWidth={110} />
+            <HorizontalCategoryChartCard
+              title="Collision Type Distribution"
+              data={processedCollisionType}
+              fillColor={CHART_TEAL}
+              yAxisWidth={110}
+            />
 
             <ChartCard title="Vehicles Involved">
-              {!stats.vehicle_involvement_breakdown || stats.vehicle_involvement_breakdown.length === 0 ? (
+              {!stats.vehicle_involvement_breakdown ||
+              stats.vehicle_involvement_breakdown.length === 0 ? (
                 <EmptyState />
               ) : (
                 <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={stats.vehicle_involvement_breakdown} margin={{ top: 20, right: 15, left: -15, bottom: 5 }} barCategoryGap="30%">
-                    <CartesianGrid stroke={GRID} vertical={false} strokeDasharray="3 3" opacity={0.4} />
-                    <XAxis dataKey="label" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <BarChart
+                    data={stats.vehicle_involvement_breakdown}
+                    margin={{ top: 20, right: 15, left: -15, bottom: 5 }}
+                    barCategoryGap="30%"
+                  >
+                    <CartesianGrid
+                      stroke={GRID}
+                      vertical={false}
+                      strokeDasharray="3 3"
+                      opacity={0.4}
+                    />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: MUTED, fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: MUTED, fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="count" name="Accidents" radius={[4, 4, 0, 0]} barSize={36}>
+                    <Bar
+                      dataKey="count"
+                      name="Accidents"
+                      radius={[4, 4, 0, 0]}
+                      barSize={36}
+                    >
                       {stats.vehicle_involvement_breakdown.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={INVOLVED_GRADIENT[index % INVOLVED_GRADIENT.length]} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={
+                            INVOLVED_GRADIENT[index % INVOLVED_GRADIENT.length]
+                          }
+                        />
                       ))}
                       <LabelList
                         dataKey="count"
                         position="top"
-                        style={{ fill: "#475569", fontSize: 10, fontWeight: 600 }}
+                        style={{
+                          fill: "#475569",
+                          fontSize: 10,
+                          fontWeight: 600,
+                        }}
                         formatter={(val: any) => Number(val).toLocaleString()}
                       />
                     </Bar>
@@ -434,20 +570,69 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
 
           {/* Row 3: Victim Composition */}
           <div className="charts-row charts-row--one">
-            <ChartCard title="Victim Composition (Drivers, Passengers, Pedestrians)" className="chart--full">
-              {!stats.victim_composition || stats.victim_composition.length === 0 ? (
+            <ChartCard
+              title="Victim Composition (Drivers, Passengers, Pedestrians)"
+              className="chart--full"
+            >
+              {!stats.victim_composition ||
+              stats.victim_composition.length === 0 ? (
                 <EmptyState />
               ) : (
                 <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={stats.victim_composition} margin={{ top: 20, right: 20, left: -10, bottom: 5 }} barGap={8}>
-                    <CartesianGrid stroke={GRID} vertical={false} strokeDasharray="3 3" opacity={0.4} />
-                    <XAxis dataKey="type" tick={{ fill: MUTED, fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <BarChart
+                    data={stats.victim_composition}
+                    margin={{ top: 20, right: 20, left: -10, bottom: 5 }}
+                    barGap={8}
+                  >
+                    <CartesianGrid
+                      stroke={GRID}
+                      vertical={false}
+                      strokeDasharray="3 3"
+                      opacity={0.4}
+                    />
+                    <XAxis
+                      dataKey="type"
+                      tick={{ fill: MUTED, fontSize: 12, fontWeight: 600 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: MUTED, fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
                     <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 12, color: MUTED, paddingTop: "12px" }} iconType="circle" iconSize={10} />
-                    <Bar dataKey="Killed" name="Fatal (Killed)" stackId="a" fill={SEVERITY_COLORS["Fatal"]} barSize={45} />
-                    <Bar dataKey="Grievous Injury" name="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} barSize={45} />
-                    <Bar dataKey="Minor Injury" name="Minor Injury" stackId="a" fill={SEVERITY_COLORS["Minor Injury"]} radius={[4, 4, 0, 0]} barSize={45} />
+                    <Legend
+                      wrapperStyle={{
+                        fontSize: 12,
+                        color: MUTED,
+                        paddingTop: "12px",
+                      }}
+                      iconType="circle"
+                      iconSize={10}
+                    />
+                    <Bar
+                      dataKey="Killed"
+                      name="Fatal (Killed)"
+                      stackId="a"
+                      fill={SEVERITY_COLORS["Fatal"]}
+                      barSize={45}
+                    />
+                    <Bar
+                      dataKey="Grievous Injury"
+                      name="Grievous Injury"
+                      stackId="a"
+                      fill={SEVERITY_COLORS["Grievous Injury"]}
+                      barSize={45}
+                    />
+                    <Bar
+                      dataKey="Minor Injury"
+                      name="Minor Injury"
+                      stackId="a"
+                      fill={SEVERITY_COLORS["Minor Injury"]}
+                      radius={[4, 4, 0, 0]}
+                      barSize={45}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -456,13 +641,28 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
 
           {/* Row 4: Weather Condition + Light Condition */}
           <div className="charts-row charts-row--two">
-            <HorizontalCategoryChartCard title="Weather Condition Breakdown" data={processedWeather} fillColor={CHART_BLUE} yAxisWidth={110} />
-            <HorizontalCategoryChartCard title="Light Condition Analysis" data={processedLight} fillColor={CHART_PURPLE} yAxisWidth={110} />
+            <HorizontalCategoryChartCard
+              title="Weather Condition Breakdown"
+              data={processedWeather}
+              fillColor={CHART_BLUE}
+              yAxisWidth={110}
+            />
+            <HorizontalCategoryChartCard
+              title="Light Condition Analysis"
+              data={processedLight}
+              fillColor={CHART_PURPLE}
+              yAxisWidth={110}
+            />
           </div>
 
           {/* Row 5: Collision Nature */}
           <div className="charts-row charts-row--one">
-            <HorizontalCategoryChartCard title="Collision Nature Analysis (Top 10)" data={processedCollisionNature} fillColor={CHART_INDIGO} yAxisWidth={150} />
+            <HorizontalCategoryChartCard
+              title="Collision Nature Analysis (Top 10)"
+              data={processedCollisionNature}
+              fillColor={CHART_INDIGO}
+              yAxisWidth={150}
+            />
           </div>
         </>
       )}
@@ -475,7 +675,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
           padding: 24px;
           background: #f8fafc;
           overflow-y: auto;
-          height: 100%;
+          min-height: 400px;
           box-sizing: border-box;
         }
 

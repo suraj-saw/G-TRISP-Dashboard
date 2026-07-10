@@ -9,8 +9,8 @@ import { fetchGujaratDistrictSummary } from "../../api/gujaratDashboardApi";
 import { buildDistrictDashboardPath } from "../../config/constants";
 import { useDistrictInsights } from "../../context/DistrictInsightsContext";
 // Internal dimensions for the SVG viewBox
-const SVG_W = 600;
-const SVG_H = 650;
+const SVG_W = 700;
+const SVG_H = 600;
 
 interface DistrictFeature {
   slug: string;
@@ -116,11 +116,18 @@ export default function GujaratChoroplethMap() {
         const projection = geoMercator();
         projection.fitExtent(
           [
-            [20, 20],
-            [SVG_W - 20, SVG_H - 20],
+            [10, 10],
+            [SVG_W - 10, SVG_H - 10],
           ],
           collection as any
         );
+
+        // 2. Zoom in by 15% to eat up empty space
+        projection.scale(projection.scale() * 1.15);
+
+        // 3. Nudge the map 40 pixels to the right to visually center it
+        const [tx, ty] = projection.translate();
+        projection.translate([tx + 40, ty]);
         const pathFn = geoPath(projection);
 
         const built: DistrictFeature[] = [];

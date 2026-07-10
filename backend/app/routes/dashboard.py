@@ -167,6 +167,14 @@ def get_filter_options(
     if district:
         date_q = date_q.filter(Accident.district.in_(district))
     min_dt, max_dt = date_q.first()
+    
+    # Get distinct years
+    year_q = db.query(func.extract("year", Accident.accident_date_time)).filter(
+        Accident.accident_date_time.isnot(None)
+    )
+    if district:
+        year_q = year_q.filter(Accident.district.in_(district))
+    years = sorted([int(r[0]) for r in year_q.distinct().all()])
 
     return FilterOptions(
         road_classifications=distinct(Accident.road_classification),
@@ -174,6 +182,8 @@ def get_filter_options(
         light_conditions=distinct(Accident.light_condition),
         collision_types=distinct(Accident.type_of_collision),
         police_stations=distinct(Accident.police_station),
+        severities=distinct(Accident.severity),
+        years=years,
         min_date=min_dt.date().isoformat() if min_dt else None,
         max_date=max_dt.date().isoformat() if max_dt else None,
     )
@@ -2192,7 +2202,7 @@ def get_district_insights(db: Session = Depends(get_db)):
 
 @router.get("/district-stats")
 def get_district_stats(
-    district: str,
+    district: Optional[List[str]] = Query(None),
     year: Optional[List[str]] = Query(None),
     severity: Optional[List[str]] = Query(None),
     road_classification: Optional[List[str]] = Query(None),
@@ -2205,7 +2215,7 @@ def get_district_stats(
     date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """Return district statistics using the same filters as the spatial view."""
+    """Return statistics using the same filters as the spatial view (for single district or all Gujarat)."""
     query = apply_filters(
         db.query(Accident),
         district=district,

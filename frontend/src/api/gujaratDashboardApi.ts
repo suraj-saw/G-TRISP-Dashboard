@@ -201,7 +201,9 @@ export const fetchGujaratWeightedKdeHeatmap = async (
   if (filters.visualization_variant === "pedestrian") {
     params.append("is_pedestrian", "true");
   }
-  const { data } = await API.get(`${GUJARAT_API_BASE}/weighted-kde-heatmap`, { params });
+  const { data } = await API.get(`${GUJARAT_API_BASE}/weighted-kde-heatmap`, {
+    params,
+  });
   return data;
 };
 
@@ -294,11 +296,10 @@ export const fetchDistrictInsights =
     return data;
   };
 
-
 // ─── Types ───────────────────────────────────────────────────────────────────
- 
+
 export interface DistrictStatsFilters {
-  district: string;
+  district?: string;
   year?: string[];
   startDate?: string;
   endDate?: string;
@@ -310,29 +311,29 @@ export interface DistrictStatsFilters {
   lightCondition?: string[];
   collisionType?: string[];
 }
- 
+
 export interface SeverityBreakdown {
   label: string;
   count: number;
   percentage: number;
 }
- 
+
 export interface MonthlyTrend {
   month: string;
   accidents: number;
   fatal: number;
 }
- 
+
 export interface HourlyDistribution {
   hour: number;
   accidents: number;
 }
- 
+
 export interface RoadTypeBreakdown {
   road_type: string;
   count: number;
 }
- 
+
 export interface DistrictStats {
   total_accidents: number;
   total_fatalities: number;
@@ -361,12 +362,14 @@ export interface DistrictStats {
 
 /**
  * Fetch pre-aggregated statistical data for the Statistical Analysis tab.
- * Backend endpoint: GET /api/district-stats/{district_slug}
+ * Backend endpoint: GET /api/gujarat-dashboard/district-stats
+ * Accepts optional district for single district, or none for Gujarat-wide
  */
 export async function getDistrictStats(
   filters: DistrictStatsFilters
 ): Promise<DistrictStats> {
-  const params = new URLSearchParams({ district: filters.district });
+  const params = new URLSearchParams();
+  if (filters.district) params.set("district", filters.district);
   if (filters.startDate) params.set("date_from", filters.startDate);
   if (filters.endDate) params.set("date_to", filters.endDate);
 

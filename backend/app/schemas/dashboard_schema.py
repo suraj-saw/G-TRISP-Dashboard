@@ -232,6 +232,8 @@ class FilterOptions(ResponseModel):
     light_conditions: List[str]
     collision_types: List[str]
     police_stations: List[str] = []
+    severities: List[str] = []
+    years: List[int] = []
     min_date: Optional[str] = None
     max_date: Optional[str] = None
 

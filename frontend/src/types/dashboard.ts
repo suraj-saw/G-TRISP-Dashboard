@@ -24,6 +24,8 @@ export interface FilterOptions {
   light_conditions: string[];
   collision_types: string[];
   police_stations?: string[]; // NEW
+  severities: string[];
+  years: number[];
   min_date?: string;
   max_date?: string;
 }

@@ -77,11 +77,11 @@ export default function CoordinateStatusBar() {
           <span className="font-semibold text-slate-700">Lng:</span>
           <span>{coordinates.lng.toFixed(6)}</span>
         </div>
-        <div className="w-px h-4 bg-slate-200" />
-        <div className="flex items-center gap-1">
+        {/* <div className="w-px h-4 bg-slate-200" /> */}
+        {/* <div className="flex items-center gap-1">
           <span className="font-semibold text-slate-700">Zoom:</span>
           <span>{coordinates.zoom.toFixed(2)}</span>
-        </div>
+        </div> */}
       </div>
     </div>
   );
