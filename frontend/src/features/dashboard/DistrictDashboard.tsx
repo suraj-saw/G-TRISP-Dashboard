@@ -14,7 +14,8 @@ import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLa
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
 import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
 import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
-// import { DensityMapOverlays } from "../../components/maps/MapOverlays";
+// import DensityMapOverlays from "../../components/maps/DensityMapOverlays";
+import SeverityLegend from "../../components/maps/SeverityLegend";
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
 import DistrictBaseMap from "../../components/maps/DistrictBaseMap";
@@ -887,15 +888,7 @@ export default function DistrictDashboard() {
                   boundaryLoading={boundaryLoading}
                   boundaryError={boundaryError}
                   loadingLabel={`Loading ${districtName || "district"}…`}
-                  // overlays={
-                  //   showDensityLegend ? (
-                  //     <DensityMapOverlays
-                  //       data={displayHeatmapData}
-                  //       subtitle={overlaySubtitle}
-                  //       title={densityLegendTitle}
-                  //     />
-                  //   ) : undefined
-                  // }
+                  overlays={undefined}
                 >
                   {isPedestrianBlackspot ? (
                     <BlackspotDetectionLayers
@@ -944,6 +937,7 @@ export default function DistrictDashboard() {
                       selectedSeverity={filters.severity}
                     />
                   )}
+                  <SeverityLegend visualizationLayerType={visualizationLayerType} />
                 </DistrictBaseMap>
                 {!loading &&
                   !error &&

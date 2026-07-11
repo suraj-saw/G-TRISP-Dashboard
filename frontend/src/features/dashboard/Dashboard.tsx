@@ -46,6 +46,7 @@ import {
   fetchWeightedKdeHeatmap,
 } from "../../api/dashboardApi";
 import SuratBaseMap from "../../components/maps/SuratBaseMap";
+import SeverityLegend from "../../components/maps/SeverityLegend";
 import { MAP_STYLES } from "../../components/maps/mapStyles";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
 import LocationMarkersInsights from "../../components/charts/LocationMarkersInsights";
@@ -623,9 +624,7 @@ export default function Dashboard() {
                   height="100%"
                   sidebarOpen={sidebarOpen}
                   baseMap={filters.baseMap || DEFAULT_BASE_MAP}
-                  overlays={
-                    undefined
-                  }
+                  overlays={undefined}
                 >
                   {isPedestrianBlackspot ? (
                     <BlackspotDetectionLayers
@@ -666,6 +665,7 @@ export default function Dashboard() {
                       selectedSeverity={filters.severity}
                     />
                   )}
+                  <SeverityLegend visualizationLayerType={visualizationLayerType} />
                 </SuratBaseMap>
               </div>
             )}

@@ -53,18 +53,40 @@ interface HoveredBlackspot {
 //   "Damage Only": "#FBBF24",
 // };
 
+const SEVERITY_COLORS = {
+  Fatal: "#B91C1C",
+  "Grievous Injury": "#EA580C",
+  "Minor Injury Hospitalized": "#F59E0B",
+  "Minor Injury Non Hospitalized": "#FBBF24",
+  "No Injury": "#65A30D",
+  default: "#64748B",
+} as const;
+
 const severityColorExpression = [
-  "match",
-  ["get", "severity"],
-  "Fatal",
-  "#4C1D1D",
-  "Grievous Injury",
-  "#DC2626",
-  "Minor Injury",
-  "#EA580C",
-  "Damage Only",
-  "#FBBF24",
-  "#64748b",
+  "case",
+  ["in", "fatal", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+  SEVERITY_COLORS.Fatal,
+  ["in", "grievous", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+  SEVERITY_COLORS["Grievous Injury"],
+  [
+    "in",
+    "minor injury hospitalized",
+    ["downcase", ["coalesce", ["get", "severity"], ""]],
+  ],
+  SEVERITY_COLORS["Minor Injury Hospitalized"],
+  [
+    "in",
+    "minor injury non",
+    ["downcase", ["coalesce", ["get", "severity"], ""]],
+  ],
+  SEVERITY_COLORS["Minor Injury Non Hospitalized"],
+  [
+    "any",
+    ["in", "no injury", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+    ["in", "damage only", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+  ],
+  SEVERITY_COLORS["No Injury"],
+  SEVERITY_COLORS.default,
 ] as const;
 
 const NULL_TEXT_SENTINEL = "nan";
