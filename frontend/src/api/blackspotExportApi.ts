@@ -11,14 +11,14 @@ function buildBlackspotExportParams(
   algorithm: BlackspotAlgorithm,
   isSurat: boolean,
   districtName?: string,
-  bsId?: number
+  bsIds?: string
 ): URLSearchParams {
   const params = new URLSearchParams();
   params.set("format", format);
   params.set("algorithm", algorithm);
 
-  if (bsId !== undefined) {
-    params.set("bs_id", String(bsId));
+  if (bsIds !== undefined && bsIds.trim()) {
+    params.set("bs_ids", bsIds.trim());
   }
 
   if (isSurat) {
@@ -55,7 +55,7 @@ export async function downloadBlackspotExport(
   algorithm: BlackspotAlgorithm,
   isSurat: boolean = true,
   districtName?: string,
-  bsId?: number
+  bsIds?: string
 ): Promise<void> {
   const base = isSurat ? SURAT_API_BASE : GUJARAT_API_BASE;
   const params = buildBlackspotExportParams(
@@ -64,7 +64,7 @@ export async function downloadBlackspotExport(
     algorithm,
     isSurat,
     districtName,
-    bsId
+    bsIds
   );
   const url = `/api${base}/blackspot-export?${params.toString()}`;
 

@@ -1,5 +1,6 @@
 import React from "react";
 import ExportButton from "../layout/ExportButton";
+import BlackspotExportButton from "../layout/BlackspotExportButton";
 import type { DashboardFilters } from "../../types/dashboard";
 
 export type AnalysisView = "spatial" | "statistical" | "temporal";
@@ -9,6 +10,9 @@ interface DistrictAnalysisTabsProps {
   onViewChange: (view: AnalysisView) => void;
   filters: DashboardFilters;
   districtName?: string;
+  isBlackspotDetection?: boolean;
+  isDbscanBlackspot?: boolean;
+  isPedestrianVariant?: boolean;
 }
 
 const tabs: { id: AnalysisView; label: string; icon: string }[] = [
@@ -43,10 +47,21 @@ const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
   onViewChange,
   filters,
   districtName,
+  isBlackspotDetection,
+  isDbscanBlackspot,
+  isPedestrianVariant,
 }) => {
+  const showBlackspotExport =
+    activeView === "spatial" &&
+    ((isBlackspotDetection && !isPedestrianVariant) || isDbscanBlackspot);
+
   return (
     <div className="district-analysis-tabs">
-      <div className="tabs-inner" role="tablist" aria-label="District analysis view">
+      <div
+        className="tabs-inner"
+        role="tablist"
+        aria-label="District analysis view"
+      >
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -68,6 +83,17 @@ const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
       {activeView !== "spatial" && (
         <div className="ml-auto h-full flex items-center py-1">
           <ExportButton filters={filters} districtName={districtName} />
+        </div>
+      )}
+
+      {showBlackspotExport && (
+        <div className="ml-auto h-full flex items-center py-1">
+          <BlackspotExportButton
+            filters={filters}
+            algorithm={isDbscanBlackspot ? "dbscan" : "greedy"}
+            isSurat={false}
+            districtName={districtName}
+          />
         </div>
       )}
 

@@ -1566,7 +1566,7 @@ def export_blackspots(
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
     min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
     algorithm: str = Query("greedy", enum=["greedy", "dbscan"]),
-    bs_id: Optional[int] = Query(None, description="Blackspot number to export accident details for"),
+    bs_ids: Optional[str] = Query(None, description="Blackspot number(s) to export: single (e.g. 3), range (e.g. 1-5), or comma-separated (e.g. 1,3,5)"),
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
@@ -1623,15 +1623,37 @@ def export_blackspots(
     # Build lookup by primary key id (since crash_ids now use id)
     acc_by_db_id = {a.id: a for a in filtered_accidents}
 
-    # Determine which blackspots to export
-    if bs_id is not None:
-        target_bs = [bs for bs in blackspots if bs.bs_id == bs_id]
-        if not target_bs:
-            from fastapi.responses import JSONResponse
-            return JSONResponse(
-                status_code=404,
-                content={"detail": f"Blackspot #{bs_id} not found."},
-            )
+    # Parse and determine which blackspots to export
+    target_bs_ids = []
+    if bs_ids is not None:
+        bs_ids = bs_ids.strip()
+        if bs_ids:
+            # Split by commas first
+            parts = [p.strip() for p in bs_ids.split(',') if p.strip()]
+            for part in parts:
+                if '-' in part:
+                    # Handle range, e.g. "1-5"
+                    range_parts = part.split('-')
+                    if len(range_parts) == 2:
+                        try:
+                            start = int(range_parts[0].strip())
+                            end = int(range_parts[1].strip())
+                            if start <= end:
+                                target_bs_ids.extend(range(start, end + 1))
+                        except ValueError:
+                            # Skip invalid numbers
+                            pass
+                else:
+                    # Handle single number
+                    try:
+                        target_bs_ids.append(int(part.strip()))
+                    except ValueError:
+                        # Skip invalid numbers
+                        pass
+
+    if target_bs_ids:
+        target_bs = [bs for bs in blackspots if bs.bs_id in target_bs_ids]
+        # Check if any of the requested blackspots were not found? Maybe just proceed with what's found
     else:
         target_bs = blackspots
 
@@ -1648,8 +1670,10 @@ def export_blackspots(
                 pass  # Skip if it's not a valid integer (shouldn't happen anymore)
 
     timestamp = dt.now().strftime("%Y%m%d_%H%M%S")
-    if bs_id is not None:
-        filename = f"blackspot_{bs_id}_accidents_{algorithm}_{timestamp}"
+    if bs_ids is not None and bs_ids.strip():
+        # Sanitize filename to remove invalid characters
+        safe_bs_ids = bs_ids.replace(' ', '_').replace(',', '_').replace('-', '_to_')
+        filename = f"blackspots_{safe_bs_ids}_accidents_{algorithm}_{timestamp}"
     else:
         filename = f"all_blackspot_accidents_{algorithm}_{timestamp}"
 
@@ -1668,7 +1692,7 @@ def export_blackspots(
     meta_rows = [
         ("Export Date", dt.now().strftime("%d %b %Y %H:%M")),
         ("Algorithm", algorithm.upper()),
-        ("Blackspot #", bs_id if bs_id is not None else "All"),
+        ("Blackspot #", bs_ids if bs_ids is not None and bs_ids.strip() else "All"),
         ("Total Blackspots", len(target_bs)),
         ("Total Accident Records", len(accidents_with_bs)),
         ("Total Crashes Analyzed", len(points)),

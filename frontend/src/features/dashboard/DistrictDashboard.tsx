@@ -872,6 +872,9 @@ export default function DistrictDashboard() {
                 onViewChange={setAnalysisView}
                 filters={filters}
                 districtName={districtName}
+                isBlackspotDetection={isBlackspotDetection}
+                isDbscanBlackspot={isDbscanBlackspot}
+                isPedestrianVariant={isPedestrianVariant}
               />
               <motion.div
                 className={`min-h-0 w-full flex-1 ${

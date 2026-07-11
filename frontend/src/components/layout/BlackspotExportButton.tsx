@@ -41,7 +41,7 @@ export default function BlackspotExportButton({
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [pos, setPos] = useState<MenuPos | null>(null);
-  const [bsIdInput, setBsIdInput] = useState("");
+  const [bsIdsInput, setBsIdsInput] = useState("");
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -50,7 +50,7 @@ export default function BlackspotExportButton({
     const el = triggerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    setPos({ top: rect.top - 8, left: rect.left, width: rect.width });
+    setPos({ top: rect.top, left: rect.left, width: rect.width });
   };
 
   useEffect(() => {
@@ -84,11 +84,56 @@ export default function BlackspotExportButton({
     }
   }, [status]);
 
-  const parsedBsId = bsIdInput.trim() === "" ? undefined : parseInt(bsIdInput, 10);
-  const isValidBsId = parsedBsId === undefined || (!isNaN(parsedBsId) && parsedBsId >= 1);
+  // Function to validate the input
+  const validateInput = (
+    input: string
+  ): { valid: boolean; message?: string } => {
+    const trimmed = input.trim();
+    if (!trimmed) {
+      return { valid: false, message: "Please enter blackspot number(s)" };
+    }
+
+    // Split by commas
+    const parts = trimmed
+      .split(",")
+      .map((p) => p.trim())
+      .filter((p) => p);
+    for (const part of parts) {
+      if (part.includes("-")) {
+        // Range, e.g. "1-5"
+        const rangeParts = part
+          .split("-")
+          .map((rp) => rp.trim())
+          .filter((rp) => rp);
+        if (rangeParts.length !== 2) {
+          return {
+            valid: false,
+            message: "Invalid range format (use e.g. 1-5)",
+          };
+        }
+        const start = parseInt(rangeParts[0], 10);
+        const end = parseInt(rangeParts[1], 10);
+        if (isNaN(start) || isNaN(end) || start < 1 || end < 1 || start > end) {
+          return {
+            valid: false,
+            message: "Invalid range (start must be ≤ end and ≥ 1)",
+          };
+        }
+      } else {
+        // Single number
+        const num = parseInt(part, 10);
+        if (isNaN(num) || num < 1) {
+          return { valid: false, message: "Invalid number (must be ≥ 1)" };
+        }
+      }
+    }
+    return { valid: true };
+  };
+
+  const validation = validateInput(bsIdsInput);
 
   const handleExport = async (format: BlackspotExportFormat) => {
-    if (!isValidBsId) return;
+    if (!validation.valid) return;
     setOpen(false);
     setStatus("loading");
     setErrorMsg(null);
@@ -99,9 +144,10 @@ export default function BlackspotExportButton({
         algorithm,
         isSurat,
         districtName,
-        parsedBsId
+        bsIdsInput
       );
       setStatus("success");
+      setBsIdsInput("");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Export failed.";
       setErrorMsg(msg);
@@ -158,10 +204,9 @@ export default function BlackspotExportButton({
   };
 
   const algorithmLabel = algorithm === "dbscan" ? "DBSCAN" : "Greedy";
-  const exportLabel =
-    parsedBsId !== undefined
-      ? `Blackspot #${parsedBsId} accidents`
-      : "All blackspot accidents";
+  const exportLabel = bsIdsInput.trim()
+    ? `Blackspot(s) ${bsIdsInput.trim()} accidents`
+    : "Please enter blackspot number(s)";
 
   return (
     <div className="relative w-full">
@@ -190,12 +235,15 @@ export default function BlackspotExportButton({
             ref={menuRef}
             style={{
               position: "fixed",
-              bottom: window.innerHeight - pos.top,
-              left: pos.left,
+              top: pos.top + triggerRef.current!.offsetHeight + 8,
+              left: Math.min(
+                pos.left,
+                window.innerWidth - Math.max(pos.width, 220) - 16
+              ),
               width: Math.max(pos.width, 220),
               zIndex: 9999,
             }}
-            className="rounded-xl border border-[#E4E8F4] bg-white shadow-[0_-8px_32px_rgba(15,23,42,0.14)] overflow-hidden"
+            className="rounded-xl border border-[#E4E8F4] bg-white shadow-[0_8px_32px_rgba(15,23,42,0.14)] overflow-hidden"
           >
             <div className="px-3 py-2 border-b border-[#F1F4FB] bg-[#F7F9FD]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#6B7299]">
@@ -206,34 +254,41 @@ export default function BlackspotExportButton({
             {/* Blackspot Number Input */}
             <div className="px-3 py-2.5 border-b border-[#F1F4FB]">
               <label className="block text-[10px] font-semibold text-[#6B7299] mb-1.5">
-                Blackspot # <span className="font-normal text-[#9BA3C2]">(leave empty for all)</span>
+                Blackspot #{" "}
+                <span className="font-normal text-[#9BA3C2]">
+                  (enter number(s); use , for multiple, - for range)
+                </span>
               </label>
               <input
-                type="number"
-                min={1}
-                value={bsIdInput}
-                onChange={(e) => setBsIdInput(e.target.value)}
-                placeholder="e.g. 1, 2, 3..."
+                type="text"
+                value={bsIdsInput}
+                onChange={(e) => setBsIdsInput(e.target.value)}
+                placeholder="e.g. 3, 1-5, 2,4-7"
                 className="w-full rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] px-3 py-2 text-[12px] text-[#1A1D2E] placeholder-[#B0B8D1] outline-none focus:border-[#1e3a8a] focus:ring-1 focus:ring-[#1e3a8a]/20 transition"
               />
-              {bsIdInput.trim() !== "" && !isValidBsId && (
-                <p className="text-[10px] text-red-500 mt-1">
-                  Enter a valid number ≥ 1
-                </p>
-              )}
+              {bsIdsInput.trim() !== "" &&
+                !validation.valid &&
+                validation.message && (
+                  <p className="text-[10px] text-red-500 mt-1">
+                    {validation.message}
+                  </p>
+                )}
             </div>
 
             {/* Download description */}
             <div className="px-3 py-1.5 bg-[#FAFBFE]">
               <p className="text-[10px] text-[#6B7299]">
-                Download: <span className="font-semibold text-[#1A1D2E]">{exportLabel}</span>
+                Download:{" "}
+                <span className="font-semibold text-[#1A1D2E]">
+                  {exportLabel}
+                </span>
               </p>
             </div>
 
             <div className="p-1.5 flex flex-col gap-1">
               <button
                 type="button"
-                disabled={!isValidBsId}
+                disabled={!validation.valid}
                 onClick={() => handleExport("csv")}
                 className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-left text-[13px] font-medium text-[#1A1D2E] hover:bg-[#EEF2FB] hover:text-[#1e3a8a] transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -250,7 +305,7 @@ export default function BlackspotExportButton({
 
               <button
                 type="button"
-                disabled={!isValidBsId}
+                disabled={!validation.valid}
                 onClick={() => handleExport("excel")}
                 className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-left text-[13px] font-medium text-[#1A1D2E] hover:bg-[#EEF2FB] hover:text-[#1e3a8a] transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
