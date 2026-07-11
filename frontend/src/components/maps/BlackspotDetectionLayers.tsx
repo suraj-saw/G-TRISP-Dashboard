@@ -532,7 +532,7 @@ export default function BlackspotDetectionLayers({
   };
 
   const StatusBadge = ({ children }: { children: React.ReactNode }) => (
-    <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 z-20">
+    <div className="pointer-events-none absolute bottom-4 left-4 z-20">
       <div className="pointer-events-auto rounded-full border border-slate-200/50 bg-white/90 px-5 py-3 shadow-xl backdrop-blur-md text-sm font-medium text-slate-700 flex items-center gap-3 transition-all duration-300 hover:bg-white/95">
         {children}
       </div>

@@ -26,7 +26,7 @@ export type FilterId =
   | "light_condition"
   | "collision_type"
   | "date_from"
-  | "date_to";  
+  | "date_to";
 
 export interface FilterConfigItem {
   id: FilterId;
@@ -37,25 +37,25 @@ export interface FilterConfigItem {
 export const VISUALIZATION_OPTIONS = [
   { value: "location_markers", label: "Markers" },
   { value: "density_heatmap", label: "Density Heatmap" },
-  { value: "kde_heatmap", label: "Kernel Density Heatmap (KDE)" },
-  { value: "weighted_kde_heatmap", label: "Severity-Weighted KDE Heatmap" },
+  // { value: "kde_heatmap", label: "Kernel Density Heatmap (KDE)" },
+  // { value: "weighted_kde_heatmap", label: "Severity-Weighted KDE Heatmap" },
   { value: "blackspot", label: "Blackspot Detection" },
   { value: "dbscan_blackspot", label: "DBSCAN Blackspot Detection" },
   { value: "temporal_analysis", label: "Temporal Analysis" },
 ];
 
 export const VISUALIZATION_VARIANT_OPTIONS = [
-  { value: "accident", label: "Accident" },
-  { value: "pedestrian", label: "Pedestrian" },
+  { value: "accident", label: "Overall Crashes" },
+  { value: "pedestrian", label: "Pedestrian Crashes" },
 ];
 
 export const VISUALIZATION_VARIANT_LABELS: Record<string, string> = {
-  location_markers: "Marker Type",
-  density_heatmap: "Heatmap Type",
-  kde_heatmap: "Heatmap Type",
-  weighted_kde_heatmap: "Heatmap Type",
-  blackspot: "Blackspot Type",
-  dbscan_blackspot: "Blackspot Type",
+  location_markers: "Crash Type",
+  density_heatmap: "Crash Type",
+  // kde_heatmap: "Crash Type",
+  // weighted_kde_heatmap: "Crash Type",
+  blackspot: "Crash Type",
+  dbscan_blackspot: "Crash Type",
 };
 
 export const hasVisualizationVariants = (visualizationType?: string): boolean =>
@@ -108,8 +108,8 @@ export const defaultFilters: DashboardFilters = {
   weather_condition: [],
   light_condition: [],
   collision_type: [],
-  date_from : "",
-  date_to : "",
+  date_from: "",
+  date_to: "",
   baseMap: DEFAULT_BASE_MAP,
   visualization_type: "location_markers",
   visualization_variant: "accident",

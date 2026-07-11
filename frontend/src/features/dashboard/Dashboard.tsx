@@ -339,8 +339,6 @@ export default function Dashboard() {
 
   const visualizationType = filters.visualization_type || "location_markers";
 
-  const isKdeHeatmap = visualizationType === "kde_heatmap";
-  const isWeightedKdeHeatmap = visualizationType === "weighted_kde_heatmap";
   const isTemporalAnalysis = visualizationType === "temporal_analysis";
 
   // const isDensityHeatmap = visualizationType === "density_heatmap";
@@ -575,8 +573,7 @@ export default function Dashboard() {
           })()}
 
           <ExportButton filters={filters} />
-          {((isBlackspotDetection && !isPedestrianVariant) ||
-            isDbscanBlackspot) && (
+          {(isBlackspotDetection || isDbscanBlackspot) && (
             <BlackspotExportButton
               filters={filters}
               algorithm={isDbscanBlackspot ? "dbscan" : "greedy"}
@@ -666,20 +663,6 @@ export default function Dashboard() {
                       heatmapData={data?.heatmap}
                       fetchFn={fetchDbscanBlackspots}
                       exportFn={exportBlackspotCrashes}
-                    />
-                  ) : isKdeHeatmap ? (
-                    <KdeHeatmapLayers
-                      key={`kde-heatmap-${filters.visualization_variant || "accident"}`}
-                      filters={filters}
-                      accidentPoints={displayHeatmapData}
-                      fetchFn={fetchKdeHeatmap}
-                    />
-                  ) : isWeightedKdeHeatmap ? (
-                    <WeightedKdeHeatmapLayers
-                      key="weighted-kde-heatmap"
-                      filters={filters}
-                      accidentPoints={displayHeatmapData}
-                      fetchFn={fetchWeightedKdeHeatmap}
                     />
                   ) : (
                     <VisualizationLayers
