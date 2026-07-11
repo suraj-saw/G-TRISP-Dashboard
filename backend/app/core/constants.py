@@ -182,6 +182,7 @@ HOURS_IN_DAY = 24
 BLACKSPOT_RADIUS_METERS: float = 250.0
 BLACKSPOT_MIN_CRASHES: int = 5
 PEDESTRIAN_BLACKSPOT_MIN_CRASHES: int = 3
+MIN_ANALYSIS_YEARS: int = 3
 
 # ---------------------------------------------------------------------------
 # KDE density heatmap (quartic kernel — matches QGIS Heatmap tool)

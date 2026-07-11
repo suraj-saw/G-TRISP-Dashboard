@@ -127,7 +127,8 @@ IRC_MIN_CRASHES: int = MIN_QUALIFYING_CRASHES
 class CrashPoint:
     """A single crash record with its spatial coordinates and severity."""
     index: int
-    accident_id: Optional[str]
+    accident_db_id: int  # Primary key ID of the accident in the database (always present)
+    accident_id: Optional[str]  # Original accident ID string (may be null)
     lat: float
     lon: float
     severity: str = "Unknown"
@@ -291,7 +292,7 @@ def _make_blackspot(
         anchor_lat=points[anchor_idx].lat,
         anchor_lon=points[anchor_idx].lon,
         crash_ids=[
-            points[i].accident_id or str(points[i].index)
+            str(points[i].accident_db_id)  # Use the primary key ID as string (always present)
             for i in member_indices
         ],
     )

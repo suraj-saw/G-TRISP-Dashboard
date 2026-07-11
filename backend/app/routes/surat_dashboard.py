@@ -69,6 +69,7 @@ from app.utils.surat_accident_utils import (
     total_grievous,
     total_minor,
 )
+from app.utils.accident_utils import validate_observation_period
 from app.utils.text_utils import safe_text
 from app.utils.datetime_utils import parse_accident_datetime_from_str
 from app.utils.blackspot_utils import CrashPoint, greedy_blackspots, blackspots_to_geojson, dbscan_blackspots
@@ -942,9 +943,19 @@ def get_blackspots(
 
     accidents = query.all()
 
+    # Validate observation period
+    validation_error = validate_observation_period(accidents, selected_years=year)
+    if validation_error:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"detail": validation_error},
+        )
+
     points = [
         CrashPoint(
             index=idx,
+            accident_db_id=a.id,
             accident_id=a.accident_id,
             lat=a.latitude,
             lon=a.longitude,
@@ -1010,9 +1021,19 @@ def get_pedestrian_blackspots(
         ) > 0
     ).all()
 
+    # Validate observation period
+    validation_error = validate_observation_period(accidents, selected_years=year)
+    if validation_error:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"detail": validation_error},
+        )
+
     points = [
         CrashPoint(
             index=idx,
+            accident_db_id=a.id,
             accident_id=a.accident_id,
             lat=a.latitude,
             lon=a.longitude,
@@ -1072,9 +1093,19 @@ def get_dbscan_blackspots(
 
     accidents = query.all()
 
+    # Validate observation period
+    validation_error = validate_observation_period(accidents, selected_years=year)
+    if validation_error:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"detail": validation_error},
+        )
+
     points = [
         CrashPoint(
             index=idx,
+            accident_db_id=a.id,
             accident_id=a.accident_id,
             lat=a.latitude,
             lon=a.longitude,
@@ -1288,25 +1319,38 @@ def export_blackspots(
         query = query.filter(SuratAccident.severity.in_(severity))
 
     accidents = query.all()
-    points = [
-        CrashPoint(
-            index=idx,
-            accident_id=a.accident_id,
-            lat=a.latitude,
-            lon=a.longitude,
-            severity=a.severity or "Unknown",
+
+    # Validate observation period
+    validation_error = validate_observation_period(accidents, selected_years=year)
+    if validation_error:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"detail": validation_error},
         )
-        for idx, a in enumerate(accidents)
-        if a.latitude is not None and a.longitude is not None
-    ]
+
+    # Create points and keep the corresponding accident objects in a list
+    filtered_accidents = []
+    points = []
+    for idx, a in enumerate(accidents):
+        if a.latitude is not None and a.longitude is not None:
+            filtered_accidents.append(a)
+            points.append(CrashPoint(
+                index=len(points),  # since we're building points one by one, index is len(points) before append
+                accident_db_id=a.id,
+                accident_id=a.accident_id,
+                lat=a.latitude,
+                lon=a.longitude,
+                severity=a.severity or "Unknown",
+            ))
 
     if algorithm == "dbscan":
         blackspots = dbscan_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
     else:
         blackspots = greedy_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
 
-    # Build a lookup: accident_id -> SuratAccident ORM object
-    acc_by_id = {a.accident_id: a for a in accidents if a.accident_id}
+    # Build lookup by primary key id (since crash_ids now use id)
+    acc_by_db_id = {a.id: a for a in filtered_accidents}
 
     # Determine which blackspots to export
     if bs_id is not None:
@@ -1324,9 +1368,13 @@ def export_blackspots(
     accidents_with_bs = []
     for bs in target_bs:
         for cid in bs.crash_ids:
-            acc = acc_by_id.get(cid)
-            if acc:
-                accidents_with_bs.append((bs.bs_id, acc))
+            try:
+                db_id = int(cid)
+                acc = acc_by_db_id.get(db_id)
+                if acc:
+                    accidents_with_bs.append((bs.bs_id, acc))
+            except ValueError:
+                pass  # Skip if it's not a valid integer (shouldn't happen anymore)
 
     timestamp = dt.now().strftime("%Y%m%d_%H%M%S")
     if bs_id is not None:

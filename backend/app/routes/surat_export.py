@@ -309,12 +309,24 @@ def export_specific_crashes(
             headers={"Content-Disposition": f'attachment; filename="{req.filename}"'},
         )
 
-    accidents = (
-        db.query(SuratAccident)
-        .filter(SuratAccident.accident_id.in_(req.crash_ids))
-        .order_by(SuratAccident.accident_date_time)
-        .all()
-    )
+    # Newer blackspot payloads send primary-key IDs. Keep accident_id as a
+    # fallback so older/open popups do not export a header-only file.
+    db_ids = [int(cid) for cid in req.crash_ids if cid.isdigit()]
+    query = db.query(SuratAccident)
+    if db_ids:
+        query = query.filter(SuratAccident.id.in_(db_ids))
+    else:
+        query = query.filter(SuratAccident.accident_id.in_(req.crash_ids))
+
+    accidents = query.order_by(SuratAccident.accident_date_time).all()
+
+    if not accidents and db_ids:
+        accidents = (
+            db.query(SuratAccident)
+            .filter(SuratAccident.accident_id.in_(req.crash_ids))
+            .order_by(SuratAccident.accident_date_time)
+            .all()
+        )
 
     print(f"[export-crashes] Query returned {len(accidents)} rows.")
 

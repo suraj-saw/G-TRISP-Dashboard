@@ -2,15 +2,12 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
+import { Loader2, AlertCircle, Download } from "lucide-react";
 import {
-  Loader2,
-  AlertCircle,
-  Skull,
-  AlertTriangle,
-  ShieldAlert,
-  Download,
-} from "lucide-react";
-import { fetchBlackspots, exportBlackspotCrashes, type BlackspotData } from "../../api/dashboardApi";
+  fetchBlackspots,
+  exportBlackspotCrashes,
+  type BlackspotData,
+} from "../../api/dashboardApi";
 import type { DashboardFilters, HeatmapPoint } from "../../types/dashboard";
 import {
   getPriorityColor,
@@ -23,6 +20,7 @@ import {
 interface Props {
   filters: DashboardFilters;
   fetchFn?: (filters: DashboardFilters) => Promise<BlackspotData>;
+  exportFn?: (crashIds: string[], filename: string) => Promise<void>;
   heatmapData?: HeatmapPoint[];
   analysisLabel?: string;
   crashLabel?: string;
@@ -292,6 +290,7 @@ function buildAccidentGeojson(
 export default function BlackspotDetectionLayers({
   filters,
   fetchFn,
+  exportFn,
   heatmapData,
   analysisLabel = "Blackspot detection",
   crashLabel = "crashes",
@@ -410,15 +409,42 @@ export default function BlackspotDetectionLayers({
           cancelDismiss();
           map_.getCanvas().style.cursor = "pointer";
           const f = clusterFeats[0];
+          // Use the feature's actual centroid coordinates instead of mouse position
+          // Check if this is the same cluster to avoid unnecessary re-renders
+          const newBsId = f.properties?.bs_id;
+          if (hovered?.bs_id === newBsId) {
+            return;
+          }
+          // Extract centroid coordinates from the feature
+          let lon: number, lat: number;
+          if (f.geometry.type === "Point") {
+            [lon, lat] = f.geometry.coordinates as [number, number];
+          } else {
+            // Find corresponding centroid from data using bs_id
+            const centroidFeat = data?.centroids?.features?.find(
+              (cf: any) => cf.properties?.bs_id === newBsId
+            );
+            if (centroidFeat && centroidFeat.geometry.type === "Point") {
+              [lon, lat] = centroidFeat.geometry.coordinates as [
+                number,
+                number,
+              ];
+            } else {
+              // Fallback to mouse position if no centroid found
+              lon = e.lngLat.lng;
+              lat = e.lngLat.lat;
+            }
+          }
           setHovered({
-            longitude: e.lngLat.lng,
-            latitude: e.lngLat.lat,
-            bs_id: f.properties?.bs_id,
+            longitude: lon,
+            latitude: lat,
+            bs_id: newBsId,
             crash_count: f.properties?.crash_count,
             fatal_count: f.properties?.fatal_count,
             grievous_count: f.properties?.grievous_count,
             minor_hospitalized_count: f.properties?.minor_hospitalized_count,
-            minor_non_hospitalized_count: f.properties?.minor_non_hospitalized_count,
+            minor_non_hospitalized_count:
+              f.properties?.minor_non_hospitalized_count,
             no_injury_count: f.properties?.no_injury_count,
             qualifying_count: f.properties?.qualifying_count,
             priority_score: f.properties?.priority_score,
@@ -426,7 +452,10 @@ export default function BlackspotDetectionLayers({
             total_blackspots: f.properties?.total_blackspots,
             priority_label: f.properties?.priority_label,
             qualifies_by: f.properties?.qualifies_by,
-            crash_ids: f.properties?.crash_ids != null ? String(f.properties.crash_ids) : undefined,
+            crash_ids:
+              f.properties?.crash_ids != null
+                ? String(f.properties.crash_ids)
+                : undefined,
             isPoint: false,
           });
           return;
@@ -468,16 +497,37 @@ export default function BlackspotDetectionLayers({
     };
   }, [mapRef, data]);
 
-  const handleExportData = async () => {
-    if (!hovered || !hovered.crash_ids) return;
-    const ids = String(hovered.crash_ids).split(",").map((id) => id.trim()).filter(Boolean);
+  const handleExportData = async (
+    cluster: HoveredBlackspot | null = hovered
+  ) => {
+    console.log("[BlackspotDetectionLayers] handleExportData called");
+    console.log("[BlackspotDetectionLayers] cluster:", cluster);
+    if (!cluster || !cluster.crash_ids) return;
+    const ids = String(cluster.crash_ids)
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+    console.log("[BlackspotDetectionLayers] ids to export:", ids);
     if (ids.length === 0) return;
-    
+
     try {
-      const filename = `blackspot_cluster_${hovered.bs_id}_data.csv`;
-      await exportBlackspotCrashes(ids, filename);
+      const filename = `blackspot_cluster_${cluster.bs_id}_data.csv`;
+      console.log(
+        "[BlackspotDetectionLayers] Using exportFn?",
+        !!exportFn,
+        "filename:",
+        filename
+      );
+      if (exportFn) {
+        await exportFn(ids, filename);
+      } else {
+        await exportBlackspotCrashes(ids, filename);
+      }
     } catch (err) {
-      console.error("Failed to export cluster data:", err);
+      console.error(
+        "[BlackspotDetectionLayers] Failed to export cluster data:",
+        err
+      );
     }
   };
 
@@ -513,7 +563,9 @@ export default function BlackspotDetectionLayers({
         <AlertCircle size={16} className="text-amber-500" />
         <span>
           No blackspots found — criteria:{" "}
-          <span className="font-bold text-amber-600">≥{MIN_QUALIFYING_CRASHES}</span>{" "}
+          <span className="font-bold text-amber-600">
+            ≥{MIN_QUALIFYING_CRASHES}
+          </span>{" "}
           qualifying {crashLabel} within {data?.radius_m ?? SEARCH_RADIUS_M} m.
         </span>
       </StatusBadge>
@@ -740,6 +792,7 @@ export default function BlackspotDetectionLayers({
           latitude={hovered.latitude}
           closeButton={false}
           closeOnClick={false}
+          anchor="top"
           offset={12}
           className="z-50 accident-popup"
         >
@@ -756,9 +809,12 @@ export default function BlackspotDetectionLayers({
           >
             <div
               className="px-4 py-2 text-[10px] font-bold tracking-widest text-white uppercase"
-              style={{ backgroundColor: getPriorityColor(hovered.priority_score ?? 0) }}
+              style={{
+                backgroundColor: getPriorityColor(hovered.priority_score ?? 0),
+              }}
             >
-              {hovered.priority_label ?? getPriorityLabel(hovered.priority_score ?? 0)}
+              {hovered.priority_label ??
+                getPriorityLabel(hovered.priority_score ?? 0)}
             </div>
             <div className="p-4">
               <div className="flex items-center justify-between mb-4">
@@ -766,11 +822,11 @@ export default function BlackspotDetectionLayers({
                   <div className="text-sm font-extrabold text-slate-800">
                     Cluster #{hovered.bs_id}
                   </div>
-                  {heatmapData && hovered.crash_ids && (
+                  {hovered.crash_ids && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleExportData();
+                        handleExportData(hovered);
                       }}
                       className="p-1 rounded-md bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
                       title="Export Accident Data"
@@ -839,7 +895,8 @@ export default function BlackspotDetectionLayers({
                 <span className="font-bold text-slate-700">
                   {hovered.crash_count?.toLocaleString()}
                 </span>{" "}
-                total crashes ({hovered.qualifying_count} qualifying) within {SEARCH_RADIUS_M}m
+                total crashes ({hovered.qualifying_count} qualifying) within{" "}
+                {SEARCH_RADIUS_M}m
               </div>
 
               {/* {hovered.qualifies_by && (

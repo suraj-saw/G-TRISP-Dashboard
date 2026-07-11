@@ -6,11 +6,15 @@ All field references use the iRAD-aligned names from the main project.
 """
 
 import calendar
+import csv
+import io
 from collections import defaultdict
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Body
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy import func, distinct, case
 from sqlalchemy.orm import Session
 
@@ -63,6 +67,7 @@ from app.utils.accident_utils import (
     total_fatalities,
     total_grievous,
     total_minor,
+    validate_observation_period,
 )
 from app.utils.text_utils import safe_text
 from app.utils.blackspot_utils import (
@@ -719,9 +724,19 @@ def get_blackspots(
 
     accidents = query.all()
 
+    # Validate observation period
+    validation_error = validate_observation_period(accidents, selected_years=year)
+    if validation_error:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"detail": validation_error},
+        )
+
     points = [
         CrashPoint(
             index=idx,
+            accident_db_id=a.id,
             accident_id=a.accident_id,
             lat=a.latitude,
             lon=a.longitude,
@@ -785,9 +800,19 @@ def get_pedestrian_blackspots(
         ) > 0
     ).all()
 
+    # Validate observation period
+    validation_error = validate_observation_period(accidents, selected_years=year)
+    if validation_error:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"detail": validation_error},
+        )
+
     points = [
         CrashPoint(
             index=idx,
+            accident_db_id=a.id,
             accident_id=a.accident_id,
             lat=a.latitude,
             lon=a.longitude,
@@ -845,9 +870,19 @@ def get_dbscan_blackspots(
 
     accidents = query.all()
 
+    # Validate observation period
+    validation_error = validate_observation_period(accidents, selected_years=year)
+    if validation_error:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"detail": validation_error},
+        )
+
     points = [
         CrashPoint(
             index=idx,
+            accident_db_id=a.id,
             accident_id=a.accident_id,
             lat=a.latitude,
             lon=a.longitude,
@@ -1367,7 +1402,7 @@ def get_yearly_comparison(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
 ):
@@ -1388,8 +1423,8 @@ def get_yearly_comparison(
             continue
         yr = a.accident_date_time.year
         years[yr]["total_accidents"] += 1
-        years[yr]["fatalities"]      += total_fatalities(a)
-        years[yr]["grievous"]        += total_grievous(a)
+        years[yr]["fatalities"] += total_fatalities(a)
+        years[yr]["grievous"] += total_grievous(a)
 
     return YearlyResponse(
         data=[
@@ -1401,6 +1436,119 @@ def get_yearly_comparison(
             )
             for yr, v in sorted(years.items())
         ]
+    )
+
+
+# ---------------------------------------------------------------------------
+# Blackspot cluster export endpoint for Gujarat-wide data
+# ---------------------------------------------------------------------------
+
+class ExportCrashesRequest(BaseModel):
+    crash_ids: List[str]
+    filename: Optional[str] = "blackspot_crashes.csv"
+
+
+@router.post("/export-crashes")
+def export_specific_crashes(
+    req: ExportCrashesRequest = Body(...),
+    db: Session = Depends(get_db),
+):
+    """Export all columns for a specific set of accident IDs (blackspot cluster export)."""
+    print(f"[export-crashes] Received {len(req.crash_ids)} IDs. Sample: {req.crash_ids[:5]}")
+
+    if not req.crash_ids:
+        output = io.StringIO()
+        # Use the same columns as export_utils.py
+        HEADERS = [
+            "Accident ID", "District", "Police Station", 
+            "Accident Date Time", "Latitude", "Longitude", "Road Name", 
+            "Road Classification", "Severity", "No of Vehicles", 
+            "Drivers Killed", "Drivers Grievous Injury", "Drivers Minor Injury", 
+            "Passengers Killed", "Passengers Grievous Injury", "Passengers Minor Injury", 
+            "Pedestrians Killed", "Pedestrians Grievous Injury", "Pedestrians Minor Injury", 
+            "Collision Type", "Collision Nature", "Weather Condition", 
+            "Light Condition", "Visibility", "Traffic Violation"
+        ]
+        csv.writer(output).writerow(HEADERS)
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{req.filename}"'},
+        )
+
+    # Newer blackspot payloads send primary-key IDs. Keep accident_id as a
+    # fallback so older/open popups do not export a header-only file.
+    db_ids = [int(cid) for cid in req.crash_ids if cid.isdigit()]
+    query = db.query(Accident)
+    if db_ids:
+        query = query.filter(Accident.id.in_(db_ids))
+    else:
+        query = query.filter(Accident.accident_id.in_(req.crash_ids))
+
+    accidents = query.order_by(Accident.accident_date_time).all()
+
+    if not accidents and db_ids:
+        accidents = (
+            db.query(Accident)
+            .filter(Accident.accident_id.in_(req.crash_ids))
+            .order_by(Accident.accident_date_time)
+            .all()
+        )
+
+    print(f"[export-crashes] Query returned {len(accidents)} rows.")
+
+    output = io.StringIO()
+    # Use the same columns as export_utils.py
+    HEADERS = [
+        "Accident ID", "District", "Police Station", 
+        "Accident Date Time", "Latitude", "Longitude", "Road Name", 
+        "Road Classification", "Severity", "No of Vehicles", 
+        "Drivers Killed", "Drivers Grievous Injury", "Drivers Minor Injury", 
+        "Passengers Killed", "Passengers Grievous Injury", "Passengers Minor Injury", 
+        "Pedestrians Killed", "Pedestrians Grievous Injury", "Pedestrians Minor Injury", 
+        "Collision Type", "Collision Nature", "Weather Condition", 
+        "Light Condition", "Visibility", "Traffic Violation"
+    ]
+    writer = csv.writer(output)
+    writer.writerow(HEADERS)
+
+    def row_values(acc):
+        values = []
+        fields = [
+            "accident_id", "district", "police_station",
+            "accident_date_time", "latitude", "longitude", "road_name",
+            "road_classification", "severity", "number_of_vehicles",
+            "driver_killed", "driver_grievous_injury", "driver_minor_injury",
+            "passenger_killed", "passenger_grievous_injury", "passenger_minor_injury",
+            "pedestrian_killed", "pedestrian_grievous_injury", "pedestrian_minor_injury",
+            "type_of_collision", "collision_feature", "weather_condition",
+            "light_condition", "visibility", "traffic_violation"
+        ]
+        for field in fields:
+            raw = getattr(acc, field, None)
+            if raw is None:
+                values.append("")
+            elif isinstance(raw, datetime):
+                values.append(raw.strftime("%d-%b-%Y %I:%M %p"))
+            elif isinstance(raw, float):
+                values.append(round(raw, 6))
+            else:
+                cleaned = safe_text(str(raw))
+                values.append("" if cleaned == "Unknown" else cleaned)
+        return values
+
+    for acc in accidents:
+        writer.writerow(row_values(acc))
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{req.filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
     )
 
 @router.get("/blackspot-export")
@@ -1442,25 +1590,38 @@ def export_blackspots(
         query = query.filter(Accident.severity.in_(severity))
 
     accidents = query.all()
-    points = [
-        CrashPoint(
-            index=idx,
-            accident_id=a.accident_id,
-            lat=a.latitude,
-            lon=a.longitude,
-            severity=a.severity or "Unknown",
+
+    # Validate observation period
+    validation_error = validate_observation_period(accidents, selected_years=year)
+    if validation_error:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"detail": validation_error},
         )
-        for idx, a in enumerate(accidents)
-        if a.latitude is not None and a.longitude is not None
-    ]
+
+    # Create points and keep the corresponding accident objects in a list
+    filtered_accidents = []
+    points = []
+    for idx, a in enumerate(accidents):
+        if a.latitude is not None and a.longitude is not None:
+            filtered_accidents.append(a)
+            points.append(CrashPoint(
+                index=len(points),  # since we're building points one by one, index is len(points) before append
+                accident_db_id=a.id,
+                accident_id=a.accident_id,
+                lat=a.latitude,
+                lon=a.longitude,
+                severity=a.severity or "Unknown",
+            ))
 
     if algorithm == "dbscan":
         blackspots = dbscan_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
     else:
         blackspots = greedy_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
 
-    # Build a lookup: accident_id -> Accident ORM object
-    acc_by_id = {a.accident_id: a for a in accidents if a.accident_id}
+    # Build lookup by primary key id (since crash_ids now use id)
+    acc_by_db_id = {a.id: a for a in filtered_accidents}
 
     # Determine which blackspots to export
     if bs_id is not None:
@@ -1478,9 +1639,13 @@ def export_blackspots(
     accidents_with_bs = []
     for bs in target_bs:
         for cid in bs.crash_ids:
-            acc = acc_by_id.get(cid)
-            if acc:
-                accidents_with_bs.append((bs.bs_id, acc))
+            try:
+                db_id = int(cid)
+                acc = acc_by_db_id.get(db_id)
+                if acc:
+                    accidents_with_bs.append((bs.bs_id, acc))
+            except ValueError:
+                pass  # Skip if it's not a valid integer (shouldn't happen anymore)
 
     timestamp = dt.now().strftime("%Y%m%d_%H%M%S")
     if bs_id is not None:

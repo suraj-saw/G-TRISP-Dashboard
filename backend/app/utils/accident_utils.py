@@ -5,11 +5,13 @@ All field names use the iRAD-aligned names from the main project's Accident mode
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
+from dateutil.relativedelta import relativedelta
 
 from sqlalchemy import extract
 from app.models.accident import Accident
 from app.utils.taluka_utils import apply_taluka_spatial_filter
+from app.utils.datetime_utils import parse_accident_datetime_from_str
 
 
 def apply_filters(
@@ -119,4 +121,36 @@ def total_minor(accident) -> int:
         + (accident.passenger_minor_injury or 0)
         + (accident.pedestrian_minor_injury or 0)
     )
+
+
+def validate_observation_period(accidents: List, selected_years: Optional[List[int]] = None) -> Optional[str]:
+    """
+    Validate that the analysis period has at least MIN_ANALYSIS_YEARS distinct calendar years.
+    
+    If selected_years is provided, counts the number of selected years.
+    If selected_years is None, counts distinct years from the accident data.
+    
+    Returns None if valid, or an error message if invalid.
+    """
+    from app.core.constants import MIN_ANALYSIS_YEARS
+    
+    if selected_years:
+        # User selected specific years - count how many distinct years they selected
+        num_years = len(set(selected_years))
+    else:
+        # No years selected - count distinct years from accident data
+        distinct_years = set()
+        for a in accidents:
+            dt = parse_accident_datetime_from_str(a.accident_date_time)
+            if dt:
+                distinct_years.add(dt.year)
+        num_years = len(distinct_years)
+    
+    if num_years < MIN_ANALYSIS_YEARS:
+        return (
+            "Blackspot analysis requires selecting accident data from at least "
+            f"{MIN_ANALYSIS_YEARS} calendar years. Please select additional years to continue."
+        )
+    
+    return None
 
