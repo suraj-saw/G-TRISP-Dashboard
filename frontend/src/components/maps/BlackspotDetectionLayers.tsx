@@ -1,6 +1,6 @@
 // frontend/src/components/maps/BlackspotDetectionLayers.tsx
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
 import {
   Loader2,
@@ -8,16 +8,16 @@ import {
   Skull,
   AlertTriangle,
   ShieldAlert,
+  Download,
 } from "lucide-react";
-import { fetchBlackspots, type BlackspotData } from "../../api/dashboardApi";
+import { fetchBlackspots, exportBlackspotCrashes, type BlackspotData } from "../../api/dashboardApi";
 import type { DashboardFilters, HeatmapPoint } from "../../types/dashboard";
 import {
-  getIrcRiskColor,
-  getIrcRiskLabel,
-  IRC_COLOR_EXPR,
-  IRC_RADIUS_M,
-  IRC_MIN_CRASHES,
-  IRC_MIN_ASI,
+  getPriorityColor,
+  getPriorityLabel,
+  PRIORITY_COLOR_EXPR,
+  SEARCH_RADIUS_M,
+  MIN_QUALIFYING_CRASHES,
 } from "../../config/blackspotConfig";
 
 interface Props {
@@ -35,15 +35,21 @@ interface HoveredBlackspot {
   crash_count?: number;
   fatal_count?: number;
   grievous_count?: number;
-  minor_count?: number;
-  asi?: number;
-  risk_label?: string;
+  minor_hospitalized_count?: number;
+  minor_non_hospitalized_count?: number;
+  no_injury_count?: number;
+  qualifying_count?: number;
+  priority_score?: number;
+  priority_rank?: number;
+  total_blackspots?: number;
+  priority_label?: string;
   qualifies_by?: string;
   severity?: string;
   police_station?: string | null;
   road_name?: string | null;
   accident_date_time?: string | null;
   isPoint?: boolean;
+  crash_ids?: string;
 }
 
 // const SEVERITY_COLORS: Record<string, string> = {
@@ -287,7 +293,7 @@ export default function BlackspotDetectionLayers({
   filters,
   fetchFn,
   heatmapData,
-  analysisLabel = "IRC SP:88-2019 blackspot detection",
+  analysisLabel = "Blackspot detection",
   crashLabel = "crashes",
 }: Props) {
   const { current: mapRef } = useMap();
@@ -296,6 +302,31 @@ export default function BlackspotDetectionLayers({
   const [error, setError] = useState<string | null>(null);
   const [hovered, setHovered] = useState<HoveredBlackspot | null>(null);
   const [selected, setSelected] = useState<HoveredBlackspot | null>(null);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isOverPopupRef = useRef(false);
+
+  // Cancel any pending dismiss when component unmounts
+  useEffect(() => {
+    return () => {
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    };
+  }, []);
+
+  const scheduleDismiss = useCallback(() => {
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = setTimeout(() => {
+      if (!isOverPopupRef.current) {
+        setHovered(null);
+      }
+    }, 300);
+  }, []);
+
+  const cancelDismiss = useCallback(() => {
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
+  }, []);
 
   const accidentGeojson = buildAccidentGeojson(heatmapData);
 
@@ -376,6 +407,7 @@ export default function BlackspotDetectionLayers({
           layers: presentClusterLayers,
         });
         if (clusterFeats.length) {
+          cancelDismiss();
           map_.getCanvas().style.cursor = "pointer";
           const f = clusterFeats[0];
           setHovered({
@@ -385,10 +417,16 @@ export default function BlackspotDetectionLayers({
             crash_count: f.properties?.crash_count,
             fatal_count: f.properties?.fatal_count,
             grievous_count: f.properties?.grievous_count,
-            minor_count: f.properties?.minor_count,
-            asi: f.properties?.asi,
-            risk_label: f.properties?.risk_label,
+            minor_hospitalized_count: f.properties?.minor_hospitalized_count,
+            minor_non_hospitalized_count: f.properties?.minor_non_hospitalized_count,
+            no_injury_count: f.properties?.no_injury_count,
+            qualifying_count: f.properties?.qualifying_count,
+            priority_score: f.properties?.priority_score,
+            priority_rank: f.properties?.priority_rank,
+            total_blackspots: f.properties?.total_blackspots,
+            priority_label: f.properties?.priority_label,
             qualifies_by: f.properties?.qualifies_by,
+            crash_ids: f.properties?.crash_ids != null ? String(f.properties.crash_ids) : undefined,
             isPoint: false,
           });
           return;
@@ -396,7 +434,7 @@ export default function BlackspotDetectionLayers({
       }
 
       map_.getCanvas().style.cursor = hasPoint ? "pointer" : "";
-      setHovered(null);
+      scheduleDismiss();
     };
 
     const onClick = (e: any) => {
@@ -430,6 +468,19 @@ export default function BlackspotDetectionLayers({
     };
   }, [mapRef, data]);
 
+  const handleExportData = async () => {
+    if (!hovered || !hovered.crash_ids) return;
+    const ids = String(hovered.crash_ids).split(",").map((id) => id.trim()).filter(Boolean);
+    if (ids.length === 0) return;
+    
+    try {
+      const filename = `blackspot_cluster_${hovered.bs_id}_data.csv`;
+      await exportBlackspotCrashes(ids, filename);
+    } catch (err) {
+      console.error("Failed to export cluster data:", err);
+    }
+  };
+
   const StatusBadge = ({ children }: { children: React.ReactNode }) => (
     <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 z-20">
       <div className="pointer-events-auto rounded-full border border-slate-200/50 bg-white/90 px-5 py-3 shadow-xl backdrop-blur-md text-sm font-medium text-slate-700 flex items-center gap-3 transition-all duration-300 hover:bg-white/95">
@@ -461,11 +512,9 @@ export default function BlackspotDetectionLayers({
       <StatusBadge>
         <AlertCircle size={16} className="text-amber-500" />
         <span>
-          No IRC blackspots found — criteria:{" "}
-          <span className="font-bold text-amber-600">≥{IRC_MIN_CRASHES}</span>{" "}
-          {crashLabel} or ASI{" "}
-          <span className="font-bold text-amber-600">≥{IRC_MIN_ASI}</span>{" "}
-          within {data?.radius_m ?? IRC_RADIUS_M} m.
+          No blackspots found — criteria:{" "}
+          <span className="font-bold text-amber-600">≥{MIN_QUALIFYING_CRASHES}</span>{" "}
+          qualifying {crashLabel} within {data?.radius_m ?? SEARCH_RADIUS_M} m.
         </span>
       </StatusBadge>
     );
@@ -567,7 +616,7 @@ export default function BlackspotDetectionLayers({
           id="blackspot-circles-fill"
           type="fill"
           paint={{
-            "fill-color": IRC_COLOR_EXPR as any,
+            "fill-color": PRIORITY_COLOR_EXPR as any,
             "fill-opacity": [
               "interpolate",
               ["linear"],
@@ -585,7 +634,7 @@ export default function BlackspotDetectionLayers({
           id="blackspot-circles-outline"
           type="line"
           paint={{
-            "line-color": IRC_COLOR_EXPR as any,
+            "line-color": PRIORITY_COLOR_EXPR as any,
             "line-width": [
               "interpolate",
               ["linear"],
@@ -636,7 +685,7 @@ export default function BlackspotDetectionLayers({
               350,
               22,
             ],
-            "circle-color": IRC_COLOR_EXPR as any,
+            "circle-color": PRIORITY_COLOR_EXPR as any,
             "circle-opacity": [
               "interpolate",
               ["linear"],
@@ -672,7 +721,7 @@ export default function BlackspotDetectionLayers({
           <span className="text-blue-600 font-bold">
             {data.total_blackspots}
           </span>{" "}
-          IRC Blackspots
+          Identified Blackspots
         </span>
         <span className="text-slate-300">|</span>
         <span className="flex items-center gap-1.5">
@@ -681,7 +730,7 @@ export default function BlackspotDetectionLayers({
         </span>
         <span className="text-slate-300">|</span>
         <span className="text-slate-500 text-xs">
-          SP:88-2019 ({IRC_RADIUS_M}m)
+          Search: {SEARCH_RADIUS_M}m
         </span>
       </StatusBadge>
 
@@ -689,35 +738,67 @@ export default function BlackspotDetectionLayers({
         <Popup
           longitude={hovered.longitude}
           latitude={hovered.latitude}
-          anchor="bottom"
           closeButton={false}
           closeOnClick={false}
           offset={12}
           className="z-50 accident-popup"
         >
-          <div className="w-64 overflow-hidden rounded-xl bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+          <div
+            className="w-72 overflow-hidden rounded-xl bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200"
+            onMouseEnter={() => {
+              isOverPopupRef.current = true;
+              cancelDismiss();
+            }}
+            onMouseLeave={() => {
+              isOverPopupRef.current = false;
+              scheduleDismiss();
+            }}
+          >
             <div
               className="px-4 py-2 text-[10px] font-bold tracking-widest text-white uppercase"
-              style={{ backgroundColor: getIrcRiskColor(hovered.asi ?? 0) }}
+              style={{ backgroundColor: getPriorityColor(hovered.priority_score ?? 0) }}
             >
-              {hovered.risk_label ?? getIrcRiskLabel(hovered.asi ?? 0)}
+              {hovered.priority_label ?? getPriorityLabel(hovered.priority_score ?? 0)}
             </div>
             <div className="p-4">
               <div className="flex items-center justify-between mb-4">
-                <div className="text-sm font-extrabold text-slate-800">
-                  Cluster #{hovered.bs_id}
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-extrabold text-slate-800">
+                    Cluster #{hovered.bs_id}
+                  </div>
+                  {heatmapData && hovered.crash_ids && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleExportData();
+                      }}
+                      className="p-1 rounded-md bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                      title="Export Accident Data"
+                    >
+                      <Download size={14} />
+                    </button>
+                  )}
                 </div>
-                <div
+                {/* <div
                   className="px-2 py-0.5 text-xs font-bold rounded-full bg-slate-100"
-                  style={{ color: getIrcRiskColor(hovered.asi ?? 0) }}
+                  style={{ color: getPriorityColor(hovered.priority_score ?? 0) }}
                 >
-                  ASI {hovered.asi ?? "—"}
-                </div>
+                  Score: {hovered.priority_score ?? "—"}
+                </div> */}
               </div>
 
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              {/* {hovered.priority_rank && hovered.total_blackspots && (
+                <div className="flex items-center justify-between p-2 mb-4 rounded-lg bg-slate-50 border border-slate-100">
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Priority Rank</span>
+                  <span className="text-sm font-bold text-slate-700">
+                    #{hovered.priority_rank} / {hovered.total_blackspots} <span className="text-slate-400 font-normal ml-1">(Top {Math.max(1, Math.ceil((hovered.priority_rank / hovered.total_blackspots) * 100))}%)</span>
+                  </span>
+                </div>
+              )} */}
+
+              <div className="grid grid-cols-4 gap-2 mb-4">
                 <div className="flex flex-col items-center p-1.5 rounded-lg bg-red-50 border border-red-100">
-                  <Skull size={14} className="text-[#4C1D1D] mb-1" />
+                  {/* <Skull size={14} className="text-[#4C1D1D] mb-1" /> */}
                   <span className="text-[10px] text-slate-500 uppercase tracking-wider">
                     Fatal
                   </span>
@@ -726,8 +807,8 @@ export default function BlackspotDetectionLayers({
                   </span>
                 </div>
                 <div className="flex flex-col items-center p-1.5 rounded-lg bg-orange-50 border border-orange-100">
-                  <AlertTriangle size={14} className="text-[#DC2626] mb-1" />
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                  {/* <AlertTriangle size={14} className="text-[#DC2626] mb-1" /> */}
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider text-center leading-tight">
                     Grievous
                   </span>
                   <span className="text-sm font-bold text-[#DC2626]">
@@ -735,12 +816,21 @@ export default function BlackspotDetectionLayers({
                   </span>
                 </div>
                 <div className="flex flex-col items-center p-1.5 rounded-lg bg-amber-50 border border-amber-100">
-                  <ShieldAlert size={14} className="text-[#EA580C] mb-1" />
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">
-                    Minor
+                  {/* <ShieldAlert size={14} className="text-[#EA580C] mb-1" /> */}
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider text-center leading-tight">
+                    Min Hosp
                   </span>
                   <span className="text-sm font-bold text-[#EA580C]">
-                    {hovered.minor_count ?? "—"}
+                    {hovered.minor_hospitalized_count ?? "—"}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center p-1.5 rounded-lg bg-yellow-50 border border-yellow-100">
+                  {/* <ShieldAlert size={14} className="text-[#F59E0B] mb-1" /> */}
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider text-center leading-tight">
+                    Min Non
+                  </span>
+                  <span className="text-sm font-bold text-[#F59E0B]">
+                    {hovered.minor_non_hospitalized_count ?? "—"}
                   </span>
                 </div>
               </div>
@@ -749,7 +839,7 @@ export default function BlackspotDetectionLayers({
                 <span className="font-bold text-slate-700">
                   {hovered.crash_count?.toLocaleString()}
                 </span>{" "}
-                total crashes within {IRC_RADIUS_M}m
+                total crashes ({hovered.qualifying_count} qualifying) within {SEARCH_RADIUS_M}m
               </div>
 
               {/* {hovered.qualifies_by && (

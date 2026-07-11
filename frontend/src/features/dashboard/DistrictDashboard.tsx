@@ -911,6 +911,7 @@ export default function DistrictDashboard() {
                   ) : isDbscanBlackspot ? (
                     <DbscanBlackspotDetectionLayers
                       filters={filters}
+                      heatmapData={data.heatmap}
                       fetchFn={(f) =>
                         fetchGujaratDbscanBlackspots(f, districtName)
                       }

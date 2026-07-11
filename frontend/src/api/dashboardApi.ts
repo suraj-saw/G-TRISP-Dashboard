@@ -219,6 +219,26 @@ export const fetchDbscanBlackspots = async (
   return data;
 };
 
+export const exportBlackspotCrashes = async (
+  crashIds: string[],
+  filename: string
+): Promise<void> => {
+  const response = await API.post(
+    `${SURAT_API_BASE}/export-crashes`,
+    { crash_ids: crashIds, filename },
+    { responseType: "blob" }
+  );
+  
+  const blob = new Blob([response.data], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 export interface KdeHeatmapData {
   total_crashes: number;
   radius_m: number;

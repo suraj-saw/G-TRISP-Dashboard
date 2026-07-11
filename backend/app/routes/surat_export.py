@@ -19,8 +19,13 @@ import io
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query
+# pyrefly: ignore [missing-import]
+from fastapi import APIRouter, Body, Depends, Query
+# pyrefly: ignore [missing-import]
 from fastapi.responses import StreamingResponse
+# pyrefly: ignore [missing-import]
+from pydantic import BaseModel
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -272,6 +277,59 @@ def export_data(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Blackspot cluster export endpoint
+# ---------------------------------------------------------------------------
+
+class ExportCrashesRequest(BaseModel):
+    crash_ids: List[str]
+    filename: Optional[str] = "blackspot_crashes.csv"
+
+
+@router.post("/export-crashes")
+def export_specific_crashes(
+    req: ExportCrashesRequest = Body(...),
+    db: Session = Depends(get_db),
+):
+    """Export all columns for a specific set of accident IDs (blackspot cluster export)."""
+    print(f"[export-crashes] Received {len(req.crash_ids)} IDs. Sample: {req.crash_ids[:5]}")
+
+    if not req.crash_ids:
+        output = io.StringIO()
+        csv.writer(output).writerow(HEADERS)
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{req.filename}"'},
+        )
+
+    accidents = (
+        db.query(SuratAccident)
+        .filter(SuratAccident.accident_id.in_(req.crash_ids))
+        .order_by(SuratAccident.accident_date_time)
+        .all()
+    )
+
+    print(f"[export-crashes] Query returned {len(accidents)} rows.")
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(HEADERS)
+    for acc in accidents:
+        writer.writerow(_row_values(acc))
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{req.filename}"',
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )

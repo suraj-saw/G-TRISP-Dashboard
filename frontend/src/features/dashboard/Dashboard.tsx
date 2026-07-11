@@ -642,7 +642,7 @@ export default function Dashboard() {
                       heatmapData={data?.heatmap}
                     />
                   ) : isDbscanBlackspot ? (
-                    <DbscanBlackspotDetectionLayers filters={filters} />
+                    <DbscanBlackspotDetectionLayers filters={filters} heatmapData={data?.heatmap} />
                   ) : isKdeHeatmap ? (
                     <KdeHeatmapLayers
                       key={`kde-heatmap-${filters.visualization_variant || "accident"}`}

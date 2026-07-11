@@ -19,14 +19,14 @@ import {
   buildPointRadiusExpression,
 } from "../../config/Heapmapconfig";
 import {
-  BS_COLOR_EXPR,
-  BS_HALO_COLOR_EXPR,
+  PRIORITY_COLOR_EXPR,
+  PRIORITY_HALO_COLOR_EXPR,
   BS_CORE_RADIUS_EXPR,
   BS_HALO_RADIUS_EXPR,
-  BS_TEXT_SIZE_EXPR,
-  BS_SINGLE_COLOR_EXPR,
-  getRiskLabel,
-  getRiskColor,
+  PRIORITY_TEXT_SIZE_EXPR,
+  PRIORITY_SINGLE_COLOR_EXPR,
+  getPriorityLabel,
+  getPriorityColor,
 } from "../../config/blackspotConfig";
 
 interface Props {
@@ -345,7 +345,7 @@ function BlackspotLayers({
           type="circle"
           filter={["has", "point_count"]}
           paint={{
-            "circle-color": BS_HALO_COLOR_EXPR as any,
+            "circle-color": PRIORITY_HALO_COLOR_EXPR as any,
             "circle-radius": BS_HALO_RADIUS_EXPR as any,
             "circle-blur": 0.7,
             "circle-opacity": 1,
@@ -358,7 +358,7 @@ function BlackspotLayers({
           type="circle"
           filter={["has", "point_count"]}
           paint={{
-            "circle-color": BS_COLOR_EXPR as any,
+            "circle-color": PRIORITY_COLOR_EXPR as any,
             "circle-radius": BS_CORE_RADIUS_EXPR as any,
             "circle-opacity": 0.93,
             "circle-stroke-width": 1.5,
@@ -373,7 +373,7 @@ function BlackspotLayers({
           filter={["has", "point_count"]}
           layout={{
             "text-field": "{point_count_abbreviated}",
-            "text-size": BS_TEXT_SIZE_EXPR as any,
+            "text-size": PRIORITY_TEXT_SIZE_EXPR as any,
             "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
             "text-allow-overlap": true,
           }}
@@ -410,7 +410,7 @@ function BlackspotLayers({
           type="circle"
           filter={["!", ["has", "point_count"]]}
           paint={{
-            "circle-color": BS_SINGLE_COLOR_EXPR as any,
+            "circle-color": PRIORITY_SINGLE_COLOR_EXPR as any,
             "circle-radius": [
               "interpolate",
               ["linear"],
@@ -466,8 +466,8 @@ function BlackspotLayers({
 function BlackspotPopup({ hovered }: { hovered: NonNullable<HoverState> }) {
   if (hovered.point_count !== undefined) {
     const count = hovered.point_count;
-    const risk = getRiskLabel(count);
-    const color = getRiskColor(count);
+    const risk = getPriorityLabel(count);
+    const color = getPriorityColor(count);
     return (
       <div
         className="bg-white rounded-lg shadow-xl overflow-hidden"
