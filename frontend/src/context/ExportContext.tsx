@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode, useCallback } from "react";
 
-export type SupportedFormat = "csv" | "excel" | "png";
+export type SupportedFormat = "csv" | "excel" | "png" | "pdf";
 
 export interface ExportConfig {
   supportedFormats: SupportedFormat[];

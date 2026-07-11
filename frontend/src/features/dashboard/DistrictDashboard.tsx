@@ -843,10 +843,12 @@ export default function DistrictDashboard() {
             <DistrictAnalysisTabs
               activeView={analysisView}
               onViewChange={setAnalysisView}
+              filters={filters}
+              districtName={districtName}
             />
             <motion.div
               className={`min-h-0 w-full flex-1 ${
-                analysisView === "temporal"
+                analysisView !== "spatial"
                   ? "overflow-y-auto"
                   : "overflow-hidden"
               }`}

@@ -6,7 +6,7 @@ import MapGL, {
   Popup,
   NavigationControl,
 } from "react-map-gl/maplibre";
-import type { MapRef } from "react-map-gl/maplibre";
+import type { MapRef, MapLayerMouseEvent } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useNavigate } from "react-router-dom";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -37,6 +37,7 @@ export default function GujaratOverviewMap() {
   const [error, setError] = useState<string | null>(null);
   const [hovered, setHovered] = useState<HoverInfo | null>(null);
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
+  const [contextMenuCoords, setContextMenuCoords] = useState<{lat: number, lng: number} | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -141,6 +142,11 @@ export default function GujaratOverviewMap() {
     [navigate]
   );
 
+  const onContextMenu = useCallback((e: MapLayerMouseEvent) => {
+    e.preventDefault();
+    setContextMenuCoords({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+  }, []);
+
   return (
     <div className="absolute inset-0 overflow-hidden">
       {loading && (
@@ -167,6 +173,7 @@ export default function GujaratOverviewMap() {
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
+        onContextMenu={onContextMenu}
         attributionControl={false}
       >
         <NavigationControl position="top-right" showCompass />
@@ -221,6 +228,23 @@ export default function GujaratOverviewMap() {
         )}
         {/* Coordinate Status Bar */}
         <CoordinateStatusBar />
+
+        {contextMenuCoords && (
+          <Popup
+            longitude={contextMenuCoords.lng}
+            latitude={contextMenuCoords.lat}
+            closeButton={true}
+            closeOnClick={true}
+            onClose={() => setContextMenuCoords(null)}
+            anchor="top"
+            className="z-50"
+          >
+            <div className="p-1 text-xs font-semibold text-slate-800">
+              <div>Lat: {contextMenuCoords.lat.toFixed(6)}</div>
+              <div>Lng: {contextMenuCoords.lng.toFixed(6)}</div>
+            </div>
+          </Popup>
+        )}
       </MapGL>
 
       <div className="absolute bottom-1 right-2 z-10 text-[10px] text-slate-400 pointer-events-none">

@@ -16,6 +16,7 @@ import { downloadGujaratExport } from "../../api/exportApi";
 import { fetchGujaratTemporalAnalysis } from "../../api/gujaratDashboardApi";
 import DistrictStatisticalAnalysis from "../../components/dashboard/DistrictStatisticalAnalysis";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
+import ExportButton from "../../components/layout/ExportButton";
 import type { DashboardFilters } from "../../types/dashboard";
 
 const defaultFilters: DashboardFilters = {
@@ -193,6 +194,13 @@ export default function GujaratOverview({
           </DistrictInsightsProvider>
 
           {/* Combined Analysis Container */}
+          <div className="flex items-center justify-between mt-2 px-1">
+            <h2 className="text-lg font-bold text-[#1e3a8a]">Detailed Analysis</h2>
+            <div className="w-48">
+              <ExportButton filters={defaultFilters} />
+            </div>
+          </div>
+          
           <div
             className="rounded-2xl overflow-hidden"
             style={{

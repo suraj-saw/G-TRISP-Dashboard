@@ -8,8 +8,8 @@ import {
   useImperativeHandle,
 } from "react";
 import type { ReactNode } from "react";
-import Map, { Source, Layer, NavigationControl } from "react-map-gl/maplibre";
-import type { MapRef, LngLatBoundsLike } from "react-map-gl/maplibre";
+import Map, { Source, Layer, NavigationControl, Popup } from "react-map-gl/maplibre";
+import type { MapRef, LngLatBoundsLike, MapLayerMouseEvent } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2, AlertCircle } from "lucide-react";
 import { getMapStyleUrl } from "./mapStyles";
@@ -134,6 +134,7 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
       undefined
     );
     const bboxRef = useRef<[number, number, number, number] | null>(null);
+    const [contextMenuCoords, setContextMenuCoords] = useState<{lat: number, lng: number} | null>(null);
 
     const isSatelliteMap = SATELLITE_BASE_MAP_IDS.has(baseMap ?? "");
 
@@ -249,6 +250,11 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
     const handleMapLoad = useCallback(() => setMapLoaded(true), []);
     const mapStyleUrl = getMapStyleUrl(baseMap);
 
+    const onContextMenu = useCallback((e: MapLayerMouseEvent) => {
+      e.preventDefault();
+      setContextMenuCoords({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+    }, []);
+
     return (
       <div className="relative w-full overflow-hidden" style={{ height }}>
         {(boundaryLoading || !mapLoaded) && (
@@ -275,6 +281,7 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
           reuseMaps
           minZoom={MAP_MIN_ZOOM}
           maxBounds={maxBounds}
+          onContextMenu={onContextMenu}
         >
           <NavigationControl position="top-right" showCompass />
           {boundary && (
@@ -340,6 +347,23 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
           {children}
           {/* Coordinate Status Bar */}
           <CoordinateStatusBar />
+
+          {contextMenuCoords && (
+            <Popup
+              longitude={contextMenuCoords.lng}
+              latitude={contextMenuCoords.lat}
+              closeButton={true}
+              closeOnClick={true}
+              onClose={() => setContextMenuCoords(null)}
+              anchor="top"
+              className="z-50"
+            >
+              <div className="p-1 text-xs font-semibold text-slate-800">
+                <div>Lat: {contextMenuCoords.lat.toFixed(6)}</div>
+                <div>Lng: {contextMenuCoords.lng.toFixed(6)}</div>
+              </div>
+            </Popup>
+          )}
         </Map>
 
         {overlays}

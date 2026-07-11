@@ -1,11 +1,14 @@
 import React from "react";
-import ExportAnalysisButton from "../layout/ExportAnalysisButton";
+import ExportButton from "../layout/ExportButton";
+import type { DashboardFilters } from "../../types/dashboard";
 
 export type AnalysisView = "spatial" | "statistical" | "temporal";
 
 interface DistrictAnalysisTabsProps {
   activeView: AnalysisView;
   onViewChange: (view: AnalysisView) => void;
+  filters: DashboardFilters;
+  districtName?: string;
 }
 
 const tabs: { id: AnalysisView; label: string; icon: string }[] = [
@@ -38,6 +41,8 @@ const tabs: { id: AnalysisView; label: string; icon: string }[] = [
 const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
   activeView,
   onViewChange,
+  filters,
+  districtName,
 }) => {
   return (
     <div className="district-analysis-tabs">
@@ -60,9 +65,11 @@ const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
         ))}
       </div>
 
-      <div className="ml-auto h-full flex items-center py-1">
-        <ExportAnalysisButton />
-      </div>
+      {activeView !== "spatial" && (
+        <div className="ml-auto h-full flex items-center py-1">
+          <ExportButton filters={filters} districtName={districtName} />
+        </div>
+      )}
 
       <style>{`
         .district-analysis-tabs {
