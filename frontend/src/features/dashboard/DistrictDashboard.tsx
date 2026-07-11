@@ -47,6 +47,7 @@ import {
   fetchGujaratBlackspots,
   fetchGujaratPedestrianBlackspots,
   fetchGujaratDbscanBlackspots,
+  fetchGujaratPedestrianDbscanBlackspots,
   fetchGujaratTemporalAnalysis,
   fetchGujaratKdeHeatmap,
   fetchGujaratWeightedKdeHeatmap,
@@ -945,8 +946,26 @@ export default function DistrictDashboard() {
                           exportFn={exportGujaratBlackspotCrashes}
                           heatmapData={data.heatmap}
                         />
+                      ) : isDbscanBlackspot && isPedestrianVariant ? (
+                        <DbscanBlackspotDetectionLayers
+                          key="pedestrian-dbscan-blackspot"
+                          filters={filters}
+                          heatmapData={data.heatmap.filter(
+                            isPedestrianAccident
+                          )}
+                          fetchFn={(f) =>
+                            fetchGujaratPedestrianDbscanBlackspots(
+                              f,
+                              districtName
+                            )
+                          }
+                          exportFn={exportGujaratBlackspotCrashes}
+                          analysisLabel="pedestrian DBSCAN blackspot detection"
+                          crashLabel="pedestrian crashes"
+                        />
                       ) : isDbscanBlackspot ? (
                         <DbscanBlackspotDetectionLayers
+                          key="dbscan-blackspot"
                           filters={filters}
                           heatmapData={data.heatmap}
                           fetchFn={(f) =>

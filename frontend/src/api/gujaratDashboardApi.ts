@@ -181,6 +181,18 @@ export const fetchGujaratDbscanBlackspots = async (
   return data;
 };
 
+export const fetchGujaratPedestrianDbscanBlackspots = async (
+  filters: DashboardFilters,
+  district: string
+): Promise<BlackspotData> => {
+  const params = getParams(filters, district);
+  const { data } = await API.get(
+    `${GUJARAT_API_BASE}/pedestrian-dbscan-blackspots`,
+    { params }
+  );
+  return data;
+};
+
 export const fetchGujaratKdeHeatmap = async (
   filters: DashboardFilters,
   district: string
@@ -216,7 +228,7 @@ export const exportGujaratBlackspotCrashes = async (
     { crash_ids: crashIds, filename },
     { responseType: "blob" }
   );
-  
+
   const blob = new Blob([response.data], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

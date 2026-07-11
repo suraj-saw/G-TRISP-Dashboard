@@ -906,6 +906,78 @@ def get_dbscan_blackspots(
     }
 
 
+@router.get("/pedestrian-dbscan-blackspots")
+def get_pedestrian_dbscan_blackspots(
+    district: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
+    min_crashes: int = Query(PEDESTRIAN_BLACKSPOT_MIN_CRASHES, ge=2, le=100),
+    taluka: Optional[List[str]] = Query(None),
+    db: Session = Depends(get_db),
+    police_station: Optional[List[str]] = Query(None),
+):
+    query = apply_filters(
+        db.query(Accident),
+        district, year, road_classification,
+        weather_condition, light_condition, collision_type,
+        date_from, date_to,
+        taluka=taluka, db=db,
+        police_station=police_station
+    )
+    if severity:
+        query = query.filter(Accident.severity.in_(severity))
+
+    accidents = query.filter(
+        (
+            func.coalesce(Accident.pedestrian_killed, 0) +
+            func.coalesce(Accident.pedestrian_grievous_injury, 0) +
+            func.coalesce(Accident.pedestrian_minor_injury, 0)
+        ) > 0
+    ).all()
+
+    # Validate observation period
+    validation_error = validate_observation_period(accidents, selected_years=year)
+    if validation_error:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"detail": validation_error},
+        )
+
+    points = [
+        CrashPoint(
+            index=idx,
+            accident_db_id=a.id,
+            accident_id=a.accident_id,
+            lat=a.latitude,
+            lon=a.longitude,
+            severity=a.severity or "Unknown",
+        )
+        for idx, a in enumerate(accidents)
+        if a.latitude is not None and a.longitude is not None
+    ]
+
+    blackspots = dbscan_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
+    geojson = blackspots_to_geojson(blackspots, radius_m=radius_m)
+
+    return {
+        "total_crashes": len(points),
+        "total_blackspots": len(blackspots),
+        "isolated_crashes": len(points) - sum(b.crash_count for b in blackspots),
+        "radius_m": radius_m,
+        "min_crashes": min_crashes,
+        "circles": geojson["circles"],
+        "centroids": geojson["centroids"],
+    }
+
+
 # ---------------------------------------------------------------------------
 # KDE density heatmap — generalized for any district
 # ---------------------------------------------------------------------------

@@ -24,7 +24,6 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-
 // import {
 //   Filter,
 //   Layers,
@@ -41,9 +40,13 @@ import type {
 } from "../../types/dashboard";
 import {
   fetchFilterOptions,
+  fetchBlackspots,
   fetchPedestrianBlackspots,
+  fetchDbscanBlackspots,
+  fetchPedestrianDbscanBlackspots,
   fetchKdeHeatmap,
   fetchWeightedKdeHeatmap,
+  exportBlackspotCrashes,
 } from "../../api/dashboardApi";
 import SuratBaseMap from "../../components/maps/SuratBaseMap";
 import SeverityLegend from "../../components/maps/SeverityLegend";
@@ -236,7 +239,10 @@ export default function Dashboard() {
         max: datasetDateBounds.max,
       });
 
-      if (nextFrom === (current.date_from || "") && nextTo === (current.date_to || "")) {
+      if (
+        nextFrom === (current.date_from || "") &&
+        nextTo === (current.date_to || "")
+      ) {
         return current;
       }
 
@@ -331,8 +337,7 @@ export default function Dashboard() {
 
   const activeFilterConfig = getFilterConfig(filters.visualization_type);
 
-  const visualizationType =
-    filters.visualization_type || "location_markers";
+  const visualizationType = filters.visualization_type || "location_markers";
 
   const isKdeHeatmap = visualizationType === "kde_heatmap";
   const isWeightedKdeHeatmap = visualizationType === "weighted_kde_heatmap";
@@ -360,7 +365,6 @@ export default function Dashboard() {
     isLocationMarkers && isPedestrianVariant
       ? "pedestrian_accidents"
       : visualizationType;
-
 
   // Build a human-readable subtitle for the overlay
   // const overlaySubtitle = useMemo(() => {
@@ -571,7 +575,8 @@ export default function Dashboard() {
           })()}
 
           <ExportButton filters={filters} />
-          {((isBlackspotDetection && !isPedestrianVariant) || isDbscanBlackspot) && (
+          {((isBlackspotDetection && !isPedestrianVariant) ||
+            isDbscanBlackspot) && (
             <BlackspotExportButton
               filters={filters}
               algorithm={isDbscanBlackspot ? "dbscan" : "greedy"}
@@ -631,6 +636,7 @@ export default function Dashboard() {
                       key="pedestrian-blackspot"
                       filters={filters}
                       fetchFn={fetchPedestrianBlackspots}
+                      exportFn={exportBlackspotCrashes}
                       heatmapData={data?.heatmap.filter(isPedestrianAccident)}
                       analysisLabel="pedestrian greedy blackspot detection"
                       crashLabel="pedestrian crashes"
@@ -639,10 +645,28 @@ export default function Dashboard() {
                     <BlackspotDetectionLayers
                       key="blackspot"
                       filters={filters}
+                      fetchFn={fetchBlackspots}
+                      exportFn={exportBlackspotCrashes}
                       heatmapData={data?.heatmap}
                     />
+                  ) : isDbscanBlackspot && isPedestrianVariant ? (
+                    <DbscanBlackspotDetectionLayers
+                      key="pedestrian-dbscan-blackspot"
+                      filters={filters}
+                      heatmapData={data?.heatmap.filter(isPedestrianAccident)}
+                      fetchFn={fetchPedestrianDbscanBlackspots}
+                      exportFn={exportBlackspotCrashes}
+                      analysisLabel="pedestrian DBSCAN blackspot detection"
+                      crashLabel="pedestrian crashes"
+                    />
                   ) : isDbscanBlackspot ? (
-                    <DbscanBlackspotDetectionLayers filters={filters} heatmapData={data?.heatmap} />
+                    <DbscanBlackspotDetectionLayers
+                      key="dbscan-blackspot"
+                      filters={filters}
+                      heatmapData={data?.heatmap}
+                      fetchFn={fetchDbscanBlackspots}
+                      exportFn={exportBlackspotCrashes}
+                    />
                   ) : isKdeHeatmap ? (
                     <KdeHeatmapLayers
                       key={`kde-heatmap-${filters.visualization_variant || "accident"}`}
@@ -665,7 +689,9 @@ export default function Dashboard() {
                       selectedSeverity={filters.severity}
                     />
                   )}
-                  <SeverityLegend visualizationLayerType={visualizationLayerType} />
+                  <SeverityLegend
+                    visualizationLayerType={visualizationLayerType}
+                  />
                 </SuratBaseMap>
               </div>
             )}

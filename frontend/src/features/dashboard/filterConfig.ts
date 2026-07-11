@@ -55,6 +55,7 @@ export const VISUALIZATION_VARIANT_LABELS: Record<string, string> = {
   kde_heatmap: "Heatmap Type",
   weighted_kde_heatmap: "Heatmap Type",
   blackspot: "Blackspot Type",
+  dbscan_blackspot: "Blackspot Type",
 };
 
 export const hasVisualizationVariants = (visualizationType?: string): boolean =>

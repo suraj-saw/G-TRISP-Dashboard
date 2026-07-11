@@ -219,6 +219,19 @@ export const fetchDbscanBlackspots = async (
   return data;
 };
 
+export const fetchPedestrianDbscanBlackspots = async (
+  filters: DashboardFilters
+): Promise<BlackspotData> => {
+  const params = getParams(filters);
+  const { data } = await API.get(
+    `${SURAT_API_BASE}/pedestrian-dbscan-blackspots`,
+    {
+      params,
+    }
+  );
+  return data;
+};
+
 export const exportBlackspotCrashes = async (
   crashIds: string[],
   filename: string
@@ -228,7 +241,7 @@ export const exportBlackspotCrashes = async (
     { crash_ids: crashIds, filename },
     { responseType: "blob" }
   );
-  
+
   const blob = new Blob([response.data], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -268,6 +281,8 @@ export const fetchWeightedKdeHeatmap = async (
   if (filters.visualization_variant === "pedestrian") {
     params.append("is_pedestrian", "true");
   }
-  const { data } = await API.get(`${SURAT_API_BASE}/weighted-kde-heatmap`, { params });
+  const { data } = await API.get(`${SURAT_API_BASE}/weighted-kde-heatmap`, {
+    params,
+  });
   return data;
 };
