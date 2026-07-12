@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchDashboardData } from "../api/dashboardApi";
 import type { DashboardFilters, DashboardData } from "../types/dashboard";
+import { toDataFilterKey } from "../utils/dashboardFilters";
 
 const initialData: DashboardData = {
   summary: {
@@ -25,31 +26,13 @@ const initialData: DashboardData = {
   violations: [],
 };
 
-/**
- * Produces a stable cache-key from only the data-affecting filter fields.
- * Visual-only fields (baseMap, visualization_type) are intentionally excluded
- * so switching map styles or view type doesn't trigger a redundant API call.
- */
-const toFilterKey = (filters: DashboardFilters): string =>
-  JSON.stringify({
-    district: filters.district,
-    year: filters.year,
-    severity: filters.severity,
-    road_classification: filters.road_classification,
-    weather_condition: filters.weather_condition,
-    light_condition: filters.light_condition,
-    collision_type: filters.collision_type,
-    date_from: filters.date_from,
-    date_to: filters.date_to,
-  });
-
 export const useDashboard = (filters: DashboardFilters) => {
   const [data, setData] = useState<DashboardData>(initialData);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   // Stable key — only changes when data-relevant filters change
-  const filterKey = toFilterKey(filters);
+  const filterKey = toDataFilterKey(filters);
 
   const loadData = useCallback(async () => {
     setLoading(true);

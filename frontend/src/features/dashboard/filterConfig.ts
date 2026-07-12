@@ -1,6 +1,7 @@
 // frontend/src/features/dashboard/filterConfig.ts
 import type { DashboardFilters } from "../../types/dashboard";
 import { DEFAULT_BASE_MAP, GEO_FILTER_LABEL } from "../../config/constants";
+import { isBlackspotVisualization } from "../../utils/dashboardFilters";
 
 export type VisualizationType =
   | "location_markers"
@@ -92,10 +93,18 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "light_condition", label: "Light Condition" },
 ];
 
+const withoutSeverity = (filters: FilterConfigItem[]): FilterConfigItem[] =>
+  filters.filter((filter) => filter.id !== "severity");
+
 export const getFilterConfig = (
   visualizationType?: string
-): FilterConfigItem[] =>
-  visualizationType === "temporal_analysis" ? TEMPORAL_FILTERS : MAP_FILTERS;
+): FilterConfigItem[] => {
+  const base =
+    visualizationType === "temporal_analysis" ? TEMPORAL_FILTERS : MAP_FILTERS;
+  return isBlackspotVisualization(visualizationType)
+    ? withoutSeverity(base)
+    : base;
+};
 
 export const defaultFilters: DashboardFilters = {
   district: [],

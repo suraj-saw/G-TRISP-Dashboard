@@ -9,6 +9,7 @@ import {
   type BlackspotData,
 } from "../../api/dashboardApi";
 import type { DashboardFilters, HeatmapPoint } from "../../types/dashboard";
+import { toDataFilterKey } from "../../utils/dashboardFilters";
 import {
   getPriorityColor,
   getPriorityLabel,
@@ -328,6 +329,7 @@ export default function BlackspotDetectionLayers({
   }, []);
 
   const accidentGeojson = buildAccidentGeojson(heatmapData);
+  const filterKey = toDataFilterKey(filters);
 
   useEffect(() => {
     let active = true;
@@ -360,18 +362,7 @@ export default function BlackspotDetectionLayers({
     return () => {
       active = false;
     };
-  }, [
-    filters.visualization_type,
-    filters.district,
-    filters.year,
-    filters.severity,
-    filters.road_classification,
-    filters.weather_condition,
-    filters.light_condition,
-    filters.collision_type,
-    filters.date_from,
-    filters.date_to,
-  ]);
+  }, [filterKey]);
 
   useEffect(() => {
     const map = mapRef?.getMap();

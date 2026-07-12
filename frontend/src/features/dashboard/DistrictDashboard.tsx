@@ -73,6 +73,7 @@ import {
   VISUALIZATION_VARIANT_OPTIONS,
   hasVisualizationVariants,
 } from "./filterConfig";
+import { isBlackspotVisualization, toDataFilterKey } from "../../utils/dashboardFilters";
 import { MAP_STYLES } from "../../components/maps/mapStyles";
 
 const pedestrianCasualtyTotal = (point: HeatmapPoint): number =>
@@ -149,7 +150,11 @@ function DateFilterInput({
       value={draft}
       min={min}
       max={max}
-      onChange={(event) => setDraft(event.target.value)}
+      onChange={(event) => {
+        const next = clampDateValue(event.target.value, { min, max });
+        setDraft(next);
+        if (next !== value) onCommit(next);
+      }}
       onBlur={commit}
       onKeyDown={(event) => {
         if (event.key === "Enter") {
@@ -426,6 +431,8 @@ export default function DistrictDashboard() {
   // Use a ref-based generation counter to cancel stale in-flight requests.
   const fetchGenRef = useRef(0);
 
+  const filterKey = toDataFilterKey(filters);
+
   useEffect(() => {
     if (!districtName) return;
     const generation = ++fetchGenRef.current;
@@ -444,20 +451,7 @@ export default function DistrictDashboard() {
       .finally(() => {
         if (generation === fetchGenRef.current) setLoading(false);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    districtName,
-    filters.year,
-    filters.severity,
-    filters.road_classification,
-    filters.weather_condition,
-    filters.light_condition,
-    filters.collision_type,
-    filters.police_station,
-    filters.taluka,
-    filters.date_from,
-    filters.date_to,
-  ]);
+  }, [districtName, filterKey]);
 
   // Fetch unfiltered data for this district to populate the year and severity dropdowns
   useEffect(() => {
@@ -598,8 +592,12 @@ export default function DistrictDashboard() {
     date_to: [],
   };
 
-  const activeFilterConfig =
-    analysisView === "temporal" ? TEMPORAL_FILTERS : MAP_FILTERS;
+  const activeFilterConfig = useMemo(() => {
+    const base = analysisView === "temporal" ? TEMPORAL_FILTERS : MAP_FILTERS;
+    return isBlackspotVisualization(filters.visualization_type)
+      ? base.filter((filter) => filter.id !== "severity")
+      : base;
+  }, [analysisView, filters.visualization_type]);
   // const isDensityHeatmap = filters.visualization_type === "density_heatmap";
   const isBlackspotDetection = filters.visualization_type === "blackspot";
   const isPedestrianVariant = filters.visualization_variant === "pedestrian";
@@ -658,6 +656,9 @@ export default function DistrictDashboard() {
             month: [],
             day: [],
             time_period: [],
+            severity: isBlackspotVisualization(visualizationType)
+              ? []
+              : current.severity,
           };
         }
         return { ...current, [filter.id]: nextValue };

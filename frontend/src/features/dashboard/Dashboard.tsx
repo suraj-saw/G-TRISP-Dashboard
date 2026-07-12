@@ -70,6 +70,7 @@ import {
   hasVisualizationVariants,
   type FilterId,
 } from "./filterConfig";
+import { isBlackspotVisualization } from "../../utils/dashboardFilters";
 
 const pedestrianCasualtyTotal = (point: HeatmapPoint): number =>
   (Number(point.pedestrian_killed) || 0) +
@@ -145,7 +146,11 @@ function DateFilterInput({
       value={draft}
       min={min}
       max={max}
-      onChange={(event) => setDraft(event.target.value)}
+      onChange={(event) => {
+        const next = clampDateValue(event.target.value, { min, max });
+        setDraft(next);
+        if (next !== value) onCommit(next);
+      }}
       onBlur={commit}
       onKeyDown={(event) => {
         if (event.key === "Enter") {
@@ -433,6 +438,9 @@ export default function Dashboard() {
             month: [],
             day: [],
             time_period: [],
+            severity: isBlackspotVisualization(visualizationType)
+              ? []
+              : current.severity,
           };
         }
         return { ...current, [filter.id]: nextValue };

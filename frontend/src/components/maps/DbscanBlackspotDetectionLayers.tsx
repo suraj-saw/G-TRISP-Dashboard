@@ -9,6 +9,7 @@ import {
   type BlackspotData,
 } from "../../api/dashboardApi";
 import type { DashboardFilters, HeatmapPoint } from "../../types/dashboard";
+import { toDataFilterKey } from "../../utils/dashboardFilters";
 import {
   SEARCH_RADIUS_M,
   MIN_QUALIFYING_CRASHES,
@@ -79,6 +80,8 @@ export default function DbscanBlackspotDetectionLayers({
     }
   }, []);
 
+  const filterKey = toDataFilterKey(filters);
+
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -106,17 +109,7 @@ export default function DbscanBlackspotDetectionLayers({
     return () => {
       active = false;
     };
-  }, [
-    filters.district,
-    filters.year,
-    filters.severity,
-    filters.road_classification,
-    filters.weather_condition,
-    filters.light_condition,
-    filters.collision_type,
-    filters.date_from,
-    filters.date_to,
-  ]);
+  }, [filterKey]);
 
   useEffect(() => {
     const map = mapRef?.getMap();
