@@ -25,6 +25,7 @@ import {
   adminAccidentsApi,
   type AccidentRecord,
   type AccidentFilters,
+  type AccidentFilterOptions,
 } from "../../api/adminAccidentsApi";
 import AccidentFormModal from "../../components/admin/AccidentFormModal";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
@@ -76,6 +77,25 @@ const SEVERITY_STYLES: Record<string, string> = {
   "Damage Only": "bg-slate-100 text-slate-600",
 };
 
+const TEXT_FILTER_KEYS = new Set([
+  "road_name",
+  "road_classification",
+  "collision_feature",
+  "traffic_violation",
+]);
+
+const FILTER_OPTION_KEY: Partial<
+  Record<keyof AccidentFilters, keyof AccidentFilterOptions>
+> = {
+  district: "districts",
+  police_station: "police_stations",
+  severity: "severities",
+  type_of_collision: "collision_types",
+  weather_condition: "weather_conditions",
+  light_condition: "light_conditions",
+  visibility: "visibilities",
+};
+
 export default function AccidentManagement() {
   const [accidents, setAccidents] = useState<AccidentRecord[]>([]);
   const [total, setTotal] = useState(0);
@@ -90,9 +110,16 @@ export default function AccidentManagement() {
   const [globalSearch, setGlobalSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [columnFilters, setColumnFilters] = useState<AccidentFilters>({});
-  const [filterOptions, setFilterOptions] = useState({
-    severities: [] as string[],
-    police_stations: [] as string[],
+  const [filterOptions, setFilterOptions] = useState<AccidentFilterOptions>({
+    severities: [],
+    police_stations: [],
+    districts: [],
+    road_names: [],
+    collision_types: [],
+    collision_features: [],
+    weather_conditions: [],
+    light_conditions: [],
+    visibilities: [],
   });
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
 
@@ -107,11 +134,13 @@ export default function AccidentManagement() {
   const [columnMenuOpen, setColumnMenuOpen] = useState(false);
   const columnMenuRef = useRef<HTMLDivElement>(null);
 
-  // Modals
+  // Modals & selection
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [selectedAccident, setSelectedAccident] = useState<AccidentRecord | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<number[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   // Debounce global search
   useEffect(() => {
@@ -152,6 +181,10 @@ export default function AccidentManagement() {
   }, [loadData]);
 
   useEffect(() => {
+    setSelectedIds(new Set());
+  }, [debouncedSearch, columnFilters]);
+
+  useEffect(() => {
     adminAccidentsApi.getFilterOptions().then(setFilterOptions).catch(() => {
       // Text filters remain available when option loading fails.
     });
@@ -162,22 +195,63 @@ export default function AccidentManagement() {
     setFormModalOpen(true);
   };
 
-  const handleDeleteRequest = (id: number) => {
-    setDeletingId(id);
+  const handleDeleteRequest = (ids: number[]) => {
+    setPendingDeleteIds(ids);
     setConfirmOpen(true);
   };
 
   const handleConfirmDelete = async () => {
-    if (!deletingId) return;
+    if (pendingDeleteIds.length === 0) return;
     try {
-      await adminAccidentsApi.deleteAccident(deletingId);
+      if (pendingDeleteIds.length === 1) {
+        await adminAccidentsApi.deleteAccident(pendingDeleteIds[0]);
+      } else {
+        await adminAccidentsApi.bulkDeleteAccidents(pendingDeleteIds);
+      }
+      setSelectedIds(new Set());
       loadData();
     } catch {
-      alert("Failed to delete record.");
+      alert("Failed to delete record(s).");
     } finally {
       setConfirmOpen(false);
-      setDeletingId(null);
+      setPendingDeleteIds([]);
     }
+  };
+
+  const pageIds = accidents.map((acc) => acc.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const somePageSelected = pageIds.some((id) => selectedIds.has(id));
+  const selectedOnPageCount = pageIds.filter((id) => selectedIds.has(id)).length;
+  const selectedOnOtherPages = selectedIds.size - selectedOnPageCount;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
+    }
+  }, [somePageSelected, allPageSelected]);
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        pageIds.forEach((id) => next.delete(id));
+      } else {
+        pageIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectRow = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   };
 
   const handleFormSuccess = () => {
@@ -366,34 +440,38 @@ export default function AccidentManagement() {
               className="overflow-hidden"
             >
               <div className="flex items-start gap-2 flex-wrap pt-1 pb-1">
-                {ALL_COLUMNS.filter((c) => c.filterable).map((col) => (
-                  <div key={col.key} className="flex flex-col gap-0.5">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{col.label}</label>
-                    {col.key === "severity" || col.key === "police_station" ? (
-                      <select
-                        value={columnFilters[col.key as keyof AccidentFilters] || ""}
-                        onChange={(e) => updateFilter(col.key, e.target.value)}
-                        className="w-40 px-2 py-1.5 bg-white border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-400"
-                      >
-                        <option value="">All {col.label.toLowerCase()}s</option>
-                        {(col.key === "severity"
-                          ? filterOptions.severities
-                          : filterOptions.police_stations
-                        ).map((option) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        placeholder={`Filter ${col.label.toLowerCase()}...`}
-                        value={columnFilters[col.key as keyof AccidentFilters] || ""}
-                        onChange={(e) => updateFilter(col.key, e.target.value)}
-                        className="w-32 px-2 py-1.5 bg-white border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-400"
-                      />
-                    )}
-                  </div>
-                ))}
+                {ALL_COLUMNS.filter((c) => c.filterable).map((col) => {
+                  const filterKey = col.key as keyof AccidentFilters;
+                  const filterValue = columnFilters[filterKey] || "";
+                  const optionKey = FILTER_OPTION_KEY[filterKey];
+                  const options = optionKey ? filterOptions[optionKey] : [];
+
+                  return (
+                    <div key={col.key} className="flex flex-col gap-0.5">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{col.label}</label>
+                      {TEXT_FILTER_KEYS.has(col.key) ? (
+                        <input
+                          type="text"
+                          placeholder={`Filter ${col.label.toLowerCase()}...`}
+                          value={filterValue}
+                          onChange={(e) => updateFilter(col.key, e.target.value)}
+                          className="w-32 px-2 py-1.5 bg-white border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-400"
+                        />
+                      ) : (
+                        <select
+                          value={filterValue}
+                          onChange={(e) => updateFilter(col.key, e.target.value)}
+                          className="w-40 max-w-[12rem] px-2 py-1.5 bg-white border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-400 truncate"
+                        >
+                          <option value="">All {col.label.toLowerCase()}s</option>
+                          {options.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  );
+                })}
                 {activeFilterCount > 0 && (
                   <button
                     onClick={clearFilters}
@@ -407,6 +485,33 @@ export default function AccidentManagement() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 flex-wrap px-1 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <span className="text-xs font-semibold text-indigo-700">
+              {selectedIds.size} selected
+              {selectedOnOtherPages > 0 && (
+                <span className="font-normal text-indigo-500">
+                  {" "}({selectedOnPageCount} on this page, {selectedOnOtherPages} on other pages)
+                </span>
+              )}
+            </span>
+            <button
+              onClick={() => handleDeleteRequest(Array.from(selectedIds))}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete selected
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
+            >
+              <X className="w-3 h-3" />
+              Clear selection
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Error State ── */}
@@ -431,6 +536,17 @@ export default function AccidentManagement() {
         <table className="w-full text-sm text-left whitespace-nowrap">
           <thead className="bg-slate-100/80 text-slate-600 font-semibold uppercase text-[11px] tracking-wider sticky top-0 z-20">
             <tr>
+              <th className="py-2.5 px-3 border-b border-slate-200 w-10 sticky left-0 bg-slate-100/90 z-30">
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allPageSelected}
+                  onChange={toggleSelectAll}
+                  disabled={accidents.length === 0}
+                  className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20"
+                  title="Select all on this page"
+                />
+              </th>
               {visibleCols.map((col) => (
                 <th
                   key={col.key}
@@ -448,7 +564,7 @@ export default function AccidentManagement() {
           <tbody className="divide-y divide-slate-100">
             {accidents.length === 0 && !loading && !error && (
               <tr>
-                <td colSpan={visibleCols.length + 1} className="py-16 text-center text-slate-500">
+                <td colSpan={visibleCols.length + 2} className="py-16 text-center text-slate-500">
                   <div className="flex flex-col items-center justify-center">
                     <FileSpreadsheet className="w-12 h-12 text-slate-200 mb-3" />
                     <p className="font-medium text-slate-600">No records found</p>
@@ -460,7 +576,29 @@ export default function AccidentManagement() {
               </tr>
             )}
             {accidents.map((acc) => (
-              <tr key={acc.id} className="hover:bg-indigo-50/40 transition-colors group">
+              <tr
+                key={acc.id}
+                className={`transition-colors group ${
+                  selectedIds.has(acc.id)
+                    ? "bg-indigo-50/70 hover:bg-indigo-50"
+                    : "hover:bg-indigo-50/40"
+                }`}
+              >
+                <td
+                  className={`py-2 px-3 sticky left-0 transition-colors ${
+                    selectedIds.has(acc.id)
+                      ? "bg-indigo-50/70"
+                      : "bg-white group-hover:bg-indigo-50/40"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(acc.id)}
+                    onChange={() => toggleSelectRow(acc.id)}
+                    className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20"
+                    aria-label={`Select accident ${acc.accident_id}`}
+                  />
+                </td>
                 {visibleCols.map((col) => (
                   <td
                     key={col.key}
@@ -485,7 +623,7 @@ export default function AccidentManagement() {
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => handleDeleteRequest(acc.id)}
+                      onClick={() => handleDeleteRequest([acc.id])}
                       className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                       title="Delete Record"
                     >
@@ -539,12 +677,19 @@ export default function AccidentManagement() {
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Accident Record"
-        message="Are you sure you want to permanently delete this accident record? This action cannot be undone."
-        confirmText="Delete"
+        title={pendingDeleteIds.length > 1 ? "Delete Accident Records" : "Delete Accident Record"}
+        message={
+          pendingDeleteIds.length > 1
+            ? `Are you sure you want to permanently delete ${pendingDeleteIds.length} accident records? This action cannot be undone.`
+            : "Are you sure you want to permanently delete this accident record? This action cannot be undone."
+        }
+        confirmText={pendingDeleteIds.length > 1 ? `Delete ${pendingDeleteIds.length}` : "Delete"}
         cancelText="Cancel"
         onConfirm={handleConfirmDelete}
-        onCancel={() => setConfirmOpen(false)}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setPendingDeleteIds([]);
+        }}
         danger={true}
       />
     </div>

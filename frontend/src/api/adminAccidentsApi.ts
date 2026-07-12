@@ -81,6 +81,13 @@ export interface ImportResponse {
 export interface AccidentFilterOptions {
   severities: string[];
   police_stations: string[];
+  districts: string[];
+  road_names: string[];
+  collision_types: string[];
+  collision_features: string[];
+  weather_conditions: string[];
+  light_conditions: string[];
+  visibilities: string[];
 }
 
 export const adminAccidentsApi = {
@@ -122,6 +129,14 @@ export const adminAccidentsApi = {
 
   deleteAccident: async (id: number) => {
     const res = await API.delete(`/admin/surat/accidents/${id}`);
+    return res.data;
+  },
+
+  bulkDeleteAccidents: async (ids: number[]) => {
+    const res = await API.post<{ message: string; deleted: number }>(
+      "/admin/surat/accidents/bulk-delete",
+      { ids }
+    );
     return res.data;
   },
 

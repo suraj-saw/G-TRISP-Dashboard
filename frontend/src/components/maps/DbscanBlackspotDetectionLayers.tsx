@@ -226,8 +226,8 @@ export default function DbscanBlackspotDetectionLayers({
   };
 
   const StatusBadge = ({ children }: { children: React.ReactNode }) => (
-    <div className="pointer-events-none absolute bottom-4 left-4 z-20">
-      <div className="pointer-events-auto rounded-full border border-slate-200/50 bg-white/90 px-5 py-3 shadow-xl backdrop-blur-md text-sm font-medium text-slate-700 flex items-center gap-3 transition-all duration-300 hover:bg-white/95">
+    <div className="pointer-events-none absolute top-4 left-4 z-20">
+      <div className="pointer-events-auto rounded-full border border-slate-200/50 bg-white/90 px-3 py-2 shadow-xl backdrop-blur-md text-[11px] font-medium text-slate-700 flex items-center gap-2 transition-all duration-300 hover:bg-white/95">
         {children}
       </div>
     </div>
@@ -236,7 +236,7 @@ export default function DbscanBlackspotDetectionLayers({
   if (loading) {
     return (
       <StatusBadge>
-        <Loader2 size={16} className="animate-spin text-indigo-500" />
+        <Loader2 size={14} className="animate-spin text-indigo-500" />
         Running DBSCAN detection…
       </StatusBadge>
     );
@@ -245,7 +245,7 @@ export default function DbscanBlackspotDetectionLayers({
   if (error) {
     return (
       <StatusBadge>
-        <AlertCircle size={16} className="text-red-500" />
+        <AlertCircle size={14} className="text-red-500" />
         <span className="text-red-600 font-semibold">{error}</span>
       </StatusBadge>
     );
@@ -254,7 +254,7 @@ export default function DbscanBlackspotDetectionLayers({
   if (!data || data.circles.features.length === 0) {
     return (
       <StatusBadge>
-        <AlertCircle size={16} className="text-amber-500" />
+        <AlertCircle size={14} className="text-amber-500" />
         <span>
           No blackspots found — criteria:{" "}
           <span className="font-bold text-amber-600">
@@ -337,10 +337,10 @@ export default function DbscanBlackspotDetectionLayers({
           <span className="font-bold text-slate-800">{data.total_crashes}</span>{" "}
           Crashes
         </span>
-        <span className="text-slate-300">|</span>
+        {/* <span className="text-slate-300">|</span>
         <span className="text-slate-500 text-xs">
           Search: {SEARCH_RADIUS_M}m
-        </span>
+        </span> */}
       </StatusBadge>
 
       {hovered && (

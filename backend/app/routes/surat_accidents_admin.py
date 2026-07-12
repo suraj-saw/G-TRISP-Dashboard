@@ -192,6 +192,17 @@ def _record_to_dict(record: Accident) -> Dict[str, Any]:
     return row
 
 
+def _distinct_values(db: Session, column) -> List[str]:
+    return [
+        value
+        for (value,) in db.query(column)
+        .filter(column.isnot(None), column != "")
+        .distinct()
+        .order_by(column)
+        .all()
+    ]
+
+
 @router.get("/accidents/columns")
 def get_accident_columns(
     current_user: User = Depends(get_current_admin_user),
@@ -204,23 +215,17 @@ def get_accident_filter_options(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
-    severities = [
-        value
-        for (value,) in db.query(Accident.severity)
-        .filter(Accident.severity.isnot(None), Accident.severity != "")
-        .distinct()
-        .order_by(Accident.severity)
-        .all()
-    ]
-    police_stations = [
-        value
-        for (value,) in db.query(Accident.police_station)
-        .filter(Accident.police_station.isnot(None), Accident.police_station != "")
-        .distinct()
-        .order_by(Accident.police_station)
-        .all()
-    ]
-    return {"severities": severities, "police_stations": police_stations}
+    return {
+        "severities": _distinct_values(db, Accident.severity),
+        "police_stations": _distinct_values(db, Accident.police_station),
+        "districts": _distinct_values(db, Accident.district),
+        "road_names": _distinct_values(db, Accident.road_name),
+        "collision_types": _distinct_values(db, Accident.type_of_collision),
+        "collision_features": _distinct_values(db, Accident.collision_feature),
+        "weather_conditions": _distinct_values(db, Accident.weather_condition),
+        "light_conditions": _distinct_values(db, Accident.light_condition),
+        "visibilities": _distinct_values(db, Accident.visibility),
+    }
 
 
 @router.post("/accidents", status_code=201)
@@ -405,6 +410,33 @@ def delete_accident(
     db.delete(record)
     db.commit()
     return {"message": "Accident record deleted successfully.", "id": accident_id}
+
+
+@router.post("/accidents/bulk-delete")
+def bulk_delete_accidents(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    raw_ids = payload.get("ids", [])
+    if not raw_ids:
+        raise HTTPException(status_code=400, detail="No IDs provided")
+
+    try:
+        ids = [int(record_id) for record_id in raw_ids]
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid ID list") from exc
+
+    deleted = (
+        db.query(Accident)
+        .filter(Accident.id.in_(ids))
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {
+        "message": f"{deleted} accident record(s) deleted successfully.",
+        "deleted": deleted,
+    }
 
 
 @router.post("/accidents/upload")
