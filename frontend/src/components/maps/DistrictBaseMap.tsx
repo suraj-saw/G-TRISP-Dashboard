@@ -12,6 +12,7 @@ import Map, { Source, Layer, NavigationControl, Popup } from "react-map-gl/mapli
 import type { MapRef, LngLatBoundsLike, MapLayerMouseEvent } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2, AlertCircle } from "lucide-react";
+import { MapPin, Copy, X } from "lucide-react";
 import { getMapStyleUrl } from "./mapStyles";
 import {
   GUJARAT_MAP_CENTER,
@@ -352,15 +353,41 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
             <Popup
               longitude={contextMenuCoords.lng}
               latitude={contextMenuCoords.lat}
-              closeButton={true}
-              closeOnClick={true}
-              onClose={() => setContextMenuCoords(null)}
               anchor="top"
-              className="z-50"
+              offset={16}
+              closeButton={false}
+              closeOnClick={true}
+              className="coordinate-popup"
+              onClose={() => setContextMenuCoords(null)}
             >
-              <div className="p-1 text-xs font-semibold text-slate-800">
-                <div>Lat: {contextMenuCoords.lat.toFixed(6)}</div>
-                <div>Lng: {contextMenuCoords.lng.toFixed(6)}</div>
+              <div className="min-w-[150px] rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">Latitude</span>
+                    <span className="font-mono text-xs font-semibold text-slate-800">
+                      {contextMenuCoords.lat.toFixed(6)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">Longitude</span>
+                    <span className="font-mono text-xs font-semibold text-slate-800">
+                      {contextMenuCoords.lng.toFixed(6)}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      navigator.clipboard.writeText(
+                        `${contextMenuCoords.lat.toFixed(6)}, ${contextMenuCoords.lng.toFixed(6)}`
+                      )
+                    }
+                    className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-md bg-blue-600 px-2 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700"
+                  >
+                    <Copy size={11} />
+                    Copy Coordinates
+                  </button>
+                </div>
               </div>
             </Popup>
           )}

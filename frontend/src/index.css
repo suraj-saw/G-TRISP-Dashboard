@@ -50,3 +50,15 @@
 .maplibregl-popup.accident-popup .maplibregl-popup-close-button {
   display: none;
 }
+
+.coordinate-popup .maplibregl-popup-content {
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  overflow: visible;
+}
+
+.coordinate-popup .maplibregl-popup-tip {
+  border-top-color: #ffffff;
+}

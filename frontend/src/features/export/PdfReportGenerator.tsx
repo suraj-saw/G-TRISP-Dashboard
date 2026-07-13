@@ -111,23 +111,108 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
   }, [dataLoaded, filters, onComplete, onError]);
 
   return createPortal(
-    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(255,255,255,0.9)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-      <Loader2 size={48} className="animate-spin text-blue-600 mb-4" />
-      <h2 className="text-xl font-bold text-slate-800">Exporting PDF Report</h2>
-      <p className="text-slate-600 mt-2">{progress}</p>
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{
+        background: "rgba(255,255,255,0.60)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+      }}
+    >
+      <div className="w-[370px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+        {/* Top Accent */}
+        <div className="h-1 bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-400" />
 
-      {/* Hidden render area for charts */}
+        <div className="px-6 py-5">
+          {/* Smooth Spinner */}
+          <div className="flex justify-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-50">
+              <div className="h-8 w-8 rounded-full border-[3px] border-blue-200 border-t-blue-600 animate-spin" />
+            </div>
+          </div>
+
+          {/* Title */}
+          <h2 className="mt-4 text-center text-xl font-bold text-slate-800">
+            Exporting PDF Report
+          </h2>
+
+          <p className="mt-1 text-center text-sm text-slate-500">
+            Please wait while your report is being generated.
+          </p>
+
+          {/* Status Card */}
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Current Step
+              </span>
+
+              <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                Processing
+              </span>
+            </div>
+
+            <p className="text-sm font-medium text-slate-700">{progress}</p>
+
+            {/* Animated Progress */}
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
+              <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-blue-500 via-sky-500 to-cyan-400 export-progress-bar" />
+            </div>
+          </div>
+
+          {/* Warning */}
+          <div className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-center text-[11px] text-amber-700">
+            Please don't close or refresh this page until the PDF has been
+            downloaded.
+          </div>
+        </div>
+      </div>
+
+      {/* Hidden render area */}
       {dataLoaded && (
-        <div ref={containerRef} style={{ position: "absolute", top: "-9999px", left: "-9999px", width: "1024px", background: "#fff", padding: "20px" }}>
+        <div
+          ref={containerRef}
+          style={{
+            position: "absolute",
+            top: "-9999px",
+            left: "-9999px",
+            width: "1024px",
+            background: "#fff",
+            padding: "20px",
+          }}
+        >
           {ReportRegistry.getSections("statistical").map((section) => (
-             <div id={`report-section-${section.id}`} key={section.id} style={{ marginBottom: "20px", padding: "10px", background: "#fff", border: "1px solid #e2e8f0" }}>
-                 {React.createElement(section.component, { data: statisticalData })}
-             </div>
+            <div
+              id={`report-section-${section.id}`}
+              key={section.id}
+              style={{
+                marginBottom: "20px",
+                padding: "10px",
+                background: "#fff",
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              {React.createElement(section.component, {
+                data: statisticalData,
+              })}
+            </div>
           ))}
+
           {ReportRegistry.getSections("temporal").map((section) => (
-             <div id={`report-section-${section.id}`} key={section.id} style={{ marginBottom: "20px", padding: "10px", background: "#fff", border: "1px solid #e2e8f0" }}>
-                 {React.createElement(section.component, { data: temporalData })}
-             </div>
+            <div
+              id={`report-section-${section.id}`}
+              key={section.id}
+              style={{
+                marginBottom: "20px",
+                padding: "10px",
+                background: "#fff",
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              {React.createElement(section.component, {
+                data: temporalData,
+              })}
+            </div>
           ))}
         </div>
       )}
