@@ -23,6 +23,8 @@ interface Props {
   fetchFn?: (filters: DashboardFilters) => Promise<BlackspotData>;
   exportFn?: (crashIds: string[], filename: string) => Promise<void>;
   heatmapData?: HeatmapPoint[];
+  analysisLabel?: string;
+  crashLabel?: string;
 }
 
 interface HoveredBlackspot {
@@ -48,6 +50,8 @@ export default function DbscanBlackspotDetectionLayers({
   filters,
   fetchFn,
   exportFn,
+  analysisLabel = "DBSCAN detection",
+  crashLabel = "crashes",
 }: Props) {
   const { current: mapRef } = useMap();
   const [data, setData] = useState<BlackspotData | null>(null);
@@ -230,7 +234,7 @@ export default function DbscanBlackspotDetectionLayers({
     return (
       <StatusBadge>
         <Loader2 size={14} className="animate-spin text-indigo-500" />
-        Running DBSCAN detection…
+        Running {analysisLabel}…
       </StatusBadge>
     );
   }
@@ -253,7 +257,7 @@ export default function DbscanBlackspotDetectionLayers({
           <span className="font-bold text-amber-600">
             ≥{MIN_QUALIFYING_CRASHES}
           </span>{" "}
-          qualifying crashes within {data?.radius_m ?? SEARCH_RADIUS_M} m.
+          qualifying {crashLabel} within {data?.radius_m ?? SEARCH_RADIUS_M} m.
         </span>
       </StatusBadge>
     );
@@ -328,7 +332,7 @@ export default function DbscanBlackspotDetectionLayers({
         <span className="text-slate-300">|</span>
         <span className="flex items-center gap-1.5">
           <span className="font-bold text-slate-800">{data.total_crashes}</span>{" "}
-          Crashes
+          {crashLabel}
         </span>
         {/* <span className="text-slate-300">|</span>
         <span className="text-slate-500 text-xs">

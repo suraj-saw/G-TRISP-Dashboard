@@ -12,8 +12,8 @@ import {
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
-import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
-import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
+// import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
+// import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
 // import DensityMapOverlays from "../../components/maps/DensityMapOverlays";
 import SeverityLegend from "../../components/maps/SeverityLegend";
 import TopBar from "../../components/layout/TopBar";
@@ -49,8 +49,6 @@ import {
   fetchGujaratDbscanBlackspots,
   fetchGujaratPedestrianDbscanBlackspots,
   fetchGujaratTemporalAnalysis,
-  fetchGujaratKdeHeatmap,
-  fetchGujaratWeightedKdeHeatmap,
   exportGujaratBlackspotCrashes,
 } from "../../api/gujaratDashboardApi";
 import type {

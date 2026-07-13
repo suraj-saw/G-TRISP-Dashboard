@@ -13,8 +13,8 @@ import FilterSelect from "../../components/layout/FilterSelect";
 import ExportButton from "../../components/layout/ExportButton";
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
 import BlackspotExportButton from "../../components/layout/BlackspotExportButton";
-import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
-import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
+// import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
+// import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
 
 import {
   Filter,
@@ -44,8 +44,6 @@ import {
   fetchPedestrianBlackspots,
   fetchDbscanBlackspots,
   fetchPedestrianDbscanBlackspots,
-  fetchKdeHeatmap,
-  fetchWeightedKdeHeatmap,
   exportBlackspotCrashes,
 } from "../../api/dashboardApi";
 import SuratBaseMap from "../../components/maps/SuratBaseMap";

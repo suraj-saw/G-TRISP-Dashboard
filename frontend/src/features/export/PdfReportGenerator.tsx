@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Loader2 } from "lucide-react";
+// import { Loader2 } from "lucide-react";
 import { ReportRegistry } from "./ReportRegistry";
 import { PdfEngine } from "../../utils/pdfEngine";
 import {

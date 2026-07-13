@@ -58,7 +58,7 @@ export class PdfEngine {
    */
   private addFooterInternal() {
     const pageCount = this.doc.getNumberOfPages();
-    const totalPages = this.doc.getNumberOfPages();
+    // const totalPages = this.doc.getNumberOfPages();
     const pageText = `Page ${pageCount}`;
 
     // Footer bar
