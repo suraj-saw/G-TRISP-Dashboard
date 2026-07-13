@@ -49,7 +49,7 @@ const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
   districtName,
   isBlackspotDetection,
   isDbscanBlackspot,
-  isPedestrianVariant,
+  // isPedestrianVariant,
 }) => {
   const showBlackspotExport =
     activeView === "spatial" && (isBlackspotDetection || isDbscanBlackspot);

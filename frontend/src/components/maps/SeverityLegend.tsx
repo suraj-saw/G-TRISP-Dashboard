@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMap } from "react-map-gl/maplibre";
 
 const SEVERITY_LEGEND_ITEMS = [

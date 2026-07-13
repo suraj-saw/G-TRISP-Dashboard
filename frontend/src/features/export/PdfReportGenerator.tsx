@@ -3,7 +3,10 @@ import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { ReportRegistry } from "./ReportRegistry";
 import { PdfEngine } from "../../utils/pdfEngine";
-import { getDistrictStats, fetchGujaratTemporalAnalysis } from "../../api/gujaratDashboardApi";
+import {
+  getDistrictStats,
+  fetchGujaratTemporalAnalysis,
+} from "../../api/gujaratDashboardApi";
 import type { DashboardFilters } from "../../types/dashboard";
 
 interface PdfReportGeneratorProps {
@@ -21,7 +24,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
 }) => {
   const [progress, setProgress] = useState<string>("Initializing...");
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   // Data state
   const [statisticalData, setStatisticalData] = useState<any>(null);
   const [temporalData, setTemporalData] = useState<any>(null);
@@ -34,7 +37,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
         const actualDistrict = districtName || filters.district?.[0] || "";
         const [stat, temp] = await Promise.all([
           getDistrictStats({ ...filters, district: actualDistrict } as any),
-          fetchGujaratTemporalAnalysis(filters as any, actualDistrict)
+          fetchGujaratTemporalAnalysis(filters as any, actualDistrict),
         ]);
         setStatisticalData(stat);
         setTemporalData(temp);
@@ -45,7 +48,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
       }
     }
     loadData();
-  }, [filters, onError]);
+  }, [filters, districtName, onError]);
 
   useEffect(() => {
     if (!dataLoaded || !containerRef.current) return;
@@ -63,14 +66,16 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
         const actualDistrict = districtName || filters.district?.[0] || "";
         const districtStr = actualDistrict ? actualDistrict : "All Gujarat";
         const filterStrs: string[] = [];
-        if (filters.year?.length) filterStrs.push(`Year: ${filters.year.join(", ")}`);
-        if (filters.severity?.length) filterStrs.push(`Severity: ${filters.severity.join(", ")}`);
-        
+        if (filters.year?.length)
+          filterStrs.push(`Year: ${filters.year.join(", ")}`);
+        if (filters.severity?.length)
+          filterStrs.push(`Severity: ${filters.severity.join(", ")}`);
+
         engine.addCoverPage({
-            title: "Government Road Accident Analysis Report",
-            district: districtStr,
-            dateStr: new Date().toLocaleString(),
-            filters: filterStrs,
+          title: "Government Road Accident Analysis Report",
+          district: districtStr,
+          dateStr: new Date().toLocaleString(),
+          filters: filterStrs,
         });
 
         const statSections = ReportRegistry.getSections("statistical");
@@ -78,29 +83,40 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
 
         // 2. Statistical Analysis
         if (statSections.length > 0) {
-            engine.addNewPage("Section 1 - Statistical Analysis");
-            let index = 1;
-            for (const section of statSections) {
-                setProgress(`Rendering Statistical Analysis (${index}/${statSections.length})...`);
-                await engine.addElementAsImage(`report-section-${section.id}`, section.title);
-                index++;
-            }
+          engine.addNewPage("Section 1 - Statistical Analysis");
+          let index = 1;
+          for (const section of statSections) {
+            setProgress(
+              `Rendering Statistical Analysis (${index}/${statSections.length})...`
+            );
+            await engine.addElementAsImage(
+              `report-section-${section.id}`,
+              section.title
+            );
+            index++;
+          }
         }
 
         // 3. Temporal Analysis
         if (tempSections.length > 0) {
-            engine.addNewPage("Section 2 - Temporal Analysis");
-            let index = 1;
-            for (const section of tempSections) {
-                setProgress(`Rendering Temporal Analysis (${index}/${tempSections.length})...`);
-                await engine.addElementAsImage(`report-section-${section.id}`, section.title);
-                index++;
-            }
+          engine.addNewPage("Section 2 - Temporal Analysis");
+          let index = 1;
+          for (const section of tempSections) {
+            setProgress(
+              `Rendering Temporal Analysis (${index}/${tempSections.length})...`
+            );
+            await engine.addElementAsImage(
+              `report-section-${section.id}`,
+              section.title
+            );
+            index++;
+          }
         }
 
-        engine.save(`${districtStr.toLowerCase().replace(/\s+/g, "_")}_analysis_report.pdf`);
+        engine.save(
+          `${districtStr.toLowerCase().replace(/\s+/g, "_")}_analysis_report.pdf`
+        );
         onComplete();
-
       } catch (err) {
         console.error(err);
         onError("Failed to generate PDF document.");
@@ -108,7 +124,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
     };
 
     generatePdf();
-  }, [dataLoaded, filters, onComplete, onError]);
+  }, [dataLoaded, filters, districtName, onComplete, onError]);
 
   return createPortal(
     <div
@@ -189,7 +205,6 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
                 marginBottom: "20px",
                 padding: "10px",
                 background: "#fff",
-                border: "1px solid #e2e8f0",
               }}
             >
               {React.createElement(section.component, {
@@ -206,7 +221,6 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
                 marginBottom: "20px",
                 padding: "10px",
                 background: "#fff",
-                border: "1px solid #e2e8f0",
               }}
             >
               {React.createElement(section.component, {

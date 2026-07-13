@@ -12,7 +12,7 @@ import Map, { Source, Layer, NavigationControl, Popup } from "react-map-gl/mapli
 import type { MapRef, LngLatBoundsLike, MapLayerMouseEvent } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2, AlertCircle } from "lucide-react";
-import { MapPin, Copy, X } from "lucide-react";
+import { Copy } from "lucide-react";
 import { getMapStyleUrl } from "./mapStyles";
 import {
   GUJARAT_MAP_CENTER,
