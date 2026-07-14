@@ -259,31 +259,44 @@ export class PdfEngine {
   }
 
   /**
-   * Captures an HTML element and adds it to the PDF.
-   * Auto-scales and adds page breaks if necessary.
+   * Captures an HTML element to an image without adding it to the PDF yet.
+   * This allows for parallel rendering of multiple elements.
    */
-  public async addElementAsImage(
-    elementId: string,
-    title?: string,
-    description?: string
-  ) {
+  public async captureElement(
+    elementId: string
+  ): Promise<{ imgData: string; imgWidth: number; imgHeight: number } | null> {
     const el = document.getElementById(elementId);
     if (!el) {
       console.warn(`Element with ID ${elementId} not found.`);
-      return;
+      return null;
     }
 
     // Capture the element
     const canvas = await html2canvas(el, {
-      scale: 2,
+      scale: 1, // Reduced to 1 for maximum performance
       useCORS: true,
       backgroundColor: "#ffffff",
       logging: false,
+      ignoreElements: (element) => element.id === "root",
     });
     const imgData = canvas.toDataURL("image/png");
 
     const imgWidth = this.pageWidth - 2 * this.margin;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    return { imgData, imgWidth, imgHeight };
+  }
+
+  /**
+   * Adds a pre-captured image to the PDF.
+   * Auto-scales and adds page breaks if necessary.
+   */
+  public addCapturedImage(
+    capture: { imgData: string; imgWidth: number; imgHeight: number },
+    title?: string,
+    description?: string
+  ) {
+    const { imgData, imgWidth, imgHeight } = capture;
 
     const neededHeight = title
       ? description

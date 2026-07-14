@@ -57,8 +57,8 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
     const generatePdf = async () => {
       try {
         setProgress("Generating document...");
-        // Wait for Recharts to render (disabled animation is needed on the charts, but adding a delay helps)
-        await new Promise((r) => setTimeout(r, 2000));
+        // Wait for Recharts to render (reduced delay for better performance)
+        await new Promise((r) => setTimeout(r, 500));
 
         const engine = new PdfEngine();
 
@@ -87,12 +87,16 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
           let index = 1;
           for (const section of statSections) {
             setProgress(
-              `Rendering Statistical Analysis (${index}/${statSections.length})...`
+              `Capturing Statistical Analysis (${index}/${statSections.length})...`
             );
-            await engine.addElementAsImage(
-              `report-section-${section.id}`,
-              section.title
+            // Yield to main thread to prevent UI freeze and aid GC
+            await new Promise((r) => setTimeout(r, 50));
+            const capture = await engine.captureElement(
+              `report-section-${section.id}`
             );
+            if (capture) {
+              engine.addCapturedImage(capture, section.title);
+            }
             index++;
           }
         }
@@ -103,12 +107,16 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
           let index = 1;
           for (const section of tempSections) {
             setProgress(
-              `Rendering Temporal Analysis (${index}/${tempSections.length})...`
+              `Capturing Temporal Analysis (${index}/${tempSections.length})...`
             );
-            await engine.addElementAsImage(
-              `report-section-${section.id}`,
-              section.title
+            // Yield to main thread to prevent UI freeze
+            await new Promise((r) => setTimeout(r, 50));
+            const capture = await engine.captureElement(
+              `report-section-${section.id}`
             );
+            if (capture) {
+              engine.addCapturedImage(capture, section.title);
+            }
             index++;
           }
         }

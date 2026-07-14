@@ -235,12 +235,12 @@ export const TimePeriodSection: React.FC<{ data: TemporalAnalysisData }> = ({
 }) => {
   return (
     <ChartContainer>
-      <div style={{ width: "100%", height: "300px" }}>
+      <div style={{ width: "100%", height: "450px" }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data?.time_period_distribution || []}
             layout="vertical"
-            margin={{ top: 10, right: 10, left: 100, bottom: 5 }}
+            margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
           >
             <CartesianGrid
               stroke={GRID}
@@ -252,6 +252,7 @@ export const TimePeriodSection: React.FC<{ data: TemporalAnalysisData }> = ({
             <YAxis
               dataKey="period"
               type="category"
+              width={150}
               tick={{ fill: MUTED, fontSize: 11 }}
             />
             <Bar

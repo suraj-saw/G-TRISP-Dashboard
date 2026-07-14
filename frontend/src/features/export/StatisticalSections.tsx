@@ -123,12 +123,12 @@ const HorizontalBarSection: React.FC<{
   const chartData = getTopCategories(data, 10, nameKey);
   return (
     <ChartContainer>
-      <div style={{ width: "100%", height: "300px" }}>
+      <div style={{ width: "100%", height: "450px" }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
             layout="vertical"
-            margin={{ top: 10, right: 40, left: 100, bottom: 5 }}
+            margin={{ top: 10, right: 40, left: 10, bottom: 5 }}
           >
             <CartesianGrid
               stroke={GRID}
@@ -140,6 +140,7 @@ const HorizontalBarSection: React.FC<{
             <YAxis
               dataKey="name"
               type="category"
+              width={150}
               tick={{ fill: MUTED, fontSize: 11 }}
             />
             <Bar
