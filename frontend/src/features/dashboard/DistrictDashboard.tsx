@@ -1009,7 +1009,7 @@ export default function DistrictDashboard() {
                                 {districtName || "This district"} doesn't have
                                 recorded accident records in the system yet. Try
                                 a district with available data, such as Surat or
-                                Bhavnagar.
+                                Ahmadabad.
                               </p>
                             </div>
                             <button
