@@ -13,6 +13,7 @@ import {
   type GujaratWideSummary,
 } from "../api/gujaratDashboardApi";
 
+/** Context interface for district insights data */
 interface Ctx {
   gujaratLoading: boolean; // blocks initial paint only — should be fast
   districtsReady: boolean; // becomes true once hover data is available

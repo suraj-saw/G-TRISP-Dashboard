@@ -1,3 +1,19 @@
+/**
+ * @file StatisticalSections.tsx
+ * @description Defines reusable React components and Recharts visualizations for 
+ * statistical analysis of road accidents. These components are registered into the
+ * ReportRegistry for use in both web dashboard views and PDF generation.
+ * 
+ * Main Responsibilities:
+ * - Provide standalone chart components for KPIs, Severities, Vehicles, etc.
+ * - Map accident data to Recharts compatible formats.
+ * - Enforce consistent styling and color palettes across statistical charts.
+ * 
+ * Important Dependencies:
+ * - recharts: Used for rendering SVG-based charts.
+ * - ReportRegistry: Global registry to expose these sections to the PDF generator.
+ */
+
 import React from "react";
 import {
   BarChart,
@@ -36,6 +52,20 @@ const MUTED = "#64748b";
 const GRID = "#cbd5e1";
 
 // Helpers
+
+/**
+ * Truncates and sorts categorical data to find the top 'N' categories by count,
+ * grouping the remainder into an "Others" category.
+ * 
+ * Why this logic exists: 
+ * Prevents pie and bar charts from becoming unreadable when there is a long tail
+ * of categories with very few counts (e.g., rare vehicle types or minor road names).
+ * 
+ * @param data - The raw array of categorical data items.
+ * @param limit - Maximum number of distinct categories to display before grouping.
+ * @param key - The object key representing the category label (default: 'label').
+ * @returns Array of formatted items ready for Recharts ingestion.
+ */
 const getTopCategories = (
   data: any[] | undefined,
   limit: number,
@@ -60,6 +90,14 @@ const getTopCategories = (
 };
 
 // Generic Components
+
+/**
+ * A highly reusable Key Performance Indicator (KPI) card component.
+ * 
+ * @param label - The title of the KPI (e.g., 'Total Accidents').
+ * @param value - The numerical or string value to display.
+ * @param accent - Optional hex color code for the value text (default: primary blue).
+ */
 const KpiCard: React.FC<{
   label: string;
   value: string | number;
@@ -98,6 +136,10 @@ const KpiCard: React.FC<{
   </div>
 );
 
+/**
+ * Standardized wrapper for Recharts components to enforce uniform 
+ * padding, borders, shadows, and background colors across the report.
+ */
 const ChartContainer: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => (
@@ -115,6 +157,14 @@ const ChartContainer: React.FC<{ children: React.ReactNode }> = ({
   </div>
 );
 
+/**
+ * Reusable horizontal bar chart component designed for categorical data.
+ * Internally uses `getTopCategories` to cap the number of bars.
+ * 
+ * @param data - Raw data array from the API.
+ * @param nameKey - The object key used for the Y-Axis labels.
+ * @param fillColor - Hex color code for the bars.
+ */
 const HorizontalBarSection: React.FC<{
   data: any;
   nameKey: string;
@@ -165,6 +215,13 @@ const HorizontalBarSection: React.FC<{
 };
 
 // Sections
+
+/**
+ * Renders the top-level executive KPIs: Total Accidents, Fatalities, and Injuries.
+ * Used as the primary summary section in reports.
+ * 
+ * Component Responsibility: Display high-level aggregates.
+ */
 export const StatisticalKpiSection: React.FC<{ data: DistrictStats }> = ({
   data,
 }) => {
@@ -191,6 +248,13 @@ export const StatisticalKpiSection: React.FC<{ data: DistrictStats }> = ({
   );
 };
 
+/**
+ * Renders a Pie chart illustrating the breakdown of accident severity
+ * (e.g., Fatal, Grievous Injury, Minor Injury).
+ * 
+ * Component Responsibility: Show proportional impact of accident severities.
+ * Uses `SEVERITY_COLORS` mapping to maintain visual consistency for severity levels.
+ */
 export const SeveritySection: React.FC<{ data: DistrictStats }> = ({
   data,
 }) => {
@@ -225,6 +289,11 @@ export const SeveritySection: React.FC<{ data: DistrictStats }> = ({
   );
 };
 
+/**
+ * Renders a vertical Bar chart showing the types of vehicles involved in accidents.
+ * 
+ * Uses a predefined gradient array (`INVOLVED_GRADIENT`) to cycle bar colors.
+ */
 export const VehicleInvolvedSection: React.FC<{ data: DistrictStats }> = ({
   data,
 }) => {
@@ -272,6 +341,12 @@ export const VehicleInvolvedSection: React.FC<{ data: DistrictStats }> = ({
   );
 };
 
+/**
+ * Renders a stacked Bar chart breaking down victim composition by severity.
+ * 
+ * Data Flow: Expects data structured with categories (e.g., victim type) on the X-axis
+ * and stacked sub-bars for 'Killed', 'Grievous Injury', and 'Minor Injury'.
+ */
 export const VictimCompositionSection: React.FC<{ data: DistrictStats }> = ({
   data,
 }) => {
@@ -333,6 +408,10 @@ export const VictimCompositionSection: React.FC<{ data: DistrictStats }> = ({
 };
 
 // Registrations
+// The following block registers each statistical component into the global ReportRegistry.
+// This allows the PdfReportGenerator to dynamically loop through and render these sections
+// without tightly coupling the generator to the specific chart implementations.
+
 ReportRegistry.register({
   id: "stat-kpi",
   title: "Executive Overview",

@@ -1,3 +1,20 @@
+/**
+ * @file dashboardApi.ts
+ * @description API client for fetching road accident data specific to the Surat district.
+ * Handles the serialization of dashboard filters into query parameters and manages
+ * calls to the Surat-scoped backend endpoints, including advanced GIS features
+ * like Blackspot clustering and KDE Heatmaps.
+ * 
+ * Main Responsibilities:
+ * - Map frontend `DashboardFilters` to Surat backend query parameters.
+ * - Aggregate responses for the main dashboard views (`fetchDashboardData`).
+ * - Expose endpoints for DBSCAN, Greedy Blackspots, and KDE spatial analysis.
+ * 
+ * Important Dependencies:
+ * - API (from ./axios): Configured Axios instance for network requests.
+ * - SURAT_API_BASE: Constant defining the base route for Surat endpoints.
+ */
+
 // frontend/src/api/dashboardApi.ts
 import API from "./axios";
 import { SURAT_API_BASE } from "../config/constants";
@@ -15,9 +32,14 @@ import type {
 /**
  * Converts dashboard filter state into query-string parameters for the
  * Surat dashboard endpoints.
- *
- * "all" / "Surat" are sentinel values meaning "no filter"; they are omitted
- * from the request so the backend returns the full dataset.
+ * 
+ * Business Rules:
+ * - "all" or "Surat" are treated as sentinel values indicating "no filter" (statewide/district-wide).
+ * - For Surat-level granularity, the generic `district` filter array is mapped 
+ *   to `police_station` query parameters since the root scope is already Surat.
+ * 
+ * @param filters - The current state of user-selected filters.
+ * @returns URLSearchParams populated with the active filters.
  */
 const getParams = (filters: DashboardFilters): URLSearchParams => {
   const params = new URLSearchParams();
@@ -65,6 +87,9 @@ const getParams = (filters: DashboardFilters): URLSearchParams => {
   return params;
 };
 
+/**
+ * Helper to check if a filter value exists and has elements.
+ */
 const hasValue = (value?: string[]): boolean =>
   value !== undefined && value.length > 0;
 
@@ -72,11 +97,26 @@ const hasValue = (value?: string[]): boolean =>
 // API calls
 // ---------------------------------------------------------------------------
 
+/**
+ * Fetch filter options for the Surat dashboard.
+ */
 export const fetchFilterOptions = async (): Promise<FilterOptions> => {
   const { data } = await API.get(`${SURAT_API_BASE}/filter-options`);
   return data;
 };
 
+/**
+ * Fetch main dashboard data for the Surat dashboard view.
+ * 
+ * Performance Considerations:
+ * Utilizes `Promise.all` to concurrently fetch data from 10 distinct aggregation endpoints.
+ * This parallelization is crucial to minimize loading times. The responses are then
+ * normalized (e.g., aliasing properties to `name` for charting libraries) and merged
+ * into a single comprehensive `DashboardData` object.
+ * 
+ * @param filters Dashboard filter state
+ * @returns An aggregated object containing summaries, trends, and categorical breakdowns.
+ */
 export const fetchDashboardData = async (
   filters: DashboardFilters
 ): Promise<DashboardData> => {
@@ -139,6 +179,13 @@ export const fetchDashboardData = async (
   };
 };
 
+/**
+ * Fetch temporal analysis data for Surat.
+ * Converts filters into URL params specifically formatted for temporal trend endpoints.
+ * 
+ * @param filters Dashboard filter state
+ * @returns Temporal aggregation metrics (monthly, daily, hourly, seasonality).
+ */
 export const fetchTemporalAnalysis = async (
   filters: DashboardFilters
 ): Promise<TemporalAnalysisData> => {
@@ -181,16 +228,31 @@ export const fetchTemporalAnalysis = async (
   return data;
 };
 
+/**
+ * Response shape for blackspot (accident cluster) data.
+ * Used for both Greedy and DBSCAN clustering algorithms.
+ */
 export interface BlackspotData {
+  /** Total number of crashes analyzed */
   total_crashes: number;
+  /** Number of distinct blackspots (clusters) identified */
   total_blackspots: number;
+  /** Number of crashes that did not fall into any cluster */
   isolated_crashes: number;
+  /** The spatial search radius used for clustering (in meters) */
   radius_m: number;
+  /** Minimum number of crashes required to form a cluster */
   min_crashes: number;
+  /** GeoJSON representing the buffer zones of the clusters */
   circles: GeoJSON.FeatureCollection;
+  /** GeoJSON representing the central point of each cluster */
   centroids: GeoJSON.FeatureCollection;
 }
 
+/**
+ * Fetch greedy blackspots for Surat.
+ * @param filters Dashboard filter state
+ */
 export const fetchBlackspots = async (
   filters: DashboardFilters
 ): Promise<BlackspotData> => {
@@ -199,6 +261,10 @@ export const fetchBlackspots = async (
   return data;
 };
 
+/**
+ * Fetch pedestrian-focused greedy blackspots for Surat.
+ * @param filters Dashboard filter state
+ */
 export const fetchPedestrianBlackspots = async (
   filters: DashboardFilters
 ): Promise<BlackspotData> => {
@@ -209,6 +275,10 @@ export const fetchPedestrianBlackspots = async (
   return data;
 };
 
+/**
+ * Fetch DBSCAN-based blackspots for Surat.
+ * @param filters Dashboard filter state
+ */
 export const fetchDbscanBlackspots = async (
   filters: DashboardFilters
 ): Promise<BlackspotData> => {
@@ -219,6 +289,10 @@ export const fetchDbscanBlackspots = async (
   return data;
 };
 
+/**
+ * Fetch pedestrian-focused DBSCAN-based blackspots for Surat.
+ * @param filters Dashboard filter state
+ */
 export const fetchPedestrianDbscanBlackspots = async (
   filters: DashboardFilters
 ): Promise<BlackspotData> => {
@@ -232,6 +306,11 @@ export const fetchPedestrianDbscanBlackspots = async (
   return data;
 };
 
+/**
+ * Download CSV file of crashes associated with specific blackspots.
+ * @param crashIds List of accident IDs
+ * @param filename Desired filename for the download
+ */
 export const exportBlackspotCrashes = async (
   crashIds: string[],
   filename: string
@@ -252,17 +331,33 @@ export const exportBlackspotCrashes = async (
   document.body.removeChild(link);
 };
 
+/**
+ * Response shape for Kernel Density Estimation (KDE) heatmap data.
+ * Represents spatial density of accidents using continuous color gradients.
+ */
 export interface KdeHeatmapData {
+  /** Total number of crashes analyzed for density */
   total_crashes: number;
+  /** The bandwidth/radius used for the KDE calculation (in meters) */
   radius_m: number;
+  /** Spatial resolution of the generated grid (in meters) */
   pixel_m: number;
+  /** The highest density value found in the heatmap */
   max_density: number;
+  /** Sampling stride used during computation (for performance) */
   sample_stride: number;
+  /** GeoJSON FeatureCollection containing the density polygons/points */
   data: GeoJSON.FeatureCollection;
+  /** Number of grid cells along the X axis */
   width: number;
+  /** Number of grid cells along the Y axis */
   height: number;
 }
 
+/**
+ * Fetch unweighted KDE heatmap data for Surat.
+ * @param filters Dashboard filter state
+ */
 export const fetchKdeHeatmap = async (
   filters: DashboardFilters
 ): Promise<KdeHeatmapData> => {
@@ -274,6 +369,10 @@ export const fetchKdeHeatmap = async (
   return data;
 };
 
+/**
+ * Fetch severity-weighted KDE heatmap data for Surat.
+ * @param filters Dashboard filter state
+ */
 export const fetchWeightedKdeHeatmap = async (
   filters: DashboardFilters
 ): Promise<KdeHeatmapData> => {

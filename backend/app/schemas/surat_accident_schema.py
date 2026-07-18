@@ -9,6 +9,10 @@ from pydantic import BaseModel, ConfigDict
 
 
 class SuratAccidentCreate(BaseModel):
+    """
+    Schema for validating new Surat accident record creation payloads.
+    Mirrors the GujaratAccidentCreate schema and adheres to iRAD terminology.
+    """
     # Identification
     accident_id: Optional[str] = None
     district: Optional[str] = "Surat"
@@ -56,6 +60,10 @@ class SuratAccidentCreate(BaseModel):
 
 
 class SuratAccidentResponse(BaseModel):
+    """
+    Schema for serializing SQLAlchemy SuratAccident model instances into JSON responses.
+    Appends the database-generated primary key ID to the base schema and enables ORM attribute extraction.
+    """
     model_config = ConfigDict(from_attributes=True)
 
     id: int

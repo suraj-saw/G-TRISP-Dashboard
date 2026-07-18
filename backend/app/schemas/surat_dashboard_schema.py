@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class ResponseModel(BaseModel):
+    """Base Pydantic schema for Surat dashboard responses. Enables ORM attribute extraction."""
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -17,6 +18,10 @@ class ResponseModel(BaseModel):
 # ---------------------------------------------------------------------------
 
 class SuratFilterOptions(ResponseModel):
+    """
+    Schema providing available unique values across various data dimensions for Surat-specific filters.
+    Includes police station options specific to Surat district.
+    """
     police_stations: List[str]
     road_classifications: List[str]
     weather_conditions: List[str]
@@ -29,6 +34,7 @@ class SuratFilterOptions(ResponseModel):
 # ---------------------------------------------------------------------------
 
 class PoliceStationSummaryCount(ResponseModel):
+    """Schema representing aggregated metrics for a specific police station jurisdiction."""
     police_station: str
     accident_count: int
     fatalities: int
@@ -37,6 +43,7 @@ class PoliceStationSummaryCount(ResponseModel):
 
 
 class PoliceStationSummaryResponse(ResponseModel):
+    """Schema for a collection of police station-level aggregated metrics."""
     data: List[PoliceStationSummaryCount]
 
 
@@ -45,17 +52,20 @@ class PoliceStationSummaryResponse(ResponseModel):
 # ---------------------------------------------------------------------------
 
 class HourDayCount(ResponseModel):
+    """Schema representing a single data point in an hour-of-day vs day-of-week heatmap."""
     hour: int
     day: str
     count: int
 
 
 class HourlyAccidentCount(ResponseModel):
+    """Schema representing the number of accidents per hour of the day."""
     hour: int
     count: int
 
 
 class MonthlyAccidentCount(ResponseModel):
+    """Schema representing the number of accidents per month, with year and human-readable label."""
     year: int
     month: int
     month_label: str
@@ -63,6 +73,7 @@ class MonthlyAccidentCount(ResponseModel):
 
 
 class PeakSummary(ResponseModel):
+    """Schema summarizing the peak accident time periods (hour, day, month, time-of-day bucket)."""
     peak_hour: str
     peak_hour_count: int
     peak_day: str
@@ -75,6 +86,7 @@ class PeakSummary(ResponseModel):
 
 
 class TemporalAnalysisResponse(ResponseModel):
+    """Top-level schema for the complete temporal analysis payload."""
     hour_day: List[HourDayCount]
     hourly: List[HourlyAccidentCount]
     monthly: List[MonthlyAccidentCount]

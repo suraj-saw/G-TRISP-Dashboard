@@ -1,4 +1,25 @@
-# backend/app/routes/auth.py
+"""
+@file auth.py
+@description Authentication and Authorization Routing Module.
+
+This module defines the API endpoints for user registration, login, token refresh,
+password reset, and session management. It acts as the HTTP interface for the logic
+defined in `auth_service.py`.
+
+JWT Flow & Security Assumptions:
+- Access Tokens are short-lived and used for authenticating requests.
+- Refresh Tokens are longer-lived and stored in HTTP-only, secure cookies to prevent XSS.
+- Redis is used as a stateful layer to track active sessions, enforce idle timeouts,
+  and blacklist revoked refresh tokens, marrying the statelessness of JWT with
+  stateful security controls.
+- Passwords are never returned or logged; they are hashed via bcrypt.
+
+Authorization Checks:
+- `get_current_user`: Ensures the user possesses a valid, non-expired access token
+  that matches an active Redis session, and their account status is 'approved'.
+- `get_current_admin_user`: Inherits `get_current_user` and strictly requires the
+  role to be 'admin'.
+"""
 
 import os
 import logging
@@ -10,7 +31,9 @@ COOKIE_SECURE   = ENVIRONMENT == "production"
 COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "strict")
 FRONTEND_URL    = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from jose import JWTError
 
@@ -77,6 +100,27 @@ def _set_auth_cookies(
 # ---------------------------------------------------------------------------
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+    """
+    Dependency to resolve and authenticate the current user from their access token.
+
+    Authorization Checks:
+    1. Extracts access token from HttpOnly cookies.
+    2. Decodes JWT to verify signature and expiration.
+    3. Validates the token type is 'access'.
+    4. Checks Redis to ensure the session hasn't been invalidated or timed out.
+    5. Retrieves user from the database and ensures they are 'approved'.
+
+    Args:
+        request (Request): The incoming FastAPI request.
+        db (Session): Database session.
+
+    Returns:
+        User: The fully authenticated SQLAlchemy user object.
+
+    Raises:
+        HTTPException: If authentication fails at any step (401) or if the account
+                       is not approved (403).
+    """
     token = request.cookies.get(ACCESS_TOKEN_COOKIE)
 
     if not token:
@@ -119,6 +163,22 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
 # ---------------------------------------------------------------------------
 
 def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Dependency to ensure the authenticated user has administrative privileges.
+
+    Authorization Checks:
+    - Inherits all checks from `get_current_user`.
+    - Strictly verifies that the `role` column equals 'admin'.
+
+    Args:
+        current_user (User): The authenticated user resolved by `get_current_user`.
+
+    Returns:
+        User: The authenticated admin user.
+
+    Raises:
+        HTTPException: If the user does not have the admin role (403).
+    """
     if current_user.role != "admin":
         raise HTTPException(
             status_code=403,
@@ -133,6 +193,21 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)) -> Us
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(user: UserCreate, db: Session = Depends(get_db)):
+    """
+    Register a new user account.
+
+    Business Rules:
+    - New accounts are created with a 'pending' status.
+    - They require manual approval from an administrator before they can log in.
+    - Generates a system notification for admins to review the registration.
+
+    Args:
+        user (UserCreate): The registration payload containing username, email, and password.
+        db (Session): Database session.
+
+    Returns:
+        dict: Success message and new user ID.
+    """
     existing = db.query(User).filter(
         (User.username == user.username) | (User.email == user.email)
     ).first()
@@ -168,6 +243,23 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
+    """
+    Authenticate a user and establish a new session.
+
+    JWT Flow:
+    1. Verifies credentials against hashed database password.
+    2. Checks if account is approved.
+    3. Generates a new JWT access and refresh token pair.
+    4. Sets these tokens as HttpOnly cookies on the response.
+
+    Args:
+        user (UserLogin): The login payload containing email and password.
+        response (Response): FastAPI response to set cookies on.
+        db (Session): Database session.
+
+    Returns:
+        dict: Success message.
+    """
     db_user = db.query(User).filter(User.email == user.email).first()
 
     if not db_user or not verify_password(user.password, db_user.hashed_password):
@@ -195,6 +287,23 @@ def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
 
 @router.post("/refresh")
 def refresh(request: Request, response: Response):
+    """
+    Rotate tokens using a valid refresh token.
+
+    JWT Flow:
+    1. Extracts refresh token from HttpOnly cookies.
+    2. Verifies token is not blacklisted or expired.
+    3. Verifies session is still active in Redis.
+    4. Blacklists the old refresh token (sliding window logic).
+    5. Generates and returns a fresh pair of tokens.
+
+    Args:
+        request (Request): FastAPI request to extract cookies.
+        response (Response): FastAPI response to set new cookies.
+
+    Returns:
+        dict: Success message.
+    """
     token = request.cookies.get(REFRESH_TOKEN_COOKIE)
 
     if not token:
@@ -237,6 +346,21 @@ def refresh(request: Request, response: Response):
 
 @router.post("/logout")
 def logout(request: Request, response: Response):
+    """
+    Terminate the current user session securely.
+
+    Security Assumptions:
+    - Revokes the refresh token in Redis.
+    - Destroys the active session in Redis, logging out all devices sharing the session.
+    - Clears the HttpOnly cookies from the browser.
+
+    Args:
+        request (Request): FastAPI request to extract the current token.
+        response (Response): FastAPI response to clear cookies.
+
+    Returns:
+        dict: Success message.
+    """
     token = request.cookies.get(REFRESH_TOKEN_COOKIE)
 
     if token:
@@ -250,6 +374,15 @@ def logout(request: Request, response: Response):
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
+    """
+    Retrieve the profile of the currently authenticated user.
+
+    Args:
+        current_user (User): Resolved by the `get_current_user` dependency.
+
+    Returns:
+        User: The user profile data.
+    """
     return current_user
 
 
@@ -259,6 +392,22 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 @router.post("/forgot-password")
 def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Initiate the password reset flow.
+
+    Security Assumptions:
+    - Highly susceptible to enumeration attacks; thus, rate-limited via Redis.
+    - Emits generic success messages even if the email doesn't exist, preventing 
+      attackers from probing for valid accounts.
+    - Cannot reset passwords for pending/rejected users unless they are admins.
+
+    Args:
+        req (ForgotPasswordRequest): Contains the user's email.
+        db (Session): Database session.
+
+    Returns:
+        dict: Generic success message indicating an email has been sent if valid.
+    """
     email = req.email
     
     if not check_forgot_password_rate_limit(email):
@@ -321,6 +470,21 @@ def verify_reset_token(token: str):
 
 @router.post("/reset-password")
 def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Consume a password reset token and update the user's password.
+
+    Security Assumptions:
+    - Consumes the reset token upon successful verification to enforce single-use.
+    - Hashes the new password before storage.
+    - Forces a session invalidation in Redis so active sessions are terminated.
+
+    Args:
+        req (ResetPasswordRequest): Contains the token and the new password.
+        db (Session): Database session.
+
+    Returns:
+        dict: Success message.
+    """
     raw_token = req.token
     new_password = req.new_password
     
@@ -346,6 +510,7 @@ def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
     # The current auth_service handles this primarily via login/logout, but we can't easily 
     # find the session_id to delete without changing how sessions are stored (currently stored 
     # as `session:{user_id} -> session_id`). We can just delete the session key.
+    # pyrefly: ignore [missing-import]
     import redis
     redis_client = redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
     redis_client.delete(f"session:{user.id}")

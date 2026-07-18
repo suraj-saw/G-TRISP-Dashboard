@@ -1,13 +1,15 @@
 # backend/app/utils/taluka_utils.py
 """
-Reusable helpers for Taluka (Subdistrict)-level lookups and filtering.
+Taluka (Subdistrict) Utility Module
 
-    State (Gujarat) → District → Taluka
+Provides reusable helper functions for Taluka-level lookups, validation, 
+and advanced spatial filtering within the State (Gujarat) → District → Taluka 
+administrative hierarchy.
 
-`gujarat_talukas` is the single authoritative source for taluka names,
-LGD codes, and geometry. Every dashboard visualization filters "by taluka"
-through the helpers here, so the spatial-join logic exists exactly once
-and is trivially reusable for a future Village/Ward level.
+The `GujaratTaluka` model serves as the single authoritative source for 
+taluka names, Local Government Directory (LGD) codes, and geographic boundaries. 
+By centralizing spatial-join logic here, all dashboard visualizations can 
+perform consistent GIS-based filtering without duplicating complex PostGIS logic.
 """
 
 from __future__ import annotations
@@ -21,26 +23,88 @@ from app.models.gujarat_taluka import GujaratTaluka
 
 
 def list_talukas(db: Session, district: Optional[str] = None) -> list[GujaratTaluka]:
-    """Talukas, optionally scoped to one district — powers cascading dropdowns."""
+    """
+    Retrieve full Taluka records, optionally filtered by a specific district.
+    
+    This powers cascading UI dropdowns where selecting a district dynamically
+    restricts the available subdistricts.
+
+    Parameters
+    ----------
+    db : Session
+        The active SQLAlchemy database session.
+    district : str, optional
+        The name of the parent district to filter by. Case-insensitive.
+
+    Returns
+    -------
+    list[GujaratTaluka]
+        A list of GujaratTaluka ORM objects sorted alphabetically by name.
+    """
     query = db.query(GujaratTaluka)
+    
+    # Apply case-insensitive filter if a district constraint is provided
     if district:
         query = query.filter(GujaratTaluka.district_name.ilike(district))
+        
+    # Ensure consistent alphabetical sorting for UI consistency
     return query.order_by(GujaratTaluka.taluka_name).all()
 
 
 def resolve_taluka_names(db: Session, district: Optional[str] = None) -> list[str]:
-    """Distinct taluka names, optionally scoped by district."""
+    """
+    Extract a flat list of unique, distinct taluka names.
+
+    Parameters
+    ----------
+    db : Session
+        The active SQLAlchemy database session.
+    district : str, optional
+        The name of the parent district to filter by. Case-insensitive.
+
+    Returns
+    -------
+    list[str]
+        An alphabetically sorted list of unique taluka name strings.
+    """
+    # Optimize performance by querying only the name column rather than whole entities
     query = db.query(GujaratTaluka.taluka_name).distinct()
+    
     if district:
         query = query.filter(GujaratTaluka.district_name.ilike(district))
+        
+    # Flatten the list of tuples returned by SQLAlchemy (e.g., [('Taluka A',), ('Taluka B',)] -> ['Taluka A', 'Taluka B'])
     return [row[0] for row in query.order_by(GujaratTaluka.taluka_name).all()]
 
 
 def is_valid_taluka(db: Session, taluka_name: str, district: Optional[str] = None) -> bool:
-    """Validate a taluka name (optionally scoped to a district) before use in a filter."""
+    """
+    Validate whether a given taluka name exists in the database.
+
+    Used as a guard check to validate user-supplied filter parameters 
+    before executing resource-intensive analytics queries.
+
+    Parameters
+    ----------
+    db : Session
+        The active SQLAlchemy database session.
+    taluka_name : str
+        The name of the taluka to validate. Case-insensitive.
+    district : str, optional
+        The optional parent district to ensure the taluka belongs to it.
+
+    Returns
+    -------
+    bool
+        True if the taluka exists (and matches the district if provided), False otherwise.
+    """
+    # Check existence by targeting only the primary key column for speed
     query = db.query(GujaratTaluka.id).filter(GujaratTaluka.taluka_name.ilike(taluka_name))
+    
     if district:
         query = query.filter(GujaratTaluka.district_name.ilike(district))
+        
+    # Emits an optimized SQL EXISTS query, returning a boolean via .scalar()
     return db.query(query.exists()).scalar()
 
 
@@ -52,26 +116,39 @@ def apply_taluka_spatial_filter(
     db: Session,
 ):
     """
-    Restrict `query` (any model with a PostGIS point/geometry column) to rows
-    whose `location_column` falls within one of the named taluka polygons.
+    Restrict a query to rows whose geographic points fall within specified taluka polygons.
 
-    This is the ONE spatial-join implementation for taluka filtering —
-    Gujarat-wide accidents, Surat accidents, or any future dataset all call
-    this instead of hand-rolling ST_Within joins per route.
+    This acts as the application's unified spatial-join implementation. Any dataset 
+    containing PostGIS geometry coordinates (e.g., accident coordinates, infrastructure locations) 
+    can pass its query here to filter records dynamically by administrative boundaries.
 
     Parameters
     ----------
-    query           : SQLAlchemy query being built.
-    model           : The ORM model backing `query` (must expose `.id`).
-    location_column : The geometry/point column on that model, e.g. Accident.location.
-    taluka          : One or more taluka names. No-op if falsy.
-    db              : Active session.
+    query : sqlalchemy.orm.query.Query
+        The base SQLAlchemy query currently being constructed.
+    model : DeclarativeMeta
+        The database ORM model class backing the query (must expose an `.id` column).
+    location_column : sqlalchemy.orm.attributes.InstrumentedAttribute
+        The specific PostGIS Geometry/Point column on the target model (e.g., `Accident.location`).
+    taluka : str or Sequence[str], optional
+        A single taluka name string or a list/sequence of names. If falsy, the filter is a no-op.
+    db : Session
+        The active database session required to execute subqueries.
+
+    Returns
+    -------
+    sqlalchemy.orm.query.Query
+        The modified query containing the spatial join and subquery filter logic.
     """
+    # If no taluka filter criteria is provided, return the query unmodified (no-op)
     if not taluka:
         return query
 
+    # Normalize input: coerce a single string into a single-element list for uniform processing
     names = [taluka] if isinstance(taluka, str) else list(taluka)
 
+    # Build an optimized subquery to identify matching record IDs via a PostGIS spatial join.
+    # func.ST_Within evaluates if the point coordinate lies within the multipolygon geometry boundary.
     matching_ids = (
         db.query(model.id)
         .join(GujaratTaluka, func.ST_Within(location_column, GujaratTaluka.geometry))
@@ -79,4 +156,5 @@ def apply_taluka_spatial_filter(
         .subquery()
     )
 
+    # Filter the main query using the subquery results (WHERE model.id IN (SELECT ...))
     return query.filter(model.id.in_(matching_ids))

@@ -1,6 +1,9 @@
 // frontend/src/api/adminAccidentsApi.ts
 import API from "./axios";
 
+/**
+ * Interface representing a single accident record from the admin API
+ */
 export interface AccidentRecord {
   id: number;
   accident_id: string;
@@ -30,6 +33,9 @@ export interface AccidentRecord {
   traffic_violation: string | null;
 }
 
+/**
+ * Interface for filtering accident records in admin API
+ */
 export interface AccidentFilters {
   district?: string;
   police_station?: string;
@@ -44,6 +50,9 @@ export interface AccidentFilters {
   collision_feature?: string;
 }
 
+/**
+ * Interface for getAccidents API response
+ */
 export interface GetAccidentsResponse {
   total: number;
   skip: number;
@@ -51,6 +60,9 @@ export interface GetAccidentsResponse {
   data: AccidentRecord[];
 }
 
+/**
+ * Interface for file upload validation response
+ */
 export interface UploadResponse {
   valid: boolean;
   total_rows: number;
@@ -66,6 +78,9 @@ export interface UploadResponse {
   total_duplicate_rows: number;
 }
 
+/**
+ * Interface representing a single row with validation issues (invalid or duplicate)
+ */
 export interface ValidationIssueRow {
   row: number;
   accident_id?: string;
@@ -73,11 +88,17 @@ export interface ValidationIssueRow {
   data?: Record<string, any>;
 }
 
+/**
+ * Interface for import records API response
+ */
 export interface ImportResponse {
   message: string;
   inserted: number;
 }
 
+/**
+ * Interface for available filter options for accident records
+ */
 export interface AccidentFilterOptions {
   severities: string[];
   police_stations: string[];
@@ -91,6 +112,13 @@ export interface AccidentFilterOptions {
 }
 
 export const adminAccidentsApi = {
+  /**
+   * Fetch paginated list of accident records with optional search and filters
+   * @param skip - Number of records to skip (default 0)
+   * @param limit - Max number of records per page (default 50)
+   * @param search - Search query string
+   * @param filters - Filter options for accident records
+   */
   getAccidents: async (
     skip: number = 0,
     limit: number = 50,
@@ -117,21 +145,38 @@ export const adminAccidentsApi = {
     return res.data;
   },
 
+  /**
+   * Add a new accident record
+   * @param payload - Partial accident record data to create
+   */
   addAccident: async (payload: Partial<AccidentRecord>) => {
     const res = await API.post("/admin/surat/accidents", payload);
     return res.data;
   },
 
+  /**
+   * Update an existing accident record by ID
+   * @param id - ID of the accident record to update
+   * @param payload - Partial accident record data with updates
+   */
   updateAccident: async (id: number, payload: Partial<AccidentRecord>) => {
     const res = await API.put(`/admin/surat/accidents/${id}`, payload);
     return res.data;
   },
 
+  /**
+   * Delete a single accident record by ID
+   * @param id - ID of the accident record to delete
+   */
   deleteAccident: async (id: number) => {
     const res = await API.delete(`/admin/surat/accidents/${id}`);
     return res.data;
   },
 
+  /**
+   * Bulk delete multiple accident records by IDs
+   * @param ids - Array of accident record IDs to delete
+   */
   bulkDeleteAccidents: async (ids: number[]) => {
     const res = await API.post<{ message: string; deleted: number }>(
       "/admin/surat/accidents/bulk-delete",
@@ -140,6 +185,10 @@ export const adminAccidentsApi = {
     return res.data;
   },
 
+  /**
+   * Upload an Excel file to validate and preview accident records
+   * @param file - File object containing accident data
+   */
   uploadFile: async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -151,6 +200,10 @@ export const adminAccidentsApi = {
     return res.data;
   },
 
+  /**
+   * Import validated accident records from an uploaded file
+   * @param records - Array of accident records to import
+   */
   importRecords: async (records: Record<string, any>[]) => {
     const res = await API.post<ImportResponse>(
       "/admin/surat/accidents/import",
@@ -159,6 +212,9 @@ export const adminAccidentsApi = {
     return res.data;
   },
 
+  /**
+   * Get the list of available columns for accident records
+   */
   getColumns: async () => {
     const res = await API.get<{ columns: string[] }>(
       "/admin/surat/accidents/columns"
@@ -166,6 +222,9 @@ export const adminAccidentsApi = {
     return res.data.columns;
   },
 
+  /**
+   * Get the list of available filter options for accident records
+   */
   getFilterOptions: async () => {
     const res = await API.get<AccidentFilterOptions>(
       "/admin/surat/accidents/filter-options"

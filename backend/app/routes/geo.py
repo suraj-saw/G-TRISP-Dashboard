@@ -1,22 +1,34 @@
 # backend/app/routes/geo.py
 """
-Geometry / GeoJSON endpoints.
-Serves boundary polygons stored in PostGIS as standard GeoJSON so the
+geo.py -- Geometry / GeoJSON endpoints.
+Serves administrative boundaries stored in PostGIS as standard GeoJSON so the
 frontend can use them directly in MapLibre GL sources.
 
-District boundaries are derived from ST_Union of their constituent taluka
-polygons (from gujarat_talukas) rather than the raw gujarat_districts rows.
-This correctly places enclaves inside the district they administratively
-belong to, eliminating the "hole" artefact on the district view maps.
+Coordinate Reference Systems (CRS) / SRID:
+- Geometries are natively stored in the PostGIS database.
+- The endpoints utilize ST_AsGeoJSON to dynamically reproject geometries
+  to EPSG:4326 (WGS-84) before transmitting them to the client.
+
+Complex GIS Logic (Spatial Unions):
+District boundaries are intentionally derived via ST_Union of their constituent
+taluka polygons (from gujarat_talukas) rather than serving the raw gujarat_districts rows.
+This spatial join correctly places enclaves (pockets of one district inside another)
+inside the district they administratively belong to, eliminating the "hole" visual artefact
+on the district view maps.
 """
 
 import json
 import re
 
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, HTTPException
+# pyrefly: ignore [missing-import]
 from fastapi.responses import JSONResponse
+# pyrefly: ignore [missing-import]
 from sqlalchemy import func
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
+# pyrefly: ignore [missing-import]
 from geoalchemy2.functions import ST_AsGeoJSON
 
 from app.database import get_db
@@ -49,7 +61,13 @@ def _slugify(name: str) -> str:
 def get_surat_boundary(db: Session = Depends(get_db)):
     """
     Returns the Surat district boundary as a GeoJSON FeatureCollection.
-    The geometry is reprojected to EPSG:4326 (WGS-84) by ST_AsGeoJSON.
+
+    GIS Operations:
+    - Geometry is selected from the SuratBoundary table.
+    - Reprojected natively in the database to EPSG:4326 (WGS-84) using ST_AsGeoJSON.
+
+    Returns:
+        JSONResponse: FeatureCollection ready for MapLibre ingestion.
     """
     rows = db.query(
         SuratBoundary.id,
@@ -90,14 +108,20 @@ def get_surat_boundary(db: Session = Depends(get_db)):
 @router.get("/all-districts", summary="Get All Gujarat District Boundaries")
 def get_all_district_boundaries(db: Session = Depends(get_db)):
     """
-    Returns every Gujarat district polygon as a single GeoJSON
-    FeatureCollection. Each feature's properties include `name` and `slug`
-    so the frontend can match it against `/api/dashboard/by-district`
-    counts and route to `/dashboard/district/{slug}` on click.
+    Returns every Gujarat district polygon as a single GeoJSON FeatureCollection.
+    Used by the Gujarat overview map to avoid 33 separate fetches.
 
-    Geometries are computed as ST_Union of constituent talukas so that
-    enclaves appear inside the district they belong to (no holes).
-    Falls back to the raw gujarat_districts row if no talukas are found.
+    GIS Operations & Complex Logic:
+    1. Performs an ST_Union aggregation on GujaratTaluka.geometry grouped by district name.
+       ST_Multi wraps the output to guarantee consistent MULTIPOLYGON types even if a union
+       collapses into a single POLYGON.
+    2. Maps the resulting geometries to the GujaratDistrict metadata.
+    3. If taluka data is missing for a district, it falls back to the raw GujaratDistrict geometry.
+       This dynamic unioning ensures administrative enclaves are correctly attributed, preventing
+       holes from rendering in MapLibre.
+
+    Returns:
+        JSONResponse: FeatureCollection where properties include name and slug.
     """
     # Build a lookup: district_name (upper) -> union GeoJSON from talukas
     taluka_rows = (
@@ -158,7 +182,7 @@ def get_all_district_boundaries(db: Session = Depends(get_db)):
 def list_districts(db: Session = Depends(get_db)):
     """
     Returns all 33 Gujarat districts with their slug identifiers.
-    Use the slug in `/api/geo/district-boundary/{district_slug}`.
+    Use the slug in /api/geo/district-boundary/{district_slug}.
     """
     rows = (
         db.query(GujaratDistrict.id, GujaratDistrict.shape_name)
@@ -195,15 +219,20 @@ def get_district_boundary(district_slug: str, db: Session = Depends(get_db)):
     """
     Returns the boundary polygon for a single Gujarat district as GeoJSON.
 
-    The geometry is computed as ST_Union of all talukas belonging to the
-    district, so enclaves (pockets of district A sitting inside district B's
-    bounding box) are correctly shown as part of district A. Falls back to
-    the raw gujarat_districts row if no taluka data is available.
+    GIS Operations & Complex Logic:
+    1. Resolves the URL-friendly district_slug to its DB record.
+    2. Computes the boundary using ST_Union over all talukas belonging to the
+       district. ST_Multi ensures the result is always a MULTIPOLYGON, keeping
+       the frontend type definitions stable.
+    3. Handles enclaves correctly (pockets of district A inside district B's bounding box).
+    4. Falls back to the raw gujarat_districts row if no taluka data is available.
 
-    The `district_slug` is a URL-friendly version of the district name,
-    e.g. `ahmadabad`, `the-dangs`, `kachchh`.
+    Args:
+        district_slug (str): URL-friendly district identifier.
+        db (Session): Database session.
 
-    Use `GET /api/geo/districts` to discover valid slugs.
+    Returns:
+        JSONResponse: A FeatureCollection containing exactly one feature.
     """
     # 1. Resolve the slug to a district row (for metadata)
     district_rows = db.query(

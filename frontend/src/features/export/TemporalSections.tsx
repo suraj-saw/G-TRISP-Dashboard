@@ -1,3 +1,19 @@
+/**
+ * @file TemporalSections.tsx
+ * @description Defines reusable React components and Recharts visualizations for 
+ * temporal (time-based) analysis of road accidents. These components are registered 
+ * into the ReportRegistry for use in both web dashboard views and PDF generation.
+ * 
+ * Main Responsibilities:
+ * - Provide standalone chart components for Temporal KPIs, Hourly/Monthly trends, etc.
+ * - Map accident data to Recharts compatible formats.
+ * - Enforce consistent styling, grid layouts, and color palettes across temporal charts.
+ * 
+ * Important Dependencies:
+ * - recharts: Core library for rendering SVG-based charts.
+ * - ReportRegistry: Global registry exposing these sections to the PDF generator.
+ */
+
 import React from "react";
 import {
   BarChart,
@@ -49,6 +65,15 @@ const ChartContainer: React.FC<{ children: React.ReactNode }> = ({
 );
 
 // Generic Kpi
+
+/**
+ * A highly reusable Key Performance Indicator (KPI) card component.
+ * Used identically across both statistical and temporal dashboards.
+ * 
+ * @param label - The title of the KPI (e.g., 'Total Accidents').
+ * @param value - The numerical or string value to display.
+ * @param accent - Optional hex color code for the value text (default: primary blue).
+ */
 const KpiCard: React.FC<{
   label: string;
   value: string | number;
@@ -87,6 +112,11 @@ const KpiCard: React.FC<{
   </div>
 );
 
+/**
+ * Renders the top-level temporal KPIs: Total Accidents, Peak Month, Peak Day, and Peak Hour.
+ * 
+ * Component Responsibility: Display high-level time-based aggregates.
+ */
 export const TemporalKpiSection: React.FC<{ data: TemporalAnalysisData }> = ({
   data,
 }) => {
@@ -118,6 +148,11 @@ export const TemporalKpiSection: React.FC<{ data: TemporalAnalysisData }> = ({
   );
 };
 
+/**
+ * Renders a Bar chart displaying the distribution of accidents by hour of the day.
+ * 
+ * Component Responsibility: Visualize peak hours and daily patterns.
+ */
 export const HourlyTrendSection: React.FC<{ data: TemporalAnalysisData }> = ({
   data,
 }) => {
@@ -157,6 +192,11 @@ export const HourlyTrendSection: React.FC<{ data: TemporalAnalysisData }> = ({
   );
 };
 
+/**
+ * Renders a Line chart illustrating the trend of accidents across different months.
+ * 
+ * Component Responsibility: Highlight seasonal or monthly variations across the year.
+ */
 export const MonthlyTrendSection: React.FC<{ data: TemporalAnalysisData }> = ({
   data,
 }) => {
@@ -191,6 +231,11 @@ export const MonthlyTrendSection: React.FC<{ data: TemporalAnalysisData }> = ({
   );
 };
 
+/**
+ * Renders a Bar chart breaking down accidents by the day of the week.
+ * 
+ * Component Responsibility: Show which days (e.g., weekends vs weekdays) have higher accident frequencies.
+ */
 export const DayOfWeekSection: React.FC<{ data: TemporalAnalysisData }> = ({
   data,
 }) => {
@@ -348,6 +393,9 @@ export const AnnualTrendSection: React.FC<{ data: TemporalAnalysisData }> = ({
   );
 };
 
+/**
+ * Renders a Pie chart comparing the total volume of accidents on Weekends vs Weekdays.
+ */
 export const WeekendWeekdaySection: React.FC<{
   data: TemporalAnalysisData;
 }> = ({ data }) => {
@@ -380,6 +428,12 @@ export const WeekendWeekdaySection: React.FC<{
   );
 };
 
+/**
+ * Renders a stacked Bar chart analyzing the severity of accidents on an hourly basis.
+ * 
+ * Data Flow: Expects categorical data on the X-axis (hour label) with stacked
+ * metrics for each severity level (Fatal, Grievous, Minor, Damage Only).
+ */
 export const FatalityByHourSection: React.FC<{
   data: TemporalAnalysisData;
 }> = ({ data }) => {
@@ -431,6 +485,11 @@ export const FatalityByHourSection: React.FC<{
     </ChartContainer>
   );
 };
+
+// Registrations
+// The following block registers each temporal component into the global ReportRegistry.
+// This allows the PdfReportGenerator to dynamically loop through and render these sections
+// without tightly coupling the generator to the specific chart implementations.
 
 ReportRegistry.register({
   id: "temp-kpi",

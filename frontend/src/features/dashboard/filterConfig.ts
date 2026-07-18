@@ -3,6 +3,7 @@ import type { DashboardFilters } from "../../types/dashboard";
 import { DEFAULT_BASE_MAP, GEO_FILTER_LABEL } from "../../config/constants";
 import { isBlackspotVisualization } from "../../utils/dashboardFilters";
 
+/** Type representing all possible visualization types */
 export type VisualizationType =
   | "location_markers"
   | "density_heatmap"
@@ -12,6 +13,7 @@ export type VisualizationType =
   | "dbscan_blackspot"
   | "temporal_analysis";
 
+/** Type representing all possible filter IDs */
 export type FilterId =
   | "baseMap"
   | "visualization_type"
@@ -29,12 +31,14 @@ export type FilterId =
   | "date_from"
   | "date_to";
 
+/** Interface representing a single filter configuration item */
 export interface FilterConfigItem {
   id: FilterId;
   label: string;
   icon?: "layers";
 }
 
+/** Available visualization options for the dashboard */
 export const VISUALIZATION_OPTIONS = [
   { value: "location_markers", label: "Markers" },
   { value: "density_heatmap", label: "Density Heatmap" },
@@ -45,11 +49,13 @@ export const VISUALIZATION_OPTIONS = [
   { value: "temporal_analysis", label: "Temporal Analysis" },
 ];
 
+/** Available visualization variant options */
 export const VISUALIZATION_VARIANT_OPTIONS = [
   { value: "accident", label: "Overall Crashes" },
   { value: "pedestrian", label: "Pedestrian Crashes" },
 ];
 
+/** Map of visualization types to their variant labels */
 export const VISUALIZATION_VARIANT_LABELS: Record<string, string> = {
   location_markers: "Crash Type",
   density_heatmap: "Crash Type",
@@ -59,9 +65,15 @@ export const VISUALIZATION_VARIANT_LABELS: Record<string, string> = {
   dbscan_blackspot: "Crash Type",
 };
 
+/**
+ * Checks if a given visualization type supports variants
+ * @param visualizationType - The visualization type to check
+ * @returns True if the visualization type supports variants
+ */
 export const hasVisualizationVariants = (visualizationType?: string): boolean =>
   Boolean(visualizationType && VISUALIZATION_VARIANT_LABELS[visualizationType]);
 
+/** Filter configuration for map-based visualizations */
 const MAP_FILTERS: FilterConfigItem[] = [
   { id: "baseMap", label: "Base Map", icon: "layers" },
   { id: "visualization_type", label: "Visualization Type" },
@@ -78,6 +90,7 @@ const MAP_FILTERS: FilterConfigItem[] = [
   { id: "collision_type", label: "Collision type" },
 ];
 
+/** Filter configuration for temporal analysis visualizations */
 const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "visualization_type", label: "Visualization Type" },
   { id: "visualization_variant", label: "Visualization Variant" },
@@ -93,9 +106,15 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "light_condition", label: "Light Condition" },
 ];
 
+/** Removes the severity filter from a filter configuration array */
 const withoutSeverity = (filters: FilterConfigItem[]): FilterConfigItem[] =>
   filters.filter((filter) => filter.id !== "severity");
 
+/**
+ * Gets the appropriate filter configuration based on visualization type
+ * @param visualizationType - The current visualization type
+ * @returns The filter configuration array for the given visualization
+ */
 export const getFilterConfig = (
   visualizationType?: string
 ): FilterConfigItem[] => {
@@ -106,6 +125,7 @@ export const getFilterConfig = (
     : base;
 };
 
+/** Default filter values for the dashboard */
 export const defaultFilters: DashboardFilters = {
   district: [],
   year: [],

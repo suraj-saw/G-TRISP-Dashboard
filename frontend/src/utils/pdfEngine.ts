@@ -1,13 +1,43 @@
+/**
+ * @file pdfEngine.ts
+ * @description Engine for generating professional PDF reports for the G-TRISP Dashboard.
+ * Handles the creation of PDF documents, including custom headers, footers, cover pages,
+ * and the capture/embedding of HTML elements into the PDF layout.
+ * 
+ * Main Responsibilities:
+ * - Initialize and manage jsPDF instance with A4 dimensions.
+ * - Render standardized professional headers and footers.
+ * - Build dynamic cover pages based on user-selected filters and metadata.
+ * - Capture React DOM elements via html2canvas and embed them into the PDF.
+ * - Manage pagination and content flow calculations.
+ *
+ * Important Dependencies:
+ * - jspdf: Core PDF generation library.
+ * - html2canvas: Used for converting HTML nodes to canvas images for PDF embedding.
+ */
+
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
+/**
+ * Options for PDF export configuration.
+ * Contains metadata and filter state used to generate the report cover page.
+ */
 export interface PDFExportOptions {
+  /** The main title of the generated report */
   title: string;
+  /** The selected district or region name */
   district: string;
+  /** Formatted date string indicating when the report was generated */
   dateStr: string;
+  /** Array of active filter descriptions (e.g., 'Year: 2023') applied to the data */
   filters: string[];
 }
 
+/**
+ * Engine for generating professional accident analysis PDF reports.
+ * Wraps jsPDF to provide high-level APIs for report structure and layout.
+ */
 export class PdfEngine {
   private doc: jsPDF;
   private pageWidth: number;
@@ -18,6 +48,10 @@ export class PdfEngine {
   private district: string = "";
   private dateStr: string = "";
 
+  /**
+   * Initializes the PDF engine with standard A4 portrait settings.
+   * Caches page dimensions for layout calculations.
+   */
   constructor() {
     this.doc = new jsPDF({
       orientation: "portrait",
@@ -29,7 +63,10 @@ export class PdfEngine {
   }
 
   /**
-   * Adds professional header with branding, section title, and page number
+   * Adds professional header with branding, section title, and district name to the current page.
+   * This is typically called internally when a new page is created.
+   * 
+   * Side Effects: Modifies the jsPDF document state by drawing shapes and text.
    */
   private addHeaderInternal() {
     // Header bar
@@ -54,7 +91,10 @@ export class PdfEngine {
   }
 
   /**
-   * Adds professional footer with generation date and page number
+   * Adds professional footer with generation date and page number to the current page.
+   * Ensures consistent branding and pagination at the bottom of each page.
+   * 
+   * Side Effects: Modifies the jsPDF document state by drawing shapes and text.
    */
   private addFooterInternal() {
     const pageCount = this.doc.getNumberOfPages();
@@ -77,6 +117,14 @@ export class PdfEngine {
 
   /**
    * Adds the professional cover page to the document.
+   * This builds a complex layout including a large title, district information,
+   * generation date, and a list of applied filters.
+   * 
+   * @param options - Export options containing title, district, date, and filters
+   * 
+   * Layout Logic:
+   * Uses vertical cursor tracking (`y`) to position elements sequentially from top to bottom.
+   * Calculates dynamic heights for cards based on the number of active filters.
    */
   public addCoverPage(options: PDFExportOptions) {
     this.district = options.district;
@@ -162,6 +210,7 @@ export class PdfEngine {
     y += 50;
 
     // Applied filters card
+    // Dynamically calculate height based on number of filters to ensure they all fit within the card bounds.
     if (options.filters.length > 0) {
       this.doc.setFillColor(248, 250, 252);
       const filterHeight = 30 + options.filters.length * 6;
@@ -214,6 +263,11 @@ export class PdfEngine {
 
   /**
    * Adds a new page with a professional header and footer.
+   * Resets the vertical cursor (`currentY`) for subsequent content insertion.
+   * 
+   * @param sectionTitle - Title of the section for this page (displayed in header)
+   * 
+   * Side Effects: Adds a new page to the jsPDF document and updates internal cursor state.
    */
   public addNewPage(sectionTitle: string) {
     this.doc.addPage();
@@ -225,7 +279,11 @@ export class PdfEngine {
   }
 
   /**
-   * Adds section header with description
+   * Adds a section header with an optional description below it.
+   * Handles text wrapping for long descriptions to ensure they stay within page margins.
+   * 
+   * @param title - Section title to display prominently
+   * @param description - Optional section description text providing context
    */
   public addSectionHeader(title: string, description?: string) {
     this.doc.setFont("helvetica", "bold");
@@ -260,7 +318,15 @@ export class PdfEngine {
 
   /**
    * Captures an HTML element to an image without adding it to the PDF yet.
-   * This allows for parallel rendering of multiple elements.
+   * This allows for parallel rendering of multiple elements, improving export speed.
+   * 
+   * @param elementId - ID of the HTML element to capture in the DOM
+   * @returns Promise with captured image data (base64) and calculated PDF dimensions, or null if element not found
+   * 
+   * Technical Detail:
+   * Uses html2canvas to render the DOM node. The scale is kept at 1 for maximum performance
+   * and to prevent out-of-memory errors on large charts or maps.
+   * The returned dimensions are scaled to fit within the PDF's printable area width.
    */
   public async captureElement(
     elementId: string
@@ -288,8 +354,19 @@ export class PdfEngine {
   }
 
   /**
-   * Adds a pre-captured image to the PDF.
-   * Auto-scales and adds page breaks if necessary.
+   * Adds a pre-captured image to the PDF document.
+   * Automatically calculates vertical space and adds page breaks if the image
+   * (plus its optional title/description) exceeds the available space on the current page.
+   * 
+   * @param capture - Pre-captured image data containing base64 string and scaled dimensions
+   * @param title - Optional title for the image section
+   * @param description - Optional description for the image section
+   * 
+   * Layout Logic:
+   * 1. Calculates total required vertical height (`neededHeight`).
+   * 2. Triggers `addNewPage` if `neededHeight` surpasses the printable area.
+   * 3. Draws title/description text and advances the vertical cursor.
+   * 4. Embeds the image and advances the vertical cursor for the next element.
    */
   public addCapturedImage(
     capture: { imgData: string; imgWidth: number; imgHeight: number },
@@ -338,6 +415,12 @@ export class PdfEngine {
     this.currentY += imgHeight + 10;
   }
 
+  /**
+   * Saves the generated PDF document to the user's local device.
+   * Triggers the browser's native file download prompt.
+   * 
+   * @param filename - Name of the file to be saved (e.g., 'report.pdf')
+   */
   public save(filename: string) {
     this.doc.save(filename);
   }

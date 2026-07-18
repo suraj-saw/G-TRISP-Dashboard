@@ -1,64 +1,119 @@
+/*
+  ==========================================================
+  Global Stylesheet for the Frontend Application
+  ==========================================================
+
+  Context within the stack:
+  - Injects the Tailwind CSS engine for utility-class styling.
+  - Defines global CSS custom properties (variables) used for consistent theming across the app.
+  - Provides generic UI utility classes (e.g., hiding scrollbars).
+  - Contains highly specific DOM overrides for third-party mapping libraries (MapLibre GL JS).
+
+  Note: Avoid changing selectors/values casually; React components and MapLibre instances rely
+  on these exact class and variable names to render correctly.
+*/
+
+/* ---------------------------------------------------------------------- */
+/* Tailwind CSS Engine Integration                                        */
+/* ---------------------------------------------------------------------- */
+/* Injects Tailwind's base, components, and utilities layers (Tailwind v4 syntax) */
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------- */
+/* Global Theme Variables                                                 */
+/* ---------------------------------------------------------------------- */
 :root {
+  /* Primary brand color - Typically used for headers, main navigation, and primary actions */
+  --primary-blue: #1E3A8A;
 
---primary-blue:#1E3A8A;
+  /* Safety / positive feedback color - Used for success states, safe zones, or valid metrics */
+  --safety-green: #16A34A;
 
---safety-green:#16A34A;
-
---gov-gold:#D97706;
-
+  /* Government / warning accent color - Used for alerts, official accents, and warnings */
+  --gov-gold: #D97706;
 }
 
+/* ---------------------------------------------------------------------- */
+/* Generic UI Utilities                                                   */
+/* ---------------------------------------------------------------------- */
+/*
+  Utility: hide scrollbars while keeping scrolling enabled.
+  Useful for side-panels, carousels, or containers where a visual scrollbar is undesirable 
+  but touch/wheel scrolling is still required.
+*/
 .no-scrollbar {
   -ms-overflow-style: none;   /* IE / Edge */
   scrollbar-width: none;      /* Firefox */
 }
 .no-scrollbar::-webkit-scrollbar {
-  display: none;              /* Chrome / Safari */
+  display: none;              /* Chrome / Safari / Newer Edge */
 }
 
-/* --- Maplibre Popup Close Button Overrides --- */
 
+/* ---------------------------------------------------------------------- */
+/* Third-Party Overrides: MapLibre GL JS Popups                           */
+/* ---------------------------------------------------------------------- */
+/*
+  MapLibre popup styling notes:
+  - MapLibre dynamically injects its own DOM elements for popups and close buttons.
+  - We use `!important` heavily here because MapLibre's default CSS has high specificity 
+    and we need to force our custom UI theme over the library's defaults.
+*/
+
+/* --- MapLibre Global Popup Close Button Overrides --- */
 .maplibregl-popup-close-button {
-  font-size: 18px !important; /* Increases the 'x' size */
-  padding: 6px 10px !important; /* Increases the clickable area */
-  color: #64748b !important; /* Matches Tailwind's slate-500 */
-  outline: none !important;
-  border-radius: 0 8px 0 8px !important; /* Blends with the popup corners */
-  transition: color 0.2s ease;
+  font-size: 18px !important;            /* Increases the 'x' icon size for better accessibility */
+  padding: 6px 10px !important;          /* Increases the clickable hit-area for touch devices */
+  color: #64748b !important;             /* Matches Tailwind's slate-500 for visual consistency */
+  outline: none !important;              /* Removes default browser focus outline */
+  border-radius: 0 8px 0 8px !important; /* Blends nicely with the top-right corner of the popup */
+  transition: color 0.2s ease;           /* Smooth transition for interactions */
 }
 
+/* Hover state for the global close button */
 .maplibregl-popup-close-button:hover {
-  color: #0f172a !important; /* Darkens to slate-900 on hover */
-  background-color: transparent !important; /* Removes default gray background on hover */
+  color: #0f172a !important;             /* Darkens to Tailwind's slate-900 on hover */
+  background-color: transparent !important; /* Removes the default gray background applied by MapLibre on hover */
 }
 
+/* --- Specific Override: Accident Data Popups --- */
+/* 
+  Targets popups instantiated with the custom 'accident-popup' class. 
+  Used when displaying rich HTML components inside the popup.
+*/
 .maplibregl-popup.accident-popup .maplibregl-popup-content {
-  padding: 0;
-  background: transparent;
-  border-radius: 0.5rem;
-  box-shadow: none;
+  padding: 0;                 /* Strips default padding so the injected React component spans full width */
+  background: transparent;    /* Allows the inner React component to dictate the background color */
+  border-radius: 0.5rem;      /* Rounds the corners to match Tailwind's rounded-lg */
+  box-shadow: none;           /* Removes default shadow; shadow should be handled by inner component */
 }
  
-/* Keep the default tip/arrow but tint it white */
+/* Keep the default directional tip/arrow at the bottom of the popup, but tint it pure white */
 .maplibregl-popup.accident-popup .maplibregl-popup-tip {
   border-top-color: #ffffff;
 }
  
-/* Remove the default × button that MapLibre renders — we draw our own */
+/* Completely remove the default × button that MapLibre renders for this specific popup type, 
+   assuming the injected custom React component draws its own close button */
 .maplibregl-popup.accident-popup .maplibregl-popup-close-button {
   display: none;
 }
 
+
+/* --- Specific Override: Coordinate Selection Popups --- */
+/* 
+  Targets popups instantiated with the custom 'coordinate-popup' class. 
+  Used for lightweight UI elements like clicking on the map to get Lat/Lng.
+*/
 .coordinate-popup .maplibregl-popup-content {
-  background: transparent !important;
-  padding: 0 !important;
-  border: none !important;
-  box-shadow: none !important;
-  overflow: visible;
+  background: transparent !important;    /* Forces transparent background */
+  padding: 0 !important;                 /* Removes internal spacing */
+  border: none !important;               /* Removes any borders */
+  box-shadow: none !important;           /* Strips default shadows */
+  overflow: visible;                     /* Allows custom tooltips/elements inside to break out of the box */
 }
 
+/* Tints the directional pointer white to match the coordinate popup's internal design */
 .coordinate-popup .maplibregl-popup-tip {
   border-top-color: #ffffff;
 }

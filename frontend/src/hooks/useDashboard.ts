@@ -3,6 +3,9 @@ import { fetchDashboardData } from "../api/dashboardApi";
 import type { DashboardFilters, DashboardData } from "../types/dashboard";
 import { toDataFilterKey } from "../utils/dashboardFilters";
 
+/**
+ * Initial default dashboard data state for useDashboard hook
+ */
 const initialData: DashboardData = {
   summary: {
     total_accidents: 0,
@@ -26,14 +29,25 @@ const initialData: DashboardData = {
   violations: [],
 };
 
+/**
+ * Custom React hook to fetch and manage dashboard data
+ * @param filters - Dashboard filter options
+ * @returns Object containing data, loading state, error state, and refetch function
+ */
 export const useDashboard = (filters: DashboardFilters) => {
+  /** Current dashboard data state */
   const [data, setData] = useState<DashboardData>(initialData);
+  /** Loading indicator */
   const [loading, setLoading] = useState<boolean>(true);
+  /** Error message if data fetch fails */
   const [error, setError] = useState<string | null>(null);
 
-  // Stable key — only changes when data-relevant filters change
+  /** Stable cache key that only changes when data-relevant filter values change */
   const filterKey = toDataFilterKey(filters);
 
+  /**
+   * Load dashboard data from API
+   */
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -48,6 +62,9 @@ export const useDashboard = (filters: DashboardFilters) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterKey]); // filterKey captures all relevant filter values
 
+  /**
+   * Load data whenever filterKey changes
+   */
   useEffect(() => {
     loadData();
   }, [loadData]);

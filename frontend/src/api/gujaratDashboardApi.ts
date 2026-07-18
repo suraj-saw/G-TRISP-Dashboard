@@ -1,3 +1,20 @@
+/**
+ * @file gujaratDashboardApi.ts
+ * @description Provides a comprehensive set of API client functions for fetching 
+ * road accident data from the backend. Serves as the primary data layer for the 
+ * Gujarat Dashboard and all its sub-views (Overview, Spatial, Temporal, etc.).
+ * 
+ * Main Responsibilities:
+ * - Serialize dashboard filters into URL search parameters.
+ * - Make asynchronous HTTP GET/POST requests via the custom Axios instance.
+ * - Aggregate complex dashboard queries (e.g., fetchGujaratDashboardData).
+ * - Define TypeScript interfaces for API request filters and response structures.
+ * 
+ * Important Dependencies:
+ * - API (from ./axios): Pre-configured Axios instance for HTTP requests.
+ * - GUJARAT_API_BASE: Constant defining the base route for these endpoints.
+ */
+
 // frontend/src/api/gujaratDashboardApi.ts
 import API from "./axios";
 import { GUJARAT_API_BASE } from "../config/constants";
@@ -13,8 +30,16 @@ import type {
 import type { BlackspotData, KdeHeatmapData } from "./dashboardApi";
 
 /**
- * Query params for the Gujarat-wide endpoints, always scoped to a single
- * district (the one currently being drilled into).
+ * Helper utility to serialize standard DashboardFilters and district scoping
+ * into URLSearchParams for GET requests.
+ * 
+ * Complex Logic: 
+ * Iterates through array-based filters (e.g., year, severity) and appends multiple
+ * keys with the same name, which standardizes how the backend parses 'IN' clauses.
+ * 
+ * @param filters - Dashboard filter options selected by the user
+ * @param district - District name to scope the query (empty string for state-wide)
+ * @returns URLSearchParams object ready to be attached to an Axios GET request
  */
 function getParams(
   filters: DashboardFilters,
@@ -51,7 +76,11 @@ function getParams(
   return params;
 }
 
-// Update to accept a district scope
+/**
+ * Fetch available filter options for Gujarat-wide dashboard
+ * @param district - Optional district to scope the filter options
+ * @returns Filter options object
+ */
 export const fetchGujaratFilterOptions = async (
   district?: string
 ): Promise<FilterOptions> => {
@@ -63,13 +92,22 @@ export const fetchGujaratFilterOptions = async (
   return data;
 };
 
+/**
+ * Single district summary row for choropleth map
+ */
 export interface DistrictSummaryRow {
+  /** District name */
   district: string;
+  /** Number of accidents in this district */
   accident_count: number;
+  /** Number of fatalities in this district */
   fatalities: number;
 }
 
-/** Powers the choropleth on the Gujarat overview map. */
+/**
+ * Fetch district summary data for Gujarat overview choropleth map
+ * @returns Array of district summary rows
+ */
 export const fetchGujaratDistrictSummary = async (): Promise<
   DistrictSummaryRow[]
 > => {
@@ -77,6 +115,18 @@ export const fetchGujaratDistrictSummary = async (): Promise<
   return data.data;
 };
 
+/**
+ * Fetch complete dashboard data for the main Gujarat dashboard view.
+ * 
+ * Performance Considerations:
+ * This orchestrates 10 parallel API calls using `Promise.all` to fetch all necessary
+ * chart data simultaneously. It then merges the responses into a single `DashboardData`
+ * object. This approach minimizes total round-trip time for initial dashboard loads.
+ * 
+ * @param filters - Active dashboard filters applied globally
+ * @param district - District string to restrict data scope
+ * @returns Complete dashboard data structure mapping to all sub-components
+ */
 export const fetchGujaratDashboardData = async (
   filters: DashboardFilters,
   district: string
@@ -133,6 +183,12 @@ export const fetchGujaratDashboardData = async (
   };
 };
 
+/**
+ * Fetch temporal analysis data for Gujarat
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns Temporal analysis data structure
+ */
 export const fetchGujaratTemporalAnalysis = async (
   filters: DashboardFilters,
   district: string
@@ -150,6 +206,12 @@ export const fetchGujaratTemporalAnalysis = async (
   return data;
 };
 
+/**
+ * Fetch greedy blackspot data for Gujarat
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns Blackspot data structure
+ */
 export const fetchGujaratBlackspots = async (
   filters: DashboardFilters,
   district: string
@@ -159,6 +221,12 @@ export const fetchGujaratBlackspots = async (
   return data;
 };
 
+/**
+ * Fetch greedy pedestrian blackspot data for Gujarat
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns Blackspot data structure
+ */
 export const fetchGujaratPedestrianBlackspots = async (
   filters: DashboardFilters,
   district: string
@@ -170,6 +238,12 @@ export const fetchGujaratPedestrianBlackspots = async (
   return data;
 };
 
+/**
+ * Fetch DBSCAN blackspot data for Gujarat
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns Blackspot data structure
+ */
 export const fetchGujaratDbscanBlackspots = async (
   filters: DashboardFilters,
   district: string
@@ -181,6 +255,12 @@ export const fetchGujaratDbscanBlackspots = async (
   return data;
 };
 
+/**
+ * Fetch DBSCAN pedestrian blackspot data for Gujarat
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns Blackspot data structure
+ */
 export const fetchGujaratPedestrianDbscanBlackspots = async (
   filters: DashboardFilters,
   district: string
@@ -193,6 +273,12 @@ export const fetchGujaratPedestrianDbscanBlackspots = async (
   return data;
 };
 
+/**
+ * Fetch KDE heatmap data for Gujarat
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns KDE heatmap data structure
+ */
 export const fetchGujaratKdeHeatmap = async (
   filters: DashboardFilters,
   district: string
@@ -205,6 +291,12 @@ export const fetchGujaratKdeHeatmap = async (
   return data;
 };
 
+/**
+ * Fetch weighted KDE heatmap data for Gujarat
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns KDE heatmap data structure
+ */
 export const fetchGujaratWeightedKdeHeatmap = async (
   filters: DashboardFilters,
   district: string
@@ -219,6 +311,11 @@ export const fetchGujaratWeightedKdeHeatmap = async (
   return data;
 };
 
+/**
+ * Export blackspot crash data as CSV
+ * @param crashIds - Array of crash IDs to export
+ * @param filename - Filename for the downloaded CSV
+ */
 export const exportGujaratBlackspotCrashes = async (
   crashIds: string[],
   filename: string
@@ -239,18 +336,28 @@ export const exportGujaratBlackspotCrashes = async (
   document.body.removeChild(link);
 };
 
+/**
+ * Lightweight Gujarat overview insights data
+ */
 export interface GujaratOverviewInsights {
+  /** Summary statistics */
   summary: SummaryData;
+  /** Severity breakdown */
   severity: SeverityCount[];
+  /** Dangerous districts ranking */
   dangerous: DangerousDistrict[];
 }
 
 /**
  * Lightweight statewide summary for the Gujarat overview landing page.
- * Unlike fetchGujaratDashboardData(), this intentionally SKIPS the heatmap,
- * casualty, road, collision and time-series endpoints — those scan/return
- * every accident row statewide and are far too heavy for a landing view.
- * Only 3 small aggregate queries are made.
+ * 
+ * Performance Optimization / Complex Logic:
+ * Unlike `fetchGujaratDashboardData()`, this intentionally SKIPS the heavy endpoints 
+ * (heatmap, casualty, road, collision, and time-series). Those endpoints scan and aggregate
+ * every accident row statewide which is too slow for the initial landing view. 
+ * Instead, only 3 small, highly-aggregated queries are made to populate the top KPIs.
+ * 
+ * @returns Gujarat overview insights data (summary, severity breakdown, dangerous districts)
  */
 export const fetchGujaratOverviewInsights =
   async (): Promise<GujaratOverviewInsights> => {
@@ -270,58 +377,112 @@ export const fetchGujaratOverviewInsights =
     };
   };
 
+/**
+ * Generic named count data structure
+ */
 export interface NamedCount {
+  /** Display label */
   label: string;
+  /** Count value */
   count: number;
 }
 
+/**
+ * Detailed district insight data
+ */
 export interface DistrictInsight {
+  /** District name */
   district: string;
+  /** Total number of accidents */
   total_accidents: number;
+  /** Number of fatal accidents */
   fatal_accidents: number;
+  /** Number of fatalities */
   fatalities: number;
+  /** Number of grievous injuries */
   grievous_injuries: number;
+  /** Number of minor injuries */
   minor_injuries: number;
+  /** Fatality rate percentage */
   fatality_rate: number;
+  /** Number of police stations covered */
   police_stations: number;
+  /** Most affected police station */
   most_affected_police_station: string;
+  /** Highest accident month */
   highest_accident_month: string;
+  /** Peak accident time */
   peak_accident_time: string;
+  /** Number of blackspots */
   blackspots_count: number;
+  /** Risk level */
   risk_level: "Low" | "Moderate" | "High" | "Very High";
+  /** Severity breakdown */
   severity: NamedCount[];
+  /** Monthly trend data */
   monthly_trend: {
+    /** Year */
     year: number;
+    /** Month (1-12) */
     month: number;
+    /** Human-readable month label */
     month_label: string;
+    /** Number of accidents */
     count: number;
   }[];
+  /** Time of day distribution */
   time_of_day: NamedCount[];
+  /** Weekday distribution */
   weekday: NamedCount[];
+  /** Road type breakdown */
   road_type: NamedCount[];
+  /** Collision type breakdown */
   collision_type: NamedCount[];
 }
 
+/**
+ * Gujarat-wide summary data
+ */
 export interface GujaratWideSummary {
+  /** Total number of accidents */
   total_accidents: number;
+  /** Total number of fatalities */
   total_fatalities: number;
+  /** Total number of grievous injuries */
   total_grievous: number;
+  /** Total number of minor injuries */
   total_minor: number;
+  /** Number of districts covered */
   districts_covered: number;
+  /** Number of police stations covered */
   police_stations: number;
+  /** Severity breakdown */
   severity: NamedCount[];
+  /** Dangerous districts ranking */
   dangerous: {
+    /** District name */
     district: string;
+    /** Number of fatal accidents */
     fatal_accidents: number;
+    /** Total number of people killed */
     total_killed: number;
   }[];
 }
 
+/**
+ * District insights response structure
+ */
 export interface DistrictInsightsResponse {
+  /** Gujarat-wide summary */
   gujarat: GujaratWideSummary;
+  /** District-specific insights keyed by district name */
   districts: Record<string, DistrictInsight>;
 }
 
+/**
+ * Fetch district insights data
+ * @returns District insights response
+ */
 export const fetchDistrictInsights =
   async (): Promise<DistrictInsightsResponse> => {
     const { data } = await API.get(`${GUJARAT_API_BASE}/district-insights`);
@@ -330,63 +491,122 @@ export const fetchDistrictInsights =
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/**
+ * Filter options for district stats API
+ */
 export interface DistrictStatsFilters {
+  /** District name to scope the query */
   district?: string;
+  /** Years to include */
   year?: string[];
+  /** Start date for the filter */
   startDate?: string;
+  /** End date for the filter */
   endDate?: string;
+  /** Severity levels to include */
   severity?: string[];
+  /** Talukas to include */
   taluka?: string[];
+  /** Police stations to include */
   policeStation?: string[];
+  /** Road classifications to include */
   roadClassification?: string[];
+  /** Weather conditions to include */
   weatherCondition?: string[];
+  /** Light conditions to include */
   lightCondition?: string[];
+  /** Collision types to include */
   collisionType?: string[];
 }
 
+/**
+ * Severity breakdown entry
+ */
 export interface SeverityBreakdown {
+  /** Severity label */
   label: string;
+  /** Count of accidents with this severity */
   count: number;
+  /** Percentage of total accidents */
   percentage: number;
 }
 
+/**
+ * Monthly trend entry
+ */
 export interface MonthlyTrend {
+  /** Month label */
   month: string;
+  /** Number of accidents */
   accidents: number;
+  /** Number of fatal accidents */
   fatal: number;
 }
 
+/**
+ * Hourly distribution entry
+ */
 export interface HourlyDistribution {
+  /** Hour of the day (0-23) */
   hour: number;
+  /** Number of accidents */
   accidents: number;
 }
 
+/**
+ * Road type breakdown entry
+ */
 export interface RoadTypeBreakdown {
+  /** Road type name */
   road_type: string;
+  /** Number of accidents */
   count: number;
 }
 
+/**
+ * District stats data structure for statistical analysis
+ */
 export interface DistrictStats {
+  /** Total number of accidents */
   total_accidents: number;
+  /** Total number of fatalities */
   total_fatalities: number;
+  /** Total number of injuries */
   total_injuries: number;
+  /** Average accidents per month */
   avg_per_month: number;
+  /** Peak accident hour (0-23) */
   peak_hour: number | null;
+  /** Year-over-year change percentage */
   yoy_change: number | null;
+  /** Severity breakdown */
   severity_breakdown: SeverityBreakdown[];
+  /** Road type breakdown */
   road_type_breakdown: RoadTypeBreakdown[];
+  /** Collision type breakdown (optional) */
   collision_type_breakdown?: { label: string; count: number }[];
+  /** Collision nature breakdown (optional) */
   collision_nature_breakdown?: { label: string; count: number }[];
+  /** Weather condition breakdown (optional) */
   weather_breakdown?: { label: string; count: number }[];
+  /** Light condition breakdown (optional) */
   light_breakdown?: { label: string; count: number }[];
+  /** Vehicle involvement breakdown (optional) */
   vehicle_involvement_breakdown?: { label: string; count: number }[];
+  /** Victim composition breakdown (optional) */
   victim_composition?: {
+    /** Victim type */
     type: string;
+    /** Number of fatalities */
     Killed: number;
+    /** Number of grievous injuries */
     "Grievous Injury": number;
+    /** Number of minor injuries */
     "Minor Injury": number;
   }[];
+  /** Visibility breakdown (optional) */
   visibility_breakdown?: { label: string; count: number }[];
+  /** Statistical insights (optional) */
   statistical_insights?: string[];
 }
 
@@ -396,6 +616,8 @@ export interface DistrictStats {
  * Fetch pre-aggregated statistical data for the Statistical Analysis tab.
  * Backend endpoint: GET /api/gujarat-dashboard/district-stats
  * Accepts optional district for single district, or none for Gujarat-wide
+ * @param filters - Filter options for district stats
+ * @returns District stats data
  */
 export async function getDistrictStats(
   filters: DistrictStatsFilters

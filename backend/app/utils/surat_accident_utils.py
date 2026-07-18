@@ -7,8 +7,10 @@ Mirrors accident_utils.py but operates on the SuratAccident model.
 from datetime import datetime, date
 from typing import Optional
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import extract
 from app.models.surat_accident import SuratAccident
+from app.utils.taluka_utils import apply_taluka_spatial_filter
 
 
 def apply_surat_filters(
@@ -21,6 +23,8 @@ def apply_surat_filters(
     collision_type=None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    taluka=None,
+    db=None,
 ):
     """
     Apply common dashboard filters to a SuratAccident query.
@@ -28,6 +32,12 @@ def apply_surat_filters(
 
     date_from / date_to accept ISO date strings "YYYY-MM-DD" and filter
     accident_date_time to the inclusive range [date_from 00:00, date_to 23:59:59].
+
+    taluka : str or list, optional
+        Triggers a spatial intersection query against taluka polygon boundaries
+        if provided alongside ``db``.
+    db : sqlalchemy.orm.Session, optional
+        Required only if ``taluka`` spatial filtering is needed.
     """
     if police_station:
         if isinstance(police_station, list):
@@ -78,6 +88,12 @@ def apply_surat_filters(
         except ValueError:
             pass
 
+    # Apply PostGIS spatial filtering using the separate geometry table
+    if taluka and db is not None:
+        query = apply_taluka_spatial_filter(
+            query, SuratAccident, SuratAccident.location, taluka, db
+        )
+
     return query
 
 
@@ -86,6 +102,7 @@ def apply_surat_filters(
 # ---------------------------------------------------------------------------
 
 def total_fatalities(accident) -> int:
+    """Calculate the sum of all fatalities (driver, passenger, pedestrian)."""
     return (
         (accident.driver_killed or 0)
         + (accident.passenger_killed or 0)
@@ -94,6 +111,7 @@ def total_fatalities(accident) -> int:
 
 
 def total_grievous(accident) -> int:
+    """Calculate the sum of all grievous injuries."""
     return (
         (accident.driver_grievous_injury or 0)
         + (accident.passenger_grievous_injury or 0)
@@ -102,6 +120,7 @@ def total_grievous(accident) -> int:
 
 
 def total_minor(accident) -> int:
+    """Calculate the sum of all minor injuries."""
     return (
         (accident.driver_minor_injury or 0)
         + (accident.passenger_minor_injury or 0)

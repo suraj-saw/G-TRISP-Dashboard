@@ -1,3 +1,4 @@
+/** Interface representing a notification in the system */
 export interface Notification {
   id: number;
   type: string;

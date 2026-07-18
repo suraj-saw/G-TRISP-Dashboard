@@ -1,3 +1,17 @@
+/**
+ * @file PdfReportGenerator.tsx
+ * @description React component responsible for orchestrating the generation of PDF reports.
+ * It fetches necessary statistical and temporal data, renders the report sections in a 
+ * hidden DOM container, captures them as images using html2canvas, and uses PdfEngine
+ * to assemble and download the final PDF document.
+ * 
+ * Main Responsibilities:
+ * - Data Fetching: Retrieve district stats and temporal analysis data.
+ * - Hidden Rendering: Render charts and tables off-screen for capture.
+ * - PDF Assembly: Coordinate with PdfEngine to build pages, cover, and sections.
+ * - UI Feedback: Display a loading overlay with progress status during generation.
+ */
+
 import React, { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 // import { Loader2 } from "lucide-react";
@@ -9,27 +23,67 @@ import {
 } from "../../api/gujaratDashboardApi";
 import type { DashboardFilters } from "../../types/dashboard";
 
+/**
+ * Props for PdfReportGenerator component
+ */
 interface PdfReportGeneratorProps {
+  /** Dashboard filters to apply to the report data */
   filters: DashboardFilters;
+  /** Optional district name to override filter value */
   districtName?: string;
+  /** Callback fired when PDF generation completes successfully */
   onComplete: () => void;
+  /** Callback fired when an error occurs during PDF generation */
   onError: (msg: string) => void;
 }
 
+/**
+ * React component that orchestrates PDF report generation.
+ * 
+ * Component Responsibility:
+ * Manages the entire lifecycle of PDF export, from fetching required data to rendering
+ * hidden components and generating the final PDF using PdfEngine.
+ * 
+ * State Management:
+ * - `progress` (string): Tracks the current step of the PDF generation process for user feedback.
+ * - `statisticalData` (any): Stores fetched statistical data required by report sections.
+ * - `temporalData` (any): Stores fetched temporal data required by report sections.
+ * - `dataLoaded` (boolean): Flag to determine when all data is fetched and hidden sections can be rendered.
+ * 
+ * Hooks Usage:
+ * - `useState`: For tracking progress and data state.
+ * - `useRef`: For maintaining a reference to the hidden container DOM element (`containerRef`).
+ * - `useEffect`: 
+ *    1. Data Loading Effect: Triggers API calls when filters or district change.
+ *    2. Generation Effect: Triggers the actual PDF generation sequence once `dataLoaded` is true.
+ * 
+ * Rendering Flow:
+ * Renders a full-screen loading overlay using `createPortal` to ensure it sits on top of all other UI.
+ * Simultaneously renders a hidden `div` containing all report sections (from `ReportRegistry`) 
+ * which are populated with the fetched data, ready for html2canvas to capture.
+ */
 export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
   filters,
   districtName,
   onComplete,
   onError,
 }) => {
+  /** Progress text shown to the user during PDF generation */
   const [progress, setProgress] = useState<string>("Initializing...");
+  /** Reference to the hidden container where report sections are rendered */
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Data state
+  /** Statistical data for the report (e.g., accident counts, severity breakdown) */
   const [statisticalData, setStatisticalData] = useState<any>(null);
+  /** Temporal data for the report (e.g., monthly trends, hourly patterns) */
   const [temporalData, setTemporalData] = useState<any>(null);
+  /** Flag indicating whether all data has been loaded */
   const [dataLoaded, setDataLoaded] = useState(false);
 
+  /**
+   * Effect to load report data on mount or when filters change
+   */
   useEffect(() => {
     async function loadData() {
       setProgress("Fetching data...");
@@ -50,6 +104,16 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
     loadData();
   }, [filters, districtName, onError]);
 
+  /**
+   * Effect to generate the PDF once data is loaded and the hidden DOM is updated.
+   * 
+   * Flow:
+   * 1. Wait for React to render the hidden components and Recharts to animate/draw.
+   * 2. Initialize PdfEngine and add the cover page.
+   * 3. Iterate through statistical sections, capture each as an image, and add to PDF.
+   * 4. Iterate through temporal sections, capture each as an image, and add to PDF.
+   * 5. Save the final document and trigger `onComplete` callback.
+   */
   useEffect(() => {
     if (!dataLoaded || !containerRef.current) return;
 
@@ -82,6 +146,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
         const tempSections = ReportRegistry.getSections("temporal");
 
         // 2. Statistical Analysis
+        // Process each statistical section sequentially to manage memory and ensure proper ordering.
         if (statSections.length > 0) {
           engine.addNewPage("Section 1 - Statistical Analysis");
           let index = 1;
@@ -89,7 +154,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
             setProgress(
               `Capturing Statistical Analysis (${index}/${statSections.length})...`
             );
-            // Yield to main thread to prevent UI freeze and aid GC
+            // Yield to main thread to prevent UI freeze and aid GC during heavy html2canvas processing.
             await new Promise((r) => setTimeout(r, 50));
             const capture = await engine.captureElement(
               `report-section-${section.id}`
@@ -102,6 +167,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
         }
 
         // 3. Temporal Analysis
+        // Process each temporal section sequentially.
         if (tempSections.length > 0) {
           engine.addNewPage("Section 2 - Temporal Analysis");
           let index = 1;
@@ -109,7 +175,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
             setProgress(
               `Capturing Temporal Analysis (${index}/${tempSections.length})...`
             );
-            // Yield to main thread to prevent UI freeze
+            // Yield to main thread to prevent UI freeze during heavy html2canvas processing.
             await new Promise((r) => setTimeout(r, 50));
             const capture = await engine.captureElement(
               `report-section-${section.id}`
@@ -192,7 +258,12 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
         </div>
       </div>
 
-      {/* Hidden render area */}
+      {/* 
+        Hidden render area for report sections.
+        This container is placed far off-screen so it does not affect the visible UI,
+        but it remains in the DOM so html2canvas can capture its contents.
+        We fix the width to 1024px to ensure consistent chart rendering regardless of user's screen size.
+      */}
       {dataLoaded && (
         <div
           ref={containerRef}

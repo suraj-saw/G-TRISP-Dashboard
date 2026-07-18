@@ -1,13 +1,18 @@
 # backend/app/routes/surat_dashboard.py
 """
-Surat Dashboard API router.
+Surat Dashboard API router for advanced GIS and spatial analytics.
 
-Mirrors the main dashboard.py routes but queries the `surat_accidents` table.
+Mirrors the main dashboard.py routes but queries the surat_accidents table.
 All endpoints live under /api/surat/dashboard/* to avoid conflicts with the
 existing Gujarat-wide dashboard at /api/dashboard/*.
 
-Since all records belong to Surat district, the 'district' filter is replaced
-with 'police_station' for more granular filtering within Surat.
+GIS Operations & Complex Logic:
+- Blackspot Identification (Greedy & DBSCAN): Detects accident clusters based on spatial
+  proximity (radius) and density (minimum crashes).
+- KDE Heatmaps: Computes continuous density surfaces using quartic kernel equations,
+  returning georeferenced rasters (Base64 PNGs) for MapLibre image sources.
+- Since all records belong to Surat district, the standard 'district' filter is replaced
+  with 'police_station' to enable sub-district spatial drill-downs.
 """
 
 import calendar
@@ -15,8 +20,13 @@ from collections import defaultdict
 from datetime import datetime
 from typing import List, Optional
 
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, Query
+# pyrefly: ignore [missing-import]
+from fastapi.responses import JSONResponse, StreamingResponse
+# pyrefly: ignore [missing-import]
 from sqlalchemy import func
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -78,6 +88,7 @@ from app.core.constants import (
     BLACKSPOT_MIN_CRASHES,
     PEDESTRIAN_BLACKSPOT_MIN_CRASHES,
 )
+from app.utils.export_utils import build_accident_csv, build_accident_excel
 
 from app.core.constants import (
     SEVERITY_FATAL,
@@ -190,7 +201,7 @@ def get_summary(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query     = apply_surat_filters(
@@ -234,7 +245,7 @@ def get_by_police_station(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     """Breakdown of accidents by police station — main geo-grouping for Surat."""
@@ -288,7 +299,7 @@ def get_by_severity(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -374,7 +385,7 @@ def get_by_collision(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -420,7 +431,7 @@ def get_heatmap(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -480,7 +491,7 @@ def get_temporal_analysis(
     light_condition: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = db.query(SuratAccident)
@@ -596,7 +607,7 @@ def get_by_violation(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -642,7 +653,7 @@ def get_by_road(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -689,7 +700,7 @@ def get_by_weather(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -734,7 +745,7 @@ def get_by_light(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -779,7 +790,7 @@ def get_casualty_breakdown(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     accidents = apply_surat_filters(
@@ -822,7 +833,7 @@ def get_top_dangerous(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     """Top N police stations ranked by fatal accidents."""
@@ -872,7 +883,7 @@ def get_yearly_comparison(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_surat_filters(
@@ -924,9 +935,16 @@ def get_blackspots(
     db: Session = Depends(get_db),
 ):
     """
-    Greedy blackspot detection (same algorithm as the offline notebook
-    pipeline). Returns 250 m blackspot circles + their anchor centroids
-    as GeoJSON, respecting the active dashboard filters.
+    Greedy blackspot detection (identical algorithm to the offline Python notebook).
+
+    Complex Logic:
+    1. Filters accidents based on the active dashboard constraints.
+    2. Maps the remaining coordinates to a lightweight CrashPoint structure.
+    3. Runs the greedy clustering algorithm which iteratively finds the highest density
+       circle, absorbs the crashes, and repeats until no cluster meets min_crashes.
+
+    Returns:
+        dict: Contains cluster metadata and 250m blackspot circles + anchor centroids as GeoJSON.
     """
     query = apply_surat_filters(
         db.query(SuratAccident),
@@ -946,7 +964,6 @@ def get_blackspots(
     # Validate observation period
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
-        from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=400,
             content={"detail": validation_error},
@@ -1024,7 +1041,6 @@ def get_pedestrian_blackspots(
     # Validate observation period
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
-        from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=400,
             content={"detail": validation_error},
@@ -1073,10 +1089,17 @@ def get_dbscan_blackspots(
     db: Session = Depends(get_db),
 ):
     """
-    DBSCAN-style blackspot detection: fixed-radius neighbour counting
-    followed by overlap suppression, keeping only the densest
-    non-overlapping circles. Mirrors build_dbscan_circles() from the
-    offline notebook pipeline. Respects the active dashboard filters.
+    DBSCAN-style blackspot detection.
+
+    Complex Logic (Spatial Clustering):
+    1. Performs fixed-radius neighbor counting for every crash.
+    2. Applies overlap suppression: it keeps only the densest, non-overlapping circles,
+       resolving ties by checking density gradients.
+    3. Mirrors build_dbscan_circles() from the offline spatial pipeline.
+    4. Output is serialized to GeoJSON for MapLibre rendering.
+
+    Returns:
+        dict: Cluster metadata, bounding circles (GeoJSON), and core centroids (GeoJSON).
     """
     query = apply_surat_filters(
         db.query(SuratAccident),
@@ -1096,7 +1119,6 @@ def get_dbscan_blackspots(
     # Validate observation period
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
-        from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=400,
             content={"detail": validation_error},
@@ -1172,7 +1194,6 @@ def get_pedestrian_dbscan_blackspots(
     # Validate observation period
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
-        from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=400,
             content={"detail": validation_error},
@@ -1223,10 +1244,18 @@ def get_kde_heatmap(
     is_pedestrian: bool = Query(False),
 ):
     """
-    Continuous accident-density surface using a quartic kernel — identical
-    formula to QGIS's built-in Heatmap tool and the offline notebook's
-    build_kde_raster(). Returns a georeferenced PNG (base64 data URL) plus
-    the four corner coordinates needed for a MapLibre ImageSource overlay.
+    Generates a continuous accident-density surface using Kernel Density Estimation (KDE).
+
+    Complex Logic (Mathematical Rasterization):
+    1. Uses a Quartic (biweight) kernel to calculate the density influence of each crash
+       over a grid of pixel_m resolution, up to radius_m.
+    2. This formula perfectly matches QGIS's built-in Heatmap tool.
+    3. The resulting density matrix is normalized and color-mapped to a Base64-encoded PNG.
+    4. Calculates the precise EPSG:4326 bounding box (four corners) required by MapLibre's
+       ImageSource to stretch the raster accurately over the basemap.
+
+    Returns:
+        dict: Georeferenced image data, bounds, and maximum density scalar.
     """
     query = apply_surat_filters(
         db.query(SuratAccident),
@@ -1377,12 +1406,7 @@ def export_blackspots(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
-    from fastapi.responses import StreamingResponse
     from datetime import datetime as dt
-    from app.utils.export_utils import (
-        build_accident_csv,
-        build_accident_excel,
-    )
 
     query = apply_surat_filters(
         db.query(SuratAccident),
@@ -1399,7 +1423,6 @@ def export_blackspots(
     # Validate observation period
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
-        from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=400,
             content={"detail": validation_error},

@@ -1,10 +1,14 @@
 # backend/app/utils/datetime_utils.py
 """
-Shared datetime parsing utilities for accident data ingestion.
+Datetime Utility Module
 
-Both seed_accidents.py and seed_surat_accidents.py previously duplicated
-the same list of format strings and parsing logic.  This module centralises
-that logic so every seeder stays consistent.
+Provides shared, highly resilient datetime parsing utilities for accident data ingestion 
+and API queries. 
+
+Real-world accident datasets (often originating from Excel or CSV files) contain highly 
+inconsistent date formats, non-breaking spaces, and legacy Excel serial numbers. This 
+module centralizes the parsing logic to ensure every database seeder and API endpoint 
+processes dates consistently, avoiding duplicated logic across files.
 """
 
 from __future__ import annotations
@@ -19,48 +23,66 @@ from app.core.constants import ACCIDENT_DATETIME_FORMATS
 
 def parse_accident_datetime(value) -> Optional[datetime]:
     """
-    Parse a single datetime value from the accident dataset.
+    Parse a heterogeneous datetime value from raw accident datasets into a native 
+    Python datetime object.
 
-    Handles:
-    - pandas Timestamp objects (returned directly)
-    - Excel serial date numbers (int / float)
-    - String representations in any format listed in ACCIDENT_DATETIME_FORMATS
-    - A final fallback using pandas' generic parser (dayfirst=True)
+    This function is primarily used during database seeding/ingestion where data 
+    types are highly unpredictable. It handles:
+    - Pandas Timestamp objects (often returned by `pd.read_excel` or `pd.read_csv`).
+    - Raw integer/float values representing legacy Excel serial date numbers.
+    - String representations matching known formats.
+    - A generic Pandas parser fallback for unknown formats.
 
-    Returns None if the value cannot be parsed.
+    Parameters
+    ----------
+    value : Any
+        The raw date/time value extracted from the dataset.
+
+    Returns
+    -------
+    datetime | None
+        A valid native Python datetime object, or None if the value is missing 
+        or completely unparseable.
     """
+    # Fast exit for explicit nulls
     if value is None:
         return None
 
-    # Already a Timestamp from pandas read_excel
+    # Handle native pandas Timestamps generated during data frame loading
     if isinstance(value, pd.Timestamp):
         return value.to_pydatetime()
 
-    # Native Python datetime (rare but possible)
+    # Handle native Python datetime objects (rare in pandas ingestion, but possible)
     if isinstance(value, datetime):
         return value
 
-    # Excel serial date number
+    # Handle Excel serial date numbers (e.g., 44197.5).
+    # Excel calculates dates as the number of days since Dec 30, 1899.
     if isinstance(value, (int, float)):
         parsed = pd.to_datetime(value, unit="D", origin="1899-12-30", errors="coerce")
+        # pd.isna checks for pandas NaT (Not a Time) which results from coerced errors
         return None if pd.isna(parsed) else parsed.to_pydatetime()
 
-    # String handling
+    # Fallback to string processing for everything else
     text = str(value).strip()
 
-    # Normalise non-breaking spaces and collapse runs of whitespace
+    # Normalize weird whitespace:
+    # 1. Replace non-breaking spaces (\u00a0), which are notorious in copied Excel data.
+    # 2. Split and rejoin to collapse multiple consecutive spaces into a single space.
     text = " ".join(text.replace("\u00a0", " ").split())
 
+    # Catch empty strings or our specific null sentinel keyword
     if not text or text.lower() == "nan":
         return None
 
-    # Try each known format
+    # Attempt strict parsing against our curated list of known datetime formats
     for fmt in ACCIDENT_DATETIME_FORMATS:
         parsed = pd.to_datetime(text, format=fmt, errors="coerce")
         if not pd.isna(parsed):
             return parsed.to_pydatetime()
 
-    # Generic fallback
+    # Generic fallback: allow pandas to try and infer the date format heuristically.
+    # dayfirst=True ensures ambiguous dates like '10/11/2023' are read as Nov 10, not Oct 11.
     parsed = pd.to_datetime(text, errors="coerce", dayfirst=True)
     if pd.isna(parsed):
         return None
@@ -70,16 +92,26 @@ def parse_accident_datetime(value) -> Optional[datetime]:
 
 def parse_accident_datetime_from_str(value) -> Optional[datetime]:
     """
-    Variant used at query-time (e.g. in FastAPI route handlers) when the
-    value stored in the DB may still be a raw string rather than a proper
-    datetime column value.
+    Lightweight datetime parser used at query-time (e.g., in FastAPI route handlers).
 
-    Unlike the seeder version, this skips the Excel-serial-number path
-    because values arriving from the ORM layer are already Python objects.
+    Unlike the seeder version (`parse_accident_datetime`), this function is optimized 
+    for speed and avoids the heavy `pandas` dependency. It assumes data is either 
+    already a Python datetime object or a string originating from an API request/ORM layer.
+
+    Parameters
+    ----------
+    value : str | datetime | None
+        The raw string or datetime object to be parsed.
+
+    Returns
+    -------
+    datetime | None
+        A valid native Python datetime object, or None if parsing fails.
     """
     if value is None:
         return None
 
+    # If the ORM or framework already converted it, return it directly
     if isinstance(value, datetime):
         return value
 
@@ -87,10 +119,15 @@ def parse_accident_datetime_from_str(value) -> Optional[datetime]:
     if not text or text.lower() == "nan":
         return None
 
+    # Iterate through the curated formats using the standard library `strptime`
+    # which is significantly faster than pandas string parsing.
     for fmt in ACCIDENT_DATETIME_FORMATS:
         try:
             return datetime.strptime(text, fmt)
         except ValueError:
+            # If the format doesn't match, ValueError is thrown. 
+            # We swallow the error and try the next format in the list.
             continue
 
+    # Return None if all known formats fail to match
     return None
