@@ -17,6 +17,7 @@ import {
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
+import IrcBlackspotDetectionLayers from "../../components/maps/IrcBlackspotDetectionLayers";
 // import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
 // import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
 // import DensityMapOverlays from "../../components/maps/DensityMapOverlays";
@@ -53,6 +54,8 @@ import {
   fetchGujaratPedestrianBlackspots,
   fetchGujaratDbscanBlackspots,
   fetchGujaratPedestrianDbscanBlackspots,
+  fetchGujaratIrcGreedyBlackspots,
+  fetchGujaratIrcGridBlackspots,
   fetchGujaratTemporalAnalysis,
   exportGujaratBlackspotCrashes,
 } from "../../api/gujaratDashboardApi";
@@ -629,6 +632,8 @@ export default function DistrictDashboard() {
   const isPedestrianVariant = filters.visualization_variant === "pedestrian";
   const isPedestrianBlackspot = isBlackspotDetection && isPedestrianVariant;
   const isDbscanBlackspot = filters.visualization_type === "dbscan_blackspot";
+  const isIrcGreedyBlackspot = filters.visualization_type === "irc_greedy_blackspot";
+  const isIrcGridBlackspot = filters.visualization_type === "irc_grid_blackspot";
   const isLocationMarkers =
     filters.visualization_type === "location_markers" ||
     !filters.visualization_type;
@@ -997,6 +1002,28 @@ export default function DistrictDashboard() {
                             fetchGujaratDbscanBlackspots(f, districtName)
                           }
                           exportFn={exportGujaratBlackspotCrashes}
+                        />
+                      ) : isIrcGreedyBlackspot ? (
+                        <IrcBlackspotDetectionLayers
+                          key="irc-greedy-blackspot"
+                          filters={filters}
+                          heatmapData={data.heatmap}
+                          fetchFn={(f) =>
+                            fetchGujaratIrcGreedyBlackspots(f, districtName)
+                          }
+                          exportFn={exportGujaratBlackspotCrashes}
+                          analysisLabel="IRC greedy blackspot detection"
+                        />
+                      ) : isIrcGridBlackspot ? (
+                        <IrcBlackspotDetectionLayers
+                          key="irc-grid-blackspot"
+                          filters={filters}
+                          heatmapData={data.heatmap}
+                          fetchFn={(f) =>
+                            fetchGujaratIrcGridBlackspots(f, districtName)
+                          }
+                          exportFn={exportGujaratBlackspotCrashes}
+                          analysisLabel="IRC grid blackspot detection"
                         />
                       ) : (
                         <VisualizationLayers

@@ -12,6 +12,7 @@ import type { User } from "../../types/user";
 
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
+import IrcBlackspotDetectionLayers from "../../components/maps/IrcBlackspotDetectionLayers";
 
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
@@ -50,6 +51,8 @@ import {
   fetchDbscanBlackspots,
   fetchPedestrianDbscanBlackspots,
   exportBlackspotCrashes,
+  fetchIrcGreedyBlackspots,
+  fetchIrcGridBlackspots,
 } from "../../api/dashboardApi";
 import SuratBaseMap from "../../components/maps/SuratBaseMap";
 import SeverityLegend from "../../components/maps/SeverityLegend";
@@ -384,6 +387,8 @@ export default function Dashboard() {
   const isPedestrianVariant = filters.visualization_variant === "pedestrian";
   const isPedestrianBlackspot = isBlackspotDetection && isPedestrianVariant;
   const isDbscanBlackspot = visualizationType === "dbscan_blackspot";
+  const isIrcGreedyBlackspot = visualizationType === "irc_greedy_blackspot";
+  const isIrcGridBlackspot = visualizationType === "irc_grid_blackspot";
 
   const isLocationMarkers = visualizationType === "location_markers";
   const displayHeatmapData = isPedestrianVariant
@@ -607,10 +612,14 @@ export default function Dashboard() {
           })()}
 
           <ExportButton filters={filters} />
-          {(isBlackspotDetection || isDbscanBlackspot) && (
+          {(isBlackspotDetection || isDbscanBlackspot || isIrcGreedyBlackspot || isIrcGridBlackspot) && (
             <BlackspotExportButton
               filters={filters}
-              algorithm={isDbscanBlackspot ? "dbscan" : "greedy"}
+              algorithm={
+                isDbscanBlackspot ? "dbscan" : 
+                isIrcGreedyBlackspot ? "irc_greedy" : 
+                isIrcGridBlackspot ? "irc_grid" : "greedy"
+              }
               isSurat={true}
             />
           )}
@@ -697,6 +706,24 @@ export default function Dashboard() {
                       heatmapData={data?.heatmap}
                       fetchFn={fetchDbscanBlackspots}
                       exportFn={exportBlackspotCrashes}
+                    />
+                  ) : isIrcGreedyBlackspot ? (
+                    <IrcBlackspotDetectionLayers
+                      key="irc-greedy-blackspot"
+                      filters={filters}
+                      heatmapData={data?.heatmap}
+                      fetchFn={fetchIrcGreedyBlackspots}
+                      exportFn={exportBlackspotCrashes}
+                      analysisLabel="IRC greedy blackspot detection"
+                    />
+                  ) : isIrcGridBlackspot ? (
+                    <IrcBlackspotDetectionLayers
+                      key="irc-grid-blackspot"
+                      filters={filters}
+                      heatmapData={data?.heatmap}
+                      fetchFn={fetchIrcGridBlackspots}
+                      exportFn={exportBlackspotCrashes}
+                      analysisLabel="IRC grid blackspot detection"
                     />
                   ) : (
                     <VisualizationLayers

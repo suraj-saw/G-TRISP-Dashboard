@@ -3,7 +3,7 @@ import type { DashboardFilters } from "../types/dashboard";
 import { SURAT_API_BASE, GUJARAT_API_BASE } from "../config/constants";
 
 export type BlackspotExportFormat = "csv" | "excel";
-export type BlackspotAlgorithm = "greedy" | "dbscan";
+export type BlackspotAlgorithm = "greedy" | "dbscan" | "irc_greedy" | "irc_grid";
 
 function buildBlackspotExportParams(
   filters: DashboardFilters,

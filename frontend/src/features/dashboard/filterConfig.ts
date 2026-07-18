@@ -15,6 +15,8 @@ export type VisualizationType =
   | "weighted_kde_heatmap"
   | "blackspot"
   | "dbscan_blackspot"
+  | "irc_greedy_blackspot"
+  | "irc_grid_blackspot"
   | "temporal_analysis";
 
 /** Type representing all possible filter IDs */
@@ -50,6 +52,8 @@ export const VISUALIZATION_OPTIONS = [
   // { value: "weighted_kde_heatmap", label: "Severity-Weighted KDE Heatmap" },
   { value: "blackspot", label: "Blackspot Detection" },
   { value: "dbscan_blackspot", label: "DBSCAN Blackspot Detection" },
+  { value: "irc_greedy_blackspot", label: "IRC Blackspot Detection (Greedy)" },
+  { value: "irc_grid_blackspot", label: "IRC Blackspot Detection (Grid)" },
   { value: "temporal_analysis", label: "Temporal Analysis" },
 ];
 
@@ -67,6 +71,8 @@ export const VISUALIZATION_VARIANT_LABELS: Record<string, string> = {
   // weighted_kde_heatmap: "Crash Type",
   blackspot: "Crash Type",
   dbscan_blackspot: "Crash Type",
+  irc_greedy_blackspot: "Crash Type",
+  irc_grid_blackspot: "Crash Type",
 };
 
 /**

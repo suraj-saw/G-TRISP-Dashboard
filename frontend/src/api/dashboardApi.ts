@@ -15,9 +15,8 @@
  * - SURAT_API_BASE: Constant defining the base route for Surat endpoints.
  */
 
-// frontend/src/api/dashboardApi.ts
 import API from "./axios";
-import { SURAT_API_BASE } from "../config/constants";
+import { SURAT_API_BASE, GUJARAT_API_BASE } from "../config/constants";
 import type {
   DashboardFilters,
   FilterOptions,
@@ -303,6 +302,30 @@ export const fetchPedestrianDbscanBlackspots = async (
       params,
     }
   );
+  return data;
+};
+
+/**
+ * Fetch IRC Greedy Blackspots (Gujarat-wide or filtered).
+ * @param filters Dashboard filter state
+ */
+export const fetchIrcGreedyBlackspots = async (
+  filters: DashboardFilters
+): Promise<BlackspotData> => {
+  const params = getParams(filters);
+  const { data } = await API.get(`${GUJARAT_API_BASE}/irc-greedy-blackspots`, { params });
+  return data;
+};
+
+/**
+ * Fetch IRC Grid Blackspots (Gujarat-wide or filtered).
+ * @param filters Dashboard filter state
+ */
+export const fetchIrcGridBlackspots = async (
+  filters: DashboardFilters
+): Promise<BlackspotData> => {
+  const params = getParams(filters);
+  const { data } = await API.get(`${GUJARAT_API_BASE}/irc-grid-blackspots`, { params });
   return data;
 };
 

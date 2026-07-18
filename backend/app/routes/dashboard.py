@@ -2672,3 +2672,180 @@ def export_dashboard_data(
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+
+@router.get("/irc-greedy-blackspots")
+def get_irc_greedy_blackspots(
+    district: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
+    police_station: Optional[List[str]] = Query(None),
+    radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
+    road_network_km: Optional[float] = Query(None, ge=1.0),
+    db: Session = Depends(get_db),
+):
+    from fastapi.responses import JSONResponse
+    from app.utils.irc_blackspot_utils import (
+        irc_greedy_blackspots, 
+        irc_blackspots_to_geojson,
+        DISTRICT_ROAD_NETWORK_KM,
+        DEFAULT_ROAD_NETWORK_KM
+    )
+    
+    if road_network_km is None:
+        if district and len(district) == 1:
+            road_network_km = DISTRICT_ROAD_NETWORK_KM.get(district[0], DEFAULT_ROAD_NETWORK_KM)
+        else:
+            road_network_km = DEFAULT_ROAD_NETWORK_KM
+    
+    query = apply_filters(
+        db.query(Accident),
+        district, year, road_classification,
+        weather_condition, light_condition, collision_type,
+        date_from, date_to,
+        taluka=taluka, db=db,
+        police_station=police_station
+    )
+    if severity:
+        if isinstance(severity, list):
+            query = query.filter(Accident.severity.in_(severity))
+        else:
+            query = query.filter(Accident.severity == severity)
+
+    accidents = query.all()
+
+    validation_error = validate_observation_period(accidents, selected_years=year)
+    if validation_error:
+        return JSONResponse(status_code=400, content={"detail": validation_error})
+
+    points = [
+        CrashPoint(
+            index=idx,
+            accident_db_id=a.id,
+            accident_id=a.accident_id,
+            lat=a.latitude,
+            lon=a.longitude,
+            severity=a.severity or "Unknown",
+        )
+        for idx, a in enumerate(accidents)
+        if a.latitude is not None and a.longitude is not None
+    ]
+    
+    # Calculate years of data from the date filter or distinct years, default to 3
+    years_of_data = 3.0
+    if year and len(year) > 0:
+        years_of_data = float(len(set(year)))
+    elif accidents:
+        unique_years = set(a.accident_date_time.year for a in accidents if a.accident_date_time)
+        years_of_data = float(len(unique_years)) if unique_years else 3.0
+        
+    if years_of_data < 1.0:
+        years_of_data = 1.0
+
+    blackspots = irc_greedy_blackspots(points, radius_m=radius_m, road_network_km=road_network_km, years_of_data=years_of_data)
+    geojson = irc_blackspots_to_geojson(blackspots, radius_m=radius_m)
+
+    return {
+        "total_crashes": len(points),
+        "total_blackspots": len(blackspots),
+        "isolated_crashes": len(points) - sum(b.crash_count for b in blackspots),
+        "radius_m": radius_m,
+        "min_crashes": 0, # Will be computed in the backend
+        "circles": geojson["circles"],
+        "centroids": geojson["centroids"],
+    }
+
+@router.get("/irc-grid-blackspots")
+def get_irc_grid_blackspots(
+    district: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    weather_condition: Optional[List[str]] = Query(None),
+    light_condition: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
+    police_station: Optional[List[str]] = Query(None),
+    radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
+    road_network_km: Optional[float] = Query(None, ge=1.0),
+    spacing_m: float = Query(50.0, ge=10.0),
+    db: Session = Depends(get_db),
+):
+    from fastapi.responses import JSONResponse
+    from app.utils.irc_blackspot_utils import (
+        irc_grid_blackspots,
+        irc_blackspots_to_geojson,
+        DISTRICT_ROAD_NETWORK_KM,
+        DEFAULT_ROAD_NETWORK_KM
+    )
+    
+    if road_network_km is None:
+        if district and len(district) == 1:
+            road_network_km = DISTRICT_ROAD_NETWORK_KM.get(district[0], DEFAULT_ROAD_NETWORK_KM)
+        else:
+            road_network_km = DEFAULT_ROAD_NETWORK_KM
+    
+    query = apply_filters(
+        db.query(Accident),
+        district, year, road_classification,
+        weather_condition, light_condition, collision_type,
+        date_from, date_to,
+        taluka=taluka, db=db,
+        police_station=police_station
+    )
+    if severity:
+        if isinstance(severity, list):
+            query = query.filter(Accident.severity.in_(severity))
+        else:
+            query = query.filter(Accident.severity == severity)
+
+    accidents = query.all()
+
+    validation_error = validate_observation_period(accidents, selected_years=year)
+    if validation_error:
+        return JSONResponse(status_code=400, content={"detail": validation_error})
+
+    points = [
+        CrashPoint(
+            index=idx,
+            accident_db_id=a.id,
+            accident_id=a.accident_id,
+            lat=a.latitude,
+            lon=a.longitude,
+            severity=a.severity or "Unknown",
+        )
+        for idx, a in enumerate(accidents)
+        if a.latitude is not None and a.longitude is not None
+    ]
+    
+    # Calculate years of data from the date filter or distinct years, default to 3
+    years_of_data = 3.0
+    if year and len(year) > 0:
+        years_of_data = float(len(set(year)))
+    elif accidents:
+        unique_years = set(a.accident_date_time.year for a in accidents if a.accident_date_time)
+        years_of_data = float(len(unique_years)) if unique_years else 3.0
+        
+    if years_of_data < 1.0:
+        years_of_data = 1.0
+
+    blackspots = irc_grid_blackspots(points, radius_m=radius_m, spacing_m=spacing_m, road_network_km=road_network_km, years_of_data=years_of_data)
+    geojson = irc_blackspots_to_geojson(blackspots, radius_m=radius_m)
+
+    return {
+        "total_crashes": len(points),
+        "total_blackspots": len(blackspots),
+        "isolated_crashes": len(points) - sum(b.crash_count for b in blackspots),
+        "radius_m": radius_m,
+        "min_crashes": 0, # Will be computed in the backend
+        "circles": geojson["circles"],
+        "centroids": geojson["centroids"],
+    }
