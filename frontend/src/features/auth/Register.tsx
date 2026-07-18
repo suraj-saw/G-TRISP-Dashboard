@@ -1,4 +1,9 @@
-// frontend/src/features/auth/Register.tsx
+/**
+ * @file Register.tsx
+ * @description React component for user registration.
+ * @responsibility Provides a signup form, parses server-side password validation constraints, handles FastAPI errors, and displays an admin-approval pending message on success.
+ * @dependencies react-router-dom, axios
+ */
 import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../../api/axios";
@@ -12,6 +17,11 @@ interface RegisterForm {
 
 type FastAPIDetail = string | { msg: string; loc: string[] }[];
 
+/**
+ * Parses and formats FastAPI validation error details into a human-readable string.
+ * @param {FastAPIDetail} detail - The error detail payload from FastAPI.
+ * @returns {string} Formatted error message.
+ */
 function extractErrorMessage(detail: FastAPIDetail): string {
   if (typeof detail === "string") return detail;
   if (Array.isArray(detail)) {
@@ -20,6 +30,13 @@ function extractErrorMessage(detail: FastAPIDetail): string {
   return "Something went wrong. Please try again.";
 }
 
+/**
+ * Register Component
+ * @component_responsibility Manages the user registration workflow, ensuring already-authenticated users are redirected, capturing user input, and displaying post-registration status.
+ * @state_management Uses local state for form inputs (`username`, `email`, `password`), UI states (`loading`, `error`), and `success` boolean to swap the form out for a success message.
+ * @hooks_usage Uses `useEffect` on mount to check if a user is already authenticated (via `/auth/me`) and redirects them if true.
+ * @returns {JSX.Element} The rendered registration form or success view.
+ */
 function Register() {
   const navigate = useNavigate();
   const [form, setForm] = useState<RegisterForm>({

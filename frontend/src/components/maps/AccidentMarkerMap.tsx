@@ -1,3 +1,7 @@
+/**
+ * @file AccidentMarkerMap.tsx
+ * @description (Currently inactive/commented out) A map visualization layer designed to show individual accidents and dynamic clusters.
+ */
 // // frontend/src/components/maps/AccidentMarkerMap.tsx
 // import { useMemo } from "react";
 // import Map, { Source, Layer } from "react-map-gl/maplibre";

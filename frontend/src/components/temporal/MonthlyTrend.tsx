@@ -1,3 +1,8 @@
+/**
+ * @file MonthlyTrend.tsx
+ * @description Visualizes the macro trend of accidents over calendar months.
+ * @responsibility Renders an AreaChart utilizing a subtle SVG gradient fill to communicate volume trends.
+ */
 import {
   Area,
   AreaChart,
@@ -13,6 +18,11 @@ interface Props {
   data: MonthlyAccidentCount[];
 }
 
+/**
+ * MonthlyTrend Component
+ * @param {Object} props - Component properties.
+ * @param {MonthlyAccidentCount[]} props.data - Pre-aggregated monthly accident counts.
+ */
 export default function MonthlyTrend({ data }: Props) {
   return (
     <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">

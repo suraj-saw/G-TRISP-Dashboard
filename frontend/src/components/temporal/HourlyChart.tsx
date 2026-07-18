@@ -1,3 +1,8 @@
+/**
+ * @file HourlyChart.tsx
+ * @description Visualizes the distribution of accidents across a 24-hour cycle using a bar chart.
+ * @responsibility Maps hourly data into AM/PM labels and renders it via Recharts.
+ */
 import {
   Bar,
   BarChart,
@@ -13,13 +18,23 @@ interface Props {
   data: HourlyAccidentCount[];
 }
 
+/**
+ * Formats a 24-hour integer into a standard 12-hour AM/PM string.
+ * @param {number} hour - Integer from 0 to 23.
+ */
 const formatHour = (hour: number) => {
   const suffix = hour < 12 ? "AM" : "PM";
   const value = hour % 12 || 12;
   return `${value}${suffix}`;
 };
 
+/**
+ * HourlyChart Component
+ * @param {Object} props - Component properties.
+ * @param {HourlyAccidentCount[]} props.data - Array of hourly accident counts.
+ */
 export default function HourlyChart({ data }: Props) {
+  /** Injects formatted 12-hour labels into the data array for the XAxis. */
   const chartData = data.map((item) => ({
     ...item,
     label: formatHour(item.hour),

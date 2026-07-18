@@ -1,4 +1,9 @@
-// frontend/src/components/maps/BlackspotDetectionLayers.tsx
+/**
+ * @file BlackspotDetectionLayers.tsx
+ * @description Renders dynamic map layers for Blackspot detection using spatial algorithms (e.g., Greedy/Radius-based).
+ * @responsibility Fetches blackspot cluster data, renders Maplibre Source/Layer definitions (clusters and individual points), handles hover/click interactions, and integrates with the CSV export function.
+ * @dependencies react-map-gl/maplibre, lucide-react, dashboardApi
+ */
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
@@ -27,6 +32,9 @@ interface Props {
   crashLabel?: string;
 }
 
+/**
+ * Represents the structured metadata payload for a hovered blackspot cluster or individual crash point.
+ */
 interface HoveredBlackspot {
   longitude: number;
   latitude: number;
@@ -157,6 +165,12 @@ function pedestrianCasualtyTotal(point: {
   );
 }
 
+/**
+ * UI Component for the body of an accident popup.
+ * @param {Object} props
+ * @param {SelectedAccident} props.selected - The metadata of the selected accident.
+ * @param {boolean} props.showPedestrianCasualties - Flag to conditionally render the pedestrian casualty aggregate.
+ */
 function AccidentPopupBody({
   selected,
   showPedestrianCasualties = false,
@@ -288,6 +302,16 @@ function buildAccidentGeojson(
   };
 }
 
+/**
+ * BlackspotDetectionLayers Component
+ * @state_management Manages local `data` for clusters, `loading`/`error` states for the fetch operation, and `hovered`/`selected` states for map interactions. Uses `useRef` for debouncing popup dismissals.
+ * @hooks_usage Heavy use of `useEffect` for data fetching tied to filter changes and map event binding (`mousemove`, `click`).
+ * @param {Object} props - Component properties.
+ * @param {DashboardFilters} props.filters - Global dashboard filters applied to the backend query.
+ * @param {Function} [props.fetchFn] - Override function for fetching data.
+ * @param {Function} [props.exportFn] - Override function for exporting CSV data.
+ * @param {HeatmapPoint[]} [props.heatmapData] - Underlying raw crash points to render individually on high zoom.
+ */
 export default function BlackspotDetectionLayers({
   filters,
   fetchFn,

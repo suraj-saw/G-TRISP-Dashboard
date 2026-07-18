@@ -1,4 +1,9 @@
-// frontend/src/components/charts/LocationMarkersInsights.tsx
+/**
+ * @file LocationMarkersInsights.tsx
+ * @description A comprehensive analytics dashboard component rendering multiple statistical charts (Pie, Bar, Radar, Treemap) for accident data.
+ * @responsibility Consumes filtered `DashboardData`, calculates aggregations/top-N lists via `useMemo`, and displays them using Recharts.
+ * @dependencies recharts (charting library).
+ */
 import { useMemo } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -46,6 +51,11 @@ const CASUALTY_COLORS = { killed: "#ef4444", grievous: "#f97316", minor: "#f59e0
 
 const TOOLTIP_WRAPPER = { zIndex: 60, pointerEvents: "none" as const, outline: "none" };
 
+/**
+ * Custom tooltip renderer for Recharts.
+ * @param {Object} props - Tooltip props provided by Recharts.
+ * @returns {JSX.Element|null} A styled HTML tooltip overlay.
+ */
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
@@ -75,6 +85,13 @@ function ChartTooltip({ active, payload, label }: any) {
   );
 }
 
+/**
+ * A standard UI wrapper for individual chart sections.
+ * @param {Object} props - Component props.
+ * @param {string} props.title - Primary card heading.
+ * @param {string} [props.subtitle] - Secondary contextual text.
+ * @param {React.ReactNode} props.children - The chart to render inside.
+ */
 function Card({ title, subtitle, children, className = "" }: {
   title: string; subtitle?: string; children: React.ReactNode; className?: string;
 }) {
@@ -89,6 +106,10 @@ function Card({ title, subtitle, children, className = "" }: {
   );
 }
 
+/**
+ * A horizontal, wrappable legend component used below charts.
+ * @param {Object} props - Component props containing the items array.
+ */
 function LegendRow({ items }: { items: { color: string; label: string; value?: number }[] }) {
   return (
     <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 pt-6">
@@ -105,6 +126,9 @@ function LegendRow({ items }: { items: { color: string; label: string; value?: n
   );
 }
 
+/**
+ * Renders a single Key Performance Indicator metric with a left-colored border highlight.
+ */
 function KpiCard({ label, value, highlightColor }: {
   label: string; value: number; highlightColor: string;
 }) {
@@ -121,6 +145,10 @@ function KpiCard({ label, value, highlightColor }: {
   );
 }
 
+/**
+ * Custom SVG rendering for Treemap cells, adding text labels if the bounding box is large enough.
+ * @business_rule Hides text on small cells (width < 70 or height < 45) to prevent visual clutter.
+ */
 function TreemapContent({ x, y, width, height, name, count, fill }: any) {
   if (width < 20 || height < 20) return null;
 
@@ -158,15 +186,30 @@ function TreemapContent({ x, y, width, height, name, count, fill }: any) {
   );
 }
 
+/**
+ * LocationMarkersInsights Component
+ * @responsibility Processes raw dashboard analytics and maps them to specialized visualization components.
+ * @data_flow Raw `data` -> `useMemo` hooks (sorting, filtering zero counts, truncating top lists) -> Chart components.
+ * @rendering_flow Uses a CSS Grid layout to place KPI cards at the top, followed by 2-column rows of detailed charts.
+ * @param {Object} props - Component properties.
+ * @param {DashboardData} props.data - The aggregated accident data provided by the backend, filtered by current map bounds/time.
+ */
 export default function LocationMarkersInsights({ data }: { data: DashboardData }) {
   const s = data.summary;
 
+  /** Filters out severity categories with zero counts. */
   const severityData = useMemo(() =>
     (data.severity || []).filter(d => d.count > 0), [data.severity]);
 
+  /** Computes total severity counts for the pie chart's inner text overlay. */
   const severityTotal = useMemo(() =>
     severityData.reduce((acc, d) => acc + d.count, 0), [severityData]);
 
+  /** 
+   * Prepares horizontal bar chart data for top dangerous zones.
+   * @aggregation Sorts by fatal_accidents descending, taking the top 8.
+   * @formatting Removes 'Police Station' suffix to fit labels on the y-axis.
+   */
   const topDangerous = useMemo(() =>
     [...(data.dangerous || [])]
       .sort((a, b) => b.fatal_accidents - a.fatal_accidents)
@@ -178,10 +221,15 @@ export default function LocationMarkersInsights({ data }: { data: DashboardData 
       })),
     [data.dangerous]);
 
+  /** Sorts road classification data by accident count descending. */
   const roadData = useMemo(() =>
     [...(data.roads || [])].sort((a, b) => b.accident_count - a.accident_count),
     [data.roads]);
 
+  /**
+   * Prepares weather data for horizontal bar chart.
+   * @aggregation Filters zeroes, sorts by count descending, takes top 6.
+   */
   const weatherData = useMemo(() =>
     [...(data.weather || [])]
       .filter(w => w.count > 0)
@@ -193,6 +241,10 @@ export default function LocationMarkersInsights({ data }: { data: DashboardData 
       })),
     [data.weather]);
 
+  /**
+   * Prepares light condition data for horizontal bar chart.
+   * @aggregation Filters zeroes, sorts by count descending, takes top 6.
+   */
   const lightData = useMemo(() =>
     [...(data.light || [])]
       .filter(l => l.count > 0)
@@ -201,6 +253,10 @@ export default function LocationMarkersInsights({ data }: { data: DashboardData 
       .map(l => ({ name: l.name || l.light_condition || "", count: l.count })),
     [data.light]);
 
+  /**
+   * Prepares collision feature data for the Radar chart.
+   * @formatting Abbreviates long strings (e.g. "Vehicle to " -> "V→") and truncates to 14 chars to fit radial labels.
+   */
   const collisionData = useMemo(() =>
     (data.violations || [])
       .filter(v => v.count > 0)
@@ -213,10 +269,12 @@ export default function LocationMarkersInsights({ data }: { data: DashboardData 
       })),
     [data.violations]);
 
+  /** Filters out casualty categories (e.g. driver, passenger) that have 0 total victims. */
   const casualtyData = useMemo(() =>
     (data.casualty || []).filter(c => c.killed + c.grievous + c.minor > 0),
     [data.casualty]);
 
+  /** Formats road classification data into the structure required by Recharts' Treemap. */
   const roadTreemap = useMemo(() =>
     roadData.map((r, i) => ({
       name: r.road_classification || "Unknown",

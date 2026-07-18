@@ -1,8 +1,8 @@
-// frontend/src/features/dashboard/AccidentsPage.tsx
 /**
- * Dedicated Accident Management page.
- * Full-page enterprise layout with its own TopBar, session guard,
- * and separate actions for Add Record vs Import Records.
+ * @file AccidentsPage.tsx
+ * @description Dedicated Accident Management page.
+ * @responsibility Orchestrates the full-page enterprise layout for accident management, including the TopBar, session guard (admin only), and modals for adding/importing records.
+ * @dependencies framer-motion, lucide-react, react-router-dom
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -31,6 +31,13 @@ import type { Notification } from "../../types/notification";
 const SESSION_POLL_INTERVAL_MS = 5000;
 type SessionStatus = "checking" | "active" | "kicked";
 
+/**
+ * AccidentsPage Component
+ * @component_responsibility Acts as the wrapper for the `AccidentManagement` table, providing page-level controls, notification polling, and session verification.
+ * @state_management Manages user session state, notification data, modal visibility (add/import), and table refresh triggers.
+ * @hooks_usage Uses `useEffect` for session polling to ensure the user retains 'admin' privileges.
+ * @returns {JSX.Element} The rendered page layout.
+ */
 export default function AccidentsPage() {
   const navigate = useNavigate();
 

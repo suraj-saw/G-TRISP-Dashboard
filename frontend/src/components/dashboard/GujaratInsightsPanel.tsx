@@ -1,4 +1,9 @@
-// frontend/src/components/dashboard/GujaratInsightsPanel.tsx
+/**
+ * @file GujaratInsightsPanel.tsx
+ * @description Renders a high-level summary panel for the map view, dynamically switching between statewide aggregates and specific district data based on user hover/selection.
+ * @responsibility Consumes the global DistrictInsightsContext, aggregates severity and high-risk zone data, and renders animated KPI tiles and charts.
+ * @dependencies framer-motion (animations), recharts (charting), lucide-react (icons), useDistrictInsights (context).
+ */
 import { useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -45,7 +50,14 @@ const tooltipStyle = {
 };
 const FADE = { duration: 0.22, ease: "easeInOut" as const };
 
-// KPI tile
+/**
+ * Renders an individual KPI tile with an animated counting number effect.
+ * @param {Object} props - KPI properties.
+ * @param {React.ReactNode} props.icon - Lucide icon.
+ * @param {string} props.label - KPI title.
+ * @param {number} props.value - The raw number to animate up to.
+ * @param {string} props.tone - Base color string applied to the icon background and text.
+ */
 function KpiTile({ icon, label, value, tone }: {
   icon: React.ReactNode; label: string; value: number; tone: string;
 }) {
@@ -68,7 +80,9 @@ function KpiTile({ icon, label, value, tone }: {
   );
 }
 
-// Snapshot cell
+/**
+ * Small informational cell used within the District Snapshot block.
+ */
 function SnapshotCell({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="min-w-0">
@@ -78,7 +92,9 @@ function SnapshotCell({ label, value }: { label: string; value: string | number 
   );
 }
 
-// Pie tooltip
+/**
+ * Custom Recharts tooltip for the Severity Pie chart, displaying percentages relative to the total.
+ */
 function SeverityTooltip({ active, payload, total }: {
   active?: boolean;
   payload?: { name: string; value: number }[];
@@ -97,7 +113,13 @@ function SeverityTooltip({ active, payload, total }: {
   );
 }
 
-// Main component
+/**
+ * GujaratInsightsPanel Component
+ * @responsibility Manages the display of aggregated insights. Toggles between whole-state data and single-district data based on the map interaction context.
+ * @state_management Relies entirely on `useDistrictInsights` context. Extracts hover state (`hoveredDistrict`) and fetched geographic aggregates (`gujarat`, `active`).
+ * @data_flow District hover triggers re-render -> contextual data (state vs district) is selected -> passed to memoized chart data generators -> rendered.
+ * @rendering_flow Handles 4 main views: Loading, Error/Unavailable, Empty District, and Populated Data (Statewide or District-specific). Animations handled by Framer Motion's AnimatePresence.
+ */
 export default function GujaratInsightsPanel() {
   const {
     gujaratLoading, districtsReady, error, gujarat,
@@ -117,16 +139,22 @@ export default function GujaratInsightsPanel() {
       ? `${hoveredDistrict} Insights`
       : "Gujarat Accident Insights";
 
+  /** Determines which dataset (state vs district) to use for the pie chart, filtering out zeroes. */
   const severityData = useMemo(() => {
     const raw = isDistrictView ? active!.severity : (gujarat?.severity ?? []);
     return raw.filter((s) => s.count > 0);
   }, [isDistrictView, active, gujarat]);
 
+  /** Calculates total severity for percentage calculations in the pie chart legend and tooltip. */
   const severityTotal = useMemo(
     () => severityData.reduce((sum, d) => sum + d.count, 0),
     [severityData]
   );
 
+  /** 
+   * Aggregates the most dangerous zones specifically for the statewide view.
+   * @formatting Removes 'Police Station' text from labels to prevent truncation in the small Y-axis.
+   */
   const topDangerous = useMemo(
     () => (gujarat?.dangerous || [])
       .filter((d) => d.fatal_accidents > 0)

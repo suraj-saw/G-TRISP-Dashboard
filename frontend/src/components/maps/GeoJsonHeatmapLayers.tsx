@@ -1,3 +1,9 @@
+/**
+ * @file GeoJsonHeatmapLayers.tsx
+ * @description Renders Kernel Density Estimation (KDE) and grid-based heatmaps using Maplibre.
+ * @responsibility Consumes precomputed surface polygons (for KDE) or renders Maplibre native heatmaps based on accident points. Also handles hover/click popups to inspect accident severity and KDE density.
+ * @dependencies react-map-gl/maplibre, config/Heapmapconfig
+ */
 import { useEffect, useMemo, useState } from "react";
 import { Layer, Popup, Source, useMap } from "react-map-gl/maplibre";
 import type { HeatmapPoint } from "../../types/dashboard";
@@ -53,6 +59,16 @@ const severityColorExpression = [
   SEVERITY_COLORS.default,
 ] as const;
 
+/**
+ * GeoJsonHeatmapLayers Component
+ * @state_management Manages local `selected` state for popups (storing density, coordinates, severity).
+ * @hooks_usage Uses `useEffect` to attach `click` and `mousemove` events to the map instance for density inspection. Uses `useMemo` to construct complex mapbox-gl style expressions (e.g. interpolations for heatmap rendering).
+ * @param {Object} props - Component properties.
+ * @param {GeoJSON.FeatureCollection} props.data - GeoJSON data driving the heatmap/surface layer.
+ * @param {boolean} [props.precomputedSurface=false] - If true, renders KDE surface circles; otherwise native maplibre heatmap.
+ * @param {HeatmapPoint[]} [props.accidentPoints] - Raw accident data for rendering individual point circles at high zooms.
+ * @param {boolean} [props.inspectDensity=false] - Toggles the density inspection popup feature on click/hover.
+ */
 export default function GeoJsonHeatmapLayers({
   data,
   sourceId,

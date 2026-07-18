@@ -1,3 +1,9 @@
+/**
+ * @file AboutPage.tsx
+ * @description Renders the "About" page for the dashboard application.
+ * @responsibility Displays project metadata, institutional support, contact information, team members, and the technology stack based on configuration data.
+ * @dependencies react-router-dom (navigation), lucide-react (icons), aboutConfig (content data)
+ */
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -29,7 +35,15 @@ const technologyIcons = {
   cloud: Cloud,
 };
 
-// Clean, un-nested admin card wrapper
+/**
+ * AdminCard Component
+ * @description A reusable card wrapper for rendering distinct sections on the About page.
+ * @param {Object} props - Component properties.
+ * @param {string} props.title - The title displayed in the card header.
+ * @param {React.ElementType} [props.icon] - Optional Lucide React icon component for the header.
+ * @param {React.ReactNode} props.children - The content to render inside the card body.
+ * @returns {JSX.Element} The styled card container.
+ */
 function AdminCard({
   title,
   icon: Icon,
@@ -50,6 +64,14 @@ function AdminCard({
   );
 }
 
+/**
+ * AboutPage Component
+ * @component_responsibility Main entry point for the About page. Orchestrates the layout of various informational sections (Banner, Overview, Org/Contact grid, Teams, Tech Stack).
+ * @state_management Uses static configuration data (`ABOUT_CONFIG`) without local state.
+ * @hooks_usage Uses `useNavigate` to provide a "Back to Dashboard" routing mechanism.
+ * @rendering_flow Iterates through configuration arrays to dynamically construct cards for organizations, team groups, and technology stacks.
+ * @returns {JSX.Element} The fully composed About page.
+ */
 export default function AboutPage() {
   const navigate = useNavigate();
   const { project } = ABOUT_CONFIG;

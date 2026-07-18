@@ -1,4 +1,10 @@
 /**
+ * @file dashboard.ts
+ * @description Centralized TypeScript definitions for dashboard data structures, filter criteria, and API response payloads.
+ * @responsibility Ensures type safety across all charting components, map layers, and temporal/statistical analysis modules.
+ */
+
+/**
  * Dashboard filter options used to query accident data
  */
 export interface DashboardFilters {

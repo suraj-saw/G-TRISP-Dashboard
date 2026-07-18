@@ -1,3 +1,7 @@
+/**
+ * @file Panel.tsx
+ * @description (Currently inactive/commented out) A generic UI wrapper panel with entrance animations via framer-motion.
+ */
 // import { motion } from "framer-motion";
 // import type { ReactNode } from "react";
 

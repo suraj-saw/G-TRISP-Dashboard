@@ -1,4 +1,9 @@
-// frontend/src/features/auth/Login.tsx
+/**
+ * @file Login.tsx
+ * @description React component for authenticating users.
+ * @responsibility Provides the login form, handles API communication to establish a session, processes FastAPI validation errors, and redirects authenticated users to their role-based landing pages.
+ * @dependencies react-router-dom, axios (with cookie credentials)
+ */
 import {
   useEffect,
   useRef,
@@ -7,6 +12,7 @@ import {
   type FormEvent,
 } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import API from "../../api/axios";
 import { ROUTES } from "../../config/constants";
 
@@ -24,6 +30,11 @@ interface User {
 
 type FastAPIDetail = string | { msg: string; loc: string[] }[];
 
+/**
+ * Parses and formats FastAPI validation error details into a human-readable string.
+ * @param {FastAPIDetail} detail - The error detail payload from FastAPI.
+ * @returns {string} Formatted error message.
+ */
 function extractErrorMessage(detail: FastAPIDetail): string {
   if (typeof detail === "string") return detail;
   if (Array.isArray(detail)) {
@@ -32,21 +43,38 @@ function extractErrorMessage(detail: FastAPIDetail): string {
   return "Something went wrong. Please try again.";
 }
 
+/**
+ * Helper to pause execution for a given number of milliseconds.
+ * @param {number} ms - Milliseconds to sleep.
+ */
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Resolve the correct post-login destination based on the user's role. */
+/** 
+ * Resolves the correct post-login destination route based on the user's role.
+ * @business_rule Admin users go to the Admin panel; normal users go to the default Dashboard.
+ * @param {User} user - The authenticated user object.
+ * @returns {string} The target route.
+ */
 function destinationFor(user: User): string {
   return user.role === "admin" ? ROUTES.ADMIN : ROUTES.DASHBOARD;
 }
 
+/**
+ * Login Component
+ * @component_responsibility Manages the authentication workflow, including checking for active sessions on mount, handling credential submission, polling for cookie availability, and executing route redirects.
+ * @state_management Uses local state for form inputs, UI loading/error states, and password visibility toggle. Uses `useRef` to prevent race conditions when checking session vs submitting.
+ * @hooks_usage Uses `useEffect` to redirect users if they navigate to `/login` while already authenticated.
+ * @returns {JSX.Element} The rendered login layout.
+ */
 function Login() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState<LoginForm>({ email: "", password: "" });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const isSubmittingLogin = useRef(false);
 
@@ -189,20 +217,35 @@ function Login() {
                 Forgot Password?
               </Link>
             </div>
-            <input
-              id="password"
-              type="password"
-              name="password"
-              placeholder="••••••••"
-              value={form.password}
-              onChange={handleChange}
-              required
-              disabled={loading}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
-                         placeholder-gray-400 focus:outline-none focus:ring-2
-                         focus:ring-indigo-500 focus:border-transparent transition
-                         disabled:opacity-60 disabled:cursor-not-allowed"
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder="••••••••"
+                value={form.password}
+                onChange={handleChange}
+                required
+                disabled={loading}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm
+                           placeholder-gray-400 focus:outline-none focus:ring-2
+                           focus:ring-indigo-500 focus:border-transparent transition
+                           disabled:opacity-60 disabled:cursor-not-allowed
+                           [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff size={18} />
+                ) : (
+                  <Eye size={18} />
+                )}
+              </button>
+            </div>
           </div>
 
           <button

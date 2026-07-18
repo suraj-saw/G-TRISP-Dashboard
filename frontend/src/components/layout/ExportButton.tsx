@@ -1,4 +1,8 @@
-// frontend/src/components/layout/ExportButton.tsx
+/**
+ * @file ExportButton.tsx
+ * @description A UI button that triggers the PDF report generation process.
+ * @responsibility Manages the loading state for PDF generation and renders the invisible `PdfReportGenerator` component when triggered.
+ */
 import { useState } from "react";
 import { Download } from "lucide-react";
 import type { DashboardFilters } from "../../types/dashboard";
@@ -9,6 +13,12 @@ interface Props {
   districtName?: string;
 }
 
+/**
+ * ExportButton Component
+ * @param {Object} props - Component properties.
+ * @param {DashboardFilters} props.filters - Current dashboard filters to be included in the report.
+ * @param {string} [props.districtName] - Optional district name if generating a district-specific report.
+ */
 export default function ExportButton({ filters, districtName }: Props) {
   const [generating, setGenerating] = useState(false);
 

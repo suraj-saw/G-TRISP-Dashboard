@@ -1,3 +1,9 @@
+/**
+ * @file ExportContext.tsx
+ * @description React context to manage global export actions (CSV/PDF) triggered by UI buttons.
+ * @responsibility Allows deeply nested components to register their own specific export logic (e.g., exporting a table or chart) that can be triggered by a global export button located elsewhere in the app (like a Navbar).
+ * @dependencies react (Context API)
+ */
 import { createContext, useContext, useState, type ReactNode, useCallback } from "react";
 
 /** Supported export formats */
@@ -32,6 +38,8 @@ const ExportContext = createContext<ExportContextValue | null>(null);
 
 /**
  * Provider component for ExportContext
+ * @component_responsibility Wraps the application to hold the currently active export configuration.
+ * @state_management Holds the `exportConfig` object, which gets updated when a new component mounts and registers its export logic.
  * @param children - React children to wrap with the provider
  */
 export function ExportProvider({ children }: { children: ReactNode }) {

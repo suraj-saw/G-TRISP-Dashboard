@@ -1,3 +1,8 @@
+/**
+ * @file dashboardFilters.ts
+ * @description Utility functions for managing, validating, and hashing dashboard filter configurations.
+ * @responsibility Provides shared constants and pure functions used by hooks and components to determine visualization capabilities and generate cache keys.
+ */
 import type { DashboardFilters } from "../types/dashboard";
 
 /**

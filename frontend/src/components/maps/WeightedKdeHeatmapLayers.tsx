@@ -1,3 +1,9 @@
+/**
+ * @file WeightedKdeHeatmapLayers.tsx
+ * @description Renders a Kernel Density Estimation (KDE) surface where accident points are weighted by severity.
+ * @responsibility Coordinates the fetching of severity-weighted KDE data and wraps the `VisualizationLayers` component. Handles loading and error UI states.
+ * @dependencies lucide-react (status indicators), dashboardApi
+ */
 import { useEffect, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { fetchWeightedKdeHeatmap, type KdeHeatmapData } from "../../api/dashboardApi";
@@ -10,6 +16,15 @@ interface Props {
   fetchFn?: (filters: DashboardFilters) => Promise<KdeHeatmapData>;
 }
 
+/**
+ * WeightedKdeHeatmapLayers Component
+ * @state_management Maintains KDE `data`, `loading`, and `error` states.
+ * @hooks_usage Uses `useEffect` to trigger a fetch whenever relevant dashboard filters change.
+ * @param {Object} props - Component properties.
+ * @param {DashboardFilters} props.filters - Global dashboard filters.
+ * @param {HeatmapPoint[]} [props.accidentPoints] - Raw accident point data passed down.
+ * @param {Function} [props.fetchFn] - Override function for fetching data.
+ */
 export default function WeightedKdeHeatmapLayers({ filters, accidentPoints, fetchFn }: Props) {
   const [data, setData] = useState<KdeHeatmapData | null>(null);
   const [loading, setLoading] = useState(true);

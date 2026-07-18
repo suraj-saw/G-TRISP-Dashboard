@@ -1,4 +1,8 @@
-// frontend/src/components/maps/DistrictBaseMap.tsx
+/**
+ * @file DistrictBaseMap.tsx
+ * @description The foundational map component for rendering district-level spatial data.
+ * @responsibility Manages the core Maplibre instance, handles viewport resizing, dynamically computes and applies inverted polygon masks to obscure areas outside the active district, and renders coordinate context menus.
+ */
 import {
   useEffect,
   useRef,
@@ -36,6 +40,12 @@ const WORLD_RING: GeoJSON.Position[] = [
   [-180, -90],
 ];
 
+/**
+ * Constructs an inverted polygon (mask) to obscure areas outside a district's boundary.
+ * @business_rule Creates a massive outer bounding box (`WORLD_RING`) and subtracts the actual district geometries (inner rings), creating a "hole" where the district is located.
+ * @param {GeoJSON.FeatureCollection} fc - The feature collection representing the district boundary.
+ * @returns {GeoJSON.Feature<GeoJSON.Polygon>} The inverted polygon feature.
+ */
 function buildMask(
   fc: GeoJSON.FeatureCollection
 ): GeoJSON.Feature<GeoJSON.Polygon> {
@@ -54,6 +64,11 @@ function buildMask(
   };
 }
 
+/**
+ * Calculates the bounding box (bbox) for a given FeatureCollection.
+ * @param {GeoJSON.FeatureCollection} fc - The feature collection.
+ * @returns {[number, number, number, number] | null} Bounding box as [minLng, minLat, maxLng, maxLat].
+ */
 function getBbox(
   fc: GeoJSON.FeatureCollection
 ): [number, number, number, number] | null {
@@ -113,6 +128,11 @@ interface Props {
   overlays?: ReactNode;
 }
 
+/**
+ * DistrictBaseMap Component
+ * @state_management Manages map loading state, mask geometry, boundary bounding boxes, and context menu coordinates.
+ * @hooks_usage Heavy use of `useCallback` for memoized map manipulations, `useEffect` for boundary reactions and resize loops, and `useImperativeHandle` to expose `resize` and `getMap` to parents.
+ */
 const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
   (
     {

@@ -1,9 +1,18 @@
+/**
+ * @file NotificationBell.tsx
+ * @description A simple UI component rendering a bell icon with an optional notification badge.
+ */
 import { Bell } from "lucide-react";
 
 interface Props {
   count?: number;
 }
 
+/**
+ * NotificationBell Component
+ * @param {Object} props - Component properties.
+ * @param {number} [props.count=0] - The number of unread notifications to display in the badge.
+ */
 export default function NotificationBell({ count = 0 }: Props) {
   return (
     <button

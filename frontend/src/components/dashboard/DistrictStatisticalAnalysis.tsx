@@ -1,4 +1,9 @@
-
+/**
+ * @file DistrictStatisticalAnalysis.tsx
+ * @description Provides a dense, analytical dashboard view of crash statistics filtered by district and other parameters.
+ * @responsibility Fetches aggregated statistical data based on applied filters, orchestrates multiple Recharts components to visualize breakdowns (severity, road type, collision nature), and manages CSV/Excel exports.
+ * @dependencies recharts (charting), lucide-react (icons), getDistrictStats (API), useExportContext (global export state).
+ */
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
@@ -64,6 +69,14 @@ interface ProcessedDataPoint {
   count: number;
 }
 
+/**
+ * Utility to sort, limit, and aggregate categorical data for charts.
+ * @business_rule Displays the top N categories explicitly. Any remaining categories are summed into a generic "Others" bucket to prevent long-tail clutter on charts.
+ * @param {MetricDataPoint[] | undefined} data - The raw array of data points.
+ * @param {number} limit - The maximum number of distinct categories to show before grouping.
+ * @param {"label" | "road_type"} [key="label"] - The property key containing the category name.
+ * @returns {ProcessedDataPoint[]} An array ready for Recharts ingestion.
+ */
 const getTopCategories = (
   data: MetricDataPoint[] | undefined,
   limit: number,
@@ -101,6 +114,14 @@ const getTopCategories = (
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
+/**
+ * Renders a standardized Key Performance Indicator tile.
+ * @param {Object} props - KPI props.
+ * @param {string} props.label - The title of the metric.
+ * @param {string | number} props.value - The primary big number.
+ * @param {string} [props.sub] - Optional secondary text (e.g., YoY change).
+ * @param {string} [props.accent] - Color applied to the value text.
+ */
 const KpiCard: React.FC<{
   label: string;
   value: string | number;
@@ -116,6 +137,9 @@ const KpiCard: React.FC<{
   </div>
 );
 
+/**
+ * A standardized layout wrapper for rendering Recharts components with a consistent header and border.
+ */
 const ChartCard: React.FC<{
   title: string;
   children: React.ReactNode;
@@ -234,6 +258,13 @@ interface DistrictStatisticalAnalysisProps {
   filters: DistrictStatsFilters;
 }
 
+/**
+ * DistrictStatisticalAnalysis Component
+ * @responsibility Renders the secondary statistical dashboard view (usually toggled from the map view).
+ * @state_management Maintains `stats` payload from the API, `loading` status, and `error` states.
+ * @data_flow Receives `filters` via props -> `fetchStats` calls API -> Results memoized via `getTopCategories` -> Rendered to KPI and Chart sub-components.
+ * @hooks_usage Uses `useEffect` to trigger data fetches when filters change, and registers export capabilities via the global `useExportContext`.
+ */
 const DistrictStatisticalAnalysis: React.FC<
   DistrictStatisticalAnalysisProps
 > = ({ filters }) => {
@@ -241,6 +272,10 @@ const DistrictStatisticalAnalysis: React.FC<
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /** 
+   * Fetches the dashboard aggregates based on current filter combinations.
+   * Defined with `useCallback` to prevent infinite loops in the `useEffect` dependency array.
+   */
   const fetchStats = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -269,7 +304,11 @@ const DistrictStatisticalAnalysis: React.FC<
     fetchStats();
   }, [fetchStats]);
 
-  // ── Export handler registration ──────────────────────────────────────────
+  /**
+   * ── Export handler registration ──────────────────────────────────────────
+   * Connects this component to the top-level TopBar export button.
+   * Translates the local `filters` prop into the format expected by the backend export API.
+   */
   const { registerExportHandler } = useExportContext();
 
   useEffect(() => {
@@ -289,6 +328,7 @@ const DistrictStatisticalAnalysis: React.FC<
       day: [],
       time_period: [],
     };
+    
     registerExportHandler({
       supportedFormats: ["csv", "excel"],
       onExport: async (format) => {

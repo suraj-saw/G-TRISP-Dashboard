@@ -1,3 +1,8 @@
+/**
+ * @file useDashboard.ts
+ * @description Custom React hook for fetching and managing state for the primary Surat mapping dashboard.
+ * @responsibility Abstracts the data fetching logic, loading state, and error handling away from the presentation components.
+ */
 import { useState, useEffect, useCallback } from "react";
 import { fetchDashboardData } from "../api/dashboardApi";
 import type { DashboardFilters, DashboardData } from "../types/dashboard";
@@ -30,9 +35,13 @@ const initialData: DashboardData = {
 };
 
 /**
- * Custom React hook to fetch and manage dashboard data
- * @param filters - Dashboard filter options
- * @returns Object containing data, loading state, error state, and refetch function
+ * Custom React hook to fetch and manage dashboard data.
+ * 
+ * @hooks_usage Uses `useState` for data/loading/error states. Uses `useCallback` to memoize the fetch function, and `useEffect` to trigger fetches when the derived `filterKey` changes.
+ * @business_rule Relies on `toDataFilterKey` to generate a stable cache string from the filters object. This prevents redundant API calls if map-only filters (like baseMap or visualization_type) change, as they do not require new data from the backend.
+ * 
+ * @param {DashboardFilters} filters - The current active filter selections.
+ * @returns {{ data: DashboardData, loading: boolean, error: string | null, refetch: () => Promise<void> }} Object containing the data, loading state, error state, and a manual refetch trigger.
  */
 export const useDashboard = (filters: DashboardFilters) => {
   /** Current dashboard data state */
@@ -46,7 +55,8 @@ export const useDashboard = (filters: DashboardFilters) => {
   const filterKey = toDataFilterKey(filters);
 
   /**
-   * Load dashboard data from API
+   * Asynchronously fetches dashboard data based on the current filters.
+   * Updates loading and error states accordingly.
    */
   const loadData = useCallback(async () => {
     setLoading(true);

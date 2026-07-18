@@ -1,3 +1,9 @@
+/**
+ * @file VisualizationLayers.tsx
+ * @description Central spatial visualization orchestrator for the dashboard.
+ * @responsibility Consumes raw accident point data and renders the appropriate Maplibre layer configuration (e.g., density heatmaps, interactive point markers, blackspot clusters). Also handles popup rendering for accident inspections.
+ * @dependencies react-map-gl/maplibre
+ */
 // frontend/src/components/maps/VisualizationLayers.tsx
 
 import { useEffect, useMemo, useState } from "react";
@@ -159,6 +165,12 @@ const severityColorExpression = [
 // Shared GeoJSON builder
 // ---------------------------------------------------------------------------
 
+/**
+ * Transforms an array of HeatmapPoints into a GeoJSON FeatureCollection.
+ * @business_rule Injects dynamic weighting and normalized string properties to drive map styling expressions.
+ * @param {HeatmapPoint[]} [data] - The array of raw accident points.
+ * @returns {GeoJSON.FeatureCollection} A GeoJSON representation of the accidents.
+ */
 function buildGeojson(data?: HeatmapPoint[]): GeoJSON.FeatureCollection {
   return {
     type: "FeatureCollection",
@@ -206,6 +218,11 @@ function buildGeojson(data?: HeatmapPoint[]): GeoJSON.FeatureCollection {
 // demo effect rather than analytics.
 // ---------------------------------------------------------------------------
 
+/**
+ * Sub-component to render density heatmaps using Maplibre's native heatmap layers.
+ * @param {Object} props
+ * @param {GeoJSON.FeatureCollection} props.geojsonData - GeoJSON features for the heatmap.
+ */
 function DensityHeatmapLayers({
   geojsonData,
 }: {
@@ -246,6 +263,11 @@ type HoverState = {
   road_name?: string | null;
 } | null;
 
+/**
+ * Sub-component to render legacy risk bubbles / cluster map visualization.
+ * @param {Object} props
+ * @param {GeoJSON.FeatureCollection} props.geojsonData - Features to be clustered.
+ */
 function BlackspotLayers({
   geojsonData,
 }: {
@@ -463,6 +485,11 @@ function BlackspotLayers({
   );
 }
 
+/**
+ * Tooltip UI for Blackspot clusters and points.
+ * @param {Object} props
+ * @param {NonNullable<HoverState>} props.hovered - The hover metadata.
+ */
 function BlackspotPopup({ hovered }: { hovered: NonNullable<HoverState> }) {
   if (hovered.point_count !== undefined) {
     const count = hovered.point_count;
@@ -536,6 +563,12 @@ function BlackspotPopup({ hovered }: { hovered: NonNullable<HoverState> }) {
 // Main exported component
 // ---------------------------------------------------------------------------
 
+/**
+ * Main Exported Component: VisualizationLayers
+ * @state_management Manages `selected` accident state for point-and-click popups.
+ * @hooks_usage Uses `useMemo` to construct the GeoJSON payload, and `useEffect` to manage map-level mouse interactions (click/hover) on the dynamic Maplibre layers.
+ * @param {Props} props - Component properties.
+ */
 export function VisualizationLayers({
   data,
   type,

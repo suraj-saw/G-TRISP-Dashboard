@@ -1,3 +1,7 @@
+/**
+ * @file GujaratOverviewMap.tsx
+ * @description (Currently inactive/commented out) Legacy Maplibre-based state overview map.
+ */
 // // frontend/src/components/maps/GujaratOverviewMap.tsx
 // import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 // import MapGL, {

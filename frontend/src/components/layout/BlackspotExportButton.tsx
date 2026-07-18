@@ -1,4 +1,9 @@
-// frontend/src/components/layout/BlackspotExportButton.tsx
+/**
+ * @file BlackspotExportButton.tsx
+ * @description A complex export button component specifically designed for downloading Blackspot reports (CSV/Excel).
+ * @responsibility Renders a dropdown menu via React Portals, captures user input for specific blackspot numbers (including ranges), validates the input, and interfaces with the `blackspotExportApi` to initiate the download.
+ * @dependencies lucide-react (icons), downloadBlackspotExport (API).
+ */
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -31,6 +36,15 @@ interface MenuPos {
   width: number;
 }
 
+/**
+ * BlackspotExportButton Component
+ * @state_management Maintains UI states (`open`, `status`), handles form validation state (`bsIdsInput`), and manages the absolute positioning (`pos`) of the portaled dropdown.
+ * @param {Object} props - Component properties.
+ * @param {DashboardFilters} props.filters - Global dashboard filters applied to the export.
+ * @param {BlackspotAlgorithm} props.algorithm - The blackspot detection algorithm used (e.g. 'dbscan', 'greedy').
+ * @param {boolean} [props.isSurat=true] - Flag indicating if the current context is Surat.
+ * @param {string} [props.districtName] - Optional district name.
+ */
 export default function BlackspotExportButton({
   filters,
   algorithm,
@@ -84,7 +98,12 @@ export default function BlackspotExportButton({
     }
   }, [status]);
 
-  // Function to validate the input
+  /**
+   * Validates the blackspot number input field.
+   * @business_rule Supports comma-separated single numbers (e.g., "3") and ranges (e.g., "1-5"). Rejects negative numbers or invalid ranges where start > end.
+   * @param {string} input - The raw string input from the user.
+   * @returns {{valid: boolean, message?: string}} Validation result object.
+   */
   const validateInput = (
     input: string
   ): { valid: boolean; message?: string } => {
@@ -132,6 +151,10 @@ export default function BlackspotExportButton({
 
   const validation = validateInput(bsIdsInput);
 
+  /**
+   * Initiates the export process for the specified format.
+   * @param {BlackspotExportFormat} format - Target export format ("csv" or "excel").
+   */
   const handleExport = async (format: BlackspotExportFormat) => {
     if (!validation.valid) return;
     setOpen(false);

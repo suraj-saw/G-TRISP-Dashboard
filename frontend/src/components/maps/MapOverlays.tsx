@@ -1,3 +1,7 @@
+/**
+ * @file MapOverlays.tsx
+ * @description (Currently inactive/commented out) Legacy legend overlay components.
+ */
 // // frontend/src/components/maps/MapOverlays.tsx
 
 

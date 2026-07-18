@@ -1,4 +1,9 @@
-// frontend/src/components/charts/GujaratMap.tsx
+/**
+ * @file GujaratMap.tsx
+ * @description Renders a choropleth map of Gujarat districts, dynamically colored based on a specified statistical metric (e.g., accidents or fatalities).
+ * @responsibility Loads TopoJSON/GeoJSON district boundaries, scales data into a color gradient, and projects the geometry onto an SVG.
+ * @dependencies d3-geo (projection), d3-scale (color mapping), topojson-client (parsing map files).
+ */
 import { useEffect, useMemo, useState } from "react";
 import { geoMercator, geoPath } from "d3-geo";
 import { scaleLinear } from "d3-scale";
@@ -14,6 +19,11 @@ import { GUJARAT_DISTRICTS_GEOJSON_PATH } from "../../config/constants";
 type GeoFeature = Feature<Geometry, GeoJsonProperties>;
 type GeoFeatureCollection = FeatureCollection<Geometry, GeoJsonProperties>;
 
+/**
+ * Props for the GujaratMap component.
+ * @property {any[]} data - The dataset containing district-level statistics.
+ * @property {string} metric - The specific property key in `data` to use for color scaling (e.g., "accidents", "fatalities").
+ */
 type GujaratMapProps = {
   data: any[];
   metric: string;
@@ -22,12 +32,22 @@ type GujaratMapProps = {
 const WIDTH = 420;
 const HEIGHT = 260;
 
+/**
+ * Normalizes string names for robust matching between data arrays and GeoJSON properties.
+ * @param {unknown} value - The name to normalize.
+ * @returns {string} Lowercase, trimmed string.
+ */
 function normalizeName(value: unknown) {
   return String(value ?? "")
     .trim()
     .toLowerCase();
 }
 
+/**
+ * Type guard to check if an object is a valid GeoJSON FeatureCollection.
+ * @param {unknown} value - The object to test.
+ * @returns {boolean} True if valid.
+ */
 function isFeatureCollection(value: unknown): value is GeoFeatureCollection {
   return (
     typeof value === "object" &&
@@ -45,6 +65,12 @@ function isFeature(value: unknown): value is GeoFeature {
   );
 }
 
+/**
+ * Converts raw map topology (TopoJSON or GeoJSON) into a standard GeoJSON FeatureCollection.
+ * @business_rule Allows the component to flexibly accept both raw GeoJSON and compressed TopoJSON formats.
+ * @param {unknown} raw - The raw JSON loaded from the map file.
+ * @returns {GeoFeatureCollection} A normalized FeatureCollection.
+ */
 function toFeatureCollection(raw: unknown): GeoFeatureCollection {
   if (isFeatureCollection(raw)) {
     return raw;
@@ -80,10 +106,22 @@ function toFeatureCollection(raw: unknown): GeoFeatureCollection {
   };
 }
 
+/**
+ * GujaratMap Component
+ * @responsibility Fetches geographic boundaries, calculates data domains, and renders a choropleth map using D3 primitives within React SVG.
+ * @state_management Manages the loaded GeoJSON features and potential loading failures.
+ * @data_flow Map JSON fetched -> Extracted into features -> Data array mapped by district -> Color scales computed -> SVG paths drawn.
+ * @hooks_usage Uses `useEffect` for async fetching, and `useMemo` heavily to prevent recalculating geographic projections and color scales on unnecessary renders.
+ * @rendering_flow Displays a loading/error state if map file fails, otherwise iterates through features generating `<path>` elements with calculated `d` and `fill` attributes.
+ */
 export const GujaratMap = ({ data, metric }: GujaratMapProps) => {
   const [features, setFeatures] = useState<GeoFeature[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
 
+  /**
+   * Fetches the TopoJSON/GeoJSON map file on mount.
+   * Uses an abort flag (`cancelled`) to prevent state updates if the component unmounts during the fetch.
+   */
   useEffect(() => {
     let cancelled = false;
 
@@ -110,21 +148,35 @@ export const GujaratMap = ({ data, metric }: GujaratMapProps) => {
     };
   }, []);
 
+  /**
+   * Calculates the maximum value for the current metric to define the upper bound of the color scale.
+   * Defaults to 1 to prevent division by zero in d3 scales if data is empty.
+   */
   const maxValue = useMemo(() => {
     if (!data || data.length === 0) return 1;
     return Math.max(...data.map((d) => Number(d[metric]) || 0), 1);
   }, [data, metric]);
 
+  /**
+   * Indexes the dataset by normalized district name for O(1) lookup during rendering.
+   */
   const dataByDistrict = useMemo(() => {
     return new Map(data?.map((d) => [normalizeName(d.district), d]) ?? []);
   }, [data]);
 
+  /**
+   * Defines a linear color scale mapping values from 0 to maxValue into a blue gradient.
+   */
   const colorScale = useMemo(
     () =>
       scaleLinear<string>().domain([0, maxValue]).range(["#EEF3FF", "#2C6EF2"]),
     [maxValue]
   );
 
+  /**
+   * Generates a geographic path generator configured with a Mercator projection,
+   * automatically fitted to the defined WIDTH and HEIGHT dimensions.
+   */
   const path = useMemo(() => {
     const collection: GeoFeatureCollection = {
       type: "FeatureCollection",
@@ -155,6 +207,7 @@ export const GujaratMap = ({ data, metric }: GujaratMapProps) => {
       >
         {features.map((geo, index) => {
           const properties = geo.properties ?? {};
+          // Fallbacks for various common property keys found in Indian geographic datasets
           const districtName =
             properties.dtname ||
             properties.DTNAME ||

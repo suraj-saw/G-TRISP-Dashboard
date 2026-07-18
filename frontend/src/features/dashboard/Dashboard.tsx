@@ -1,4 +1,9 @@
-// frontend/src/features/dashboard/Dashboard.tsx
+/**
+ * @file Dashboard.tsx
+ * @description Main dashboard orchestrator for the Surat mapping application.
+ * @responsibility Manages the layout, data fetching, filter state, and rendering of the central map (with various heatmap/blackspot layers) and temporal/insight panels.
+ * @dependencies framer-motion, react-router-dom, react
+ */
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -106,6 +111,12 @@ type DateBounds = {
 //   };
 // };
 
+/**
+ * Ensures a given date string falls within the specified min/max bounds.
+ * @param {string} value - The input date string (YYYY-MM-DD).
+ * @param {DateBounds} bounds - The minimum and maximum allowed dates.
+ * @returns {string} The clamped date string.
+ */
 const clampDateValue = (value: string, bounds: DateBounds): string => {
   if (!value) return "";
   if (bounds.min && value < bounds.min) return bounds.min;
@@ -113,6 +124,16 @@ const clampDateValue = (value: string, bounds: DateBounds): string => {
   return value;
 };
 
+/**
+ * A controlled date input component that handles local draft state and commits on blur/enter.
+ * @param {Object} props - Component props.
+ * @param {string} props.value - The current committed date value.
+ * @param {string} [props.min] - The minimum allowed date.
+ * @param {string} [props.max] - The maximum allowed date.
+ * @param {(value: string) => void} props.onCommit - Callback fired when the user commits a date.
+ * @param {string} props.className - CSS classes for styling.
+ * @returns {JSX.Element} The date input element.
+ */
 function DateFilterInput({
   value,
   min,
@@ -164,6 +185,13 @@ function DateFilterInput({
   );
 }
 
+/**
+ * Dashboard Component (Surat Specific)
+ * @component_responsibility Orchestrates the Surat map dashboard, synchronizing global filters with map layers and temporal charts.
+ * @state_management Manages a complex `filters` object encompassing spatial, temporal, and categorical parameters, and manages sidebar visibility.
+ * @hooks_usage Uses custom `useDashboard` hook for data fetching. Uses `useMemo` extensively to derive options from data (e.g., available years/severities).
+ * @returns {JSX.Element} The rendered Surat dashboard layout.
+ */
 export default function Dashboard() {
   const navigate = useNavigate();
 

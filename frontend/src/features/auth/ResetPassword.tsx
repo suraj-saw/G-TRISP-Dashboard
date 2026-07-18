@@ -1,9 +1,21 @@
-// frontend/src/features/auth/ResetPassword.tsx
+/**
+ * @file ResetPassword.tsx
+ * @description React component for completing the password reset loop using a secure token.
+ * @responsibility Validates the reset token immediately on mount via the backend, and then processes the submission of a new password payload.
+ * @dependencies react-router-dom (useSearchParams), axios
+ */
 import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import API from "../../api/axios";
 import { ROUTES } from "../../config/constants";
 
+/**
+ * ResetPassword Component
+ * @component_responsibility Manages the final stage of password recovery. Ensures the URL token is valid before letting the user type a new password, and redirects them to login upon success.
+ * @state_management Manages the dual-password form state (`new_password`, `confirm_password`), API transaction status (`verifying`, `idle`, `loading`, `success`, `invalid`), and error/success messages.
+ * @hooks_usage Uses `useSearchParams` to extract the `token` from the URL, and `useEffect` to fire the token validation API request on mount.
+ * @returns {JSX.Element} The rendered token-validation view, reset form, or feedback state.
+ */
 function ResetPassword() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");

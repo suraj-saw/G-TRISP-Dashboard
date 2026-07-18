@@ -1,4 +1,9 @@
-// frontend/src/features/dashboard/GujaratOverview.tsx
+/**
+ * @file GujaratOverview.tsx
+ * @description State-wide overview dashboard for Gujarat.
+ * @responsibility Serves as the landing dashboard, presenting a choropleth map of the state alongside aggregated statistical and temporal insights.
+ * @dependencies react, react-router-dom
+ */
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin } from "lucide-react";
@@ -39,6 +44,10 @@ const defaultFilters: DashboardFilters = {
   visualization_variant: "",
 };
 
+/**
+ * Utility component that registers global export handlers for the Gujarat-level data.
+ * @returns {null} Renders nothing visually.
+ */
 function GujaratExportRegistrar() {
   const { registerExportHandler } = useExportContext();
   useEffect(() => {
@@ -60,6 +69,14 @@ interface Props {
   showAdminControls?: boolean;
 }
 
+/**
+ * GujaratOverview Component
+ * @component_responsibility Renders the primary state-level dashboard, verifying session status and injecting global providers for district insights and exports.
+ * @param {Props} props - Component properties.
+ * @param {boolean} [props.allowAdmin=false] - If true, permits admin users to view this page instead of redirecting.
+ * @param {boolean} [props.showAdminControls=false] - If true, displays admin-specific UI elements (like notification bells).
+ * @returns {JSX.Element} The rendered Gujarat overview.
+ */
 export default function GujaratOverview({
   allowAdmin = false,
   showAdminControls = false,

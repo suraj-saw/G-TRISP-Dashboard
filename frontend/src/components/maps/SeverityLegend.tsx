@@ -1,3 +1,8 @@
+/**
+ * @file SeverityLegend.tsx
+ * @description Map overlay component that displays a legend for accident severity colors.
+ * @responsibility Automatically shows or hides itself based on the current map zoom level and the active visualization layer type to prevent cluttering overview maps.
+ */
 import { useEffect, useState } from "react";
 import { useMap } from "react-map-gl/maplibre";
 
@@ -13,6 +18,13 @@ interface SeverityLegendProps {
   visualizationLayerType?: string;
 }
 
+/**
+ * SeverityLegend Component
+ * @state_management Tracks the map's current `zoom` level to evaluate visibility logic.
+ * @hooks_usage Uses `useMap` to access Maplibre, and `useEffect` to listen to native "zoom" events.
+ * @param {Object} props - Component properties.
+ * @param {string} [props.visualizationLayerType] - The active map layer type (e.g., "clusters", "density_heatmap", "blackspot_greedy").
+ */
 export default function SeverityLegend({
   visualizationLayerType,
 }: SeverityLegendProps) {

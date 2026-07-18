@@ -1,4 +1,9 @@
-// frontend/src/features/dashboard/DistrictDashboard.tsx
+/**
+ * @file DistrictDashboard.tsx
+ * @description Dashboard view tailored for a specific district in Gujarat.
+ * @responsibility Fetches district boundaries, local filters, and scoped dashboard data to present spatial, temporal, and statistical analysis for a single district.
+ * @dependencies framer-motion, react-router-dom, react
+ */
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -117,6 +122,16 @@ const clampDateValue = (value: string, bounds: DateBounds): string => {
   return value;
 };
 
+/**
+ * A controlled date input component that handles local draft state and commits on blur/enter.
+ * @param {Object} props - Component props.
+ * @param {string} props.value - The current committed date value.
+ * @param {string} [props.min] - The minimum allowed date.
+ * @param {string} [props.max] - The maximum allowed date.
+ * @param {(value: string) => void} props.onCommit - Callback fired when the user commits a date.
+ * @param {string} props.className - CSS classes for styling.
+ * @returns {JSX.Element} The date input element.
+ */
 function DateFilterInput({
   value,
   min,
@@ -277,6 +292,12 @@ const emptyDashboardData: DashboardData = {
   violations: [],
 };
 
+/**
+ * Utility component that registers spatial-specific export handlers into the global ExportContext.
+ * @business_rule Allows CSV/Excel exports only when the view is spatial (map).
+ * @param {Object} props - Configuration for the export registrar.
+ * @returns {null} Renders nothing visually.
+ */
 function SpatialExportRegistrar({
   analysisView,
   isBlackspotDetection,
@@ -332,6 +353,13 @@ function SpatialExportRegistrar({
   return null;
 }
 
+/**
+ * DistrictDashboard Component
+ * @component_responsibility Manages the district-specific dashboard logic, handling URL parameters (slug), fetching GeoJSON boundaries, and orchestrating spatial/temporal/statistical views.
+ * @state_management Uses complex state to track current active view (spatial vs statistical vs temporal) and local filters specific to the district.
+ * @hooks_usage Heavily utilizes `useEffect` for boundary resolution, option loading, and data fetching, along with `useParams` for route integration.
+ * @returns {JSX.Element} The rendered district dashboard.
+ */
 export default function DistrictDashboard() {
   const [analysisView, setAnalysisView] = useState<AnalysisView>("spatial");
   const navigate = useNavigate();

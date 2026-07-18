@@ -1,3 +1,7 @@
+/**
+ * @file AccidentHeatmap.tsx
+ * @description (Currently inactive/commented out) A map visualization layer designed to show accident hotspots using a Mapbox/Maplibre cluster approach.
+ */
 // // frontend/src/components/maps/BlackspotMap.tsx
 // import { useMemo } from "react";
 // import Map, { Source, Layer } from "react-map-gl/maplibre";

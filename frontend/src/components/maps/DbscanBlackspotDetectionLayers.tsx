@@ -1,4 +1,9 @@
-// frontend/src/components/maps/DbscanBlackspotDetectionLayers.tsx
+/**
+ * @file DbscanBlackspotDetectionLayers.tsx
+ * @description Renders dynamic map layers for Blackspot detection using the DBSCAN clustering algorithm.
+ * @responsibility Fetches DBSCAN-specific blackspot cluster data, renders Maplibre Source/Layer definitions (polygon hulls and centroids), manages popup interactions, and exports cluster datasets.
+ * @dependencies react-map-gl/maplibre, lucide-react, dashboardApi
+ */
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
@@ -46,6 +51,15 @@ interface HoveredBlackspot {
   crash_ids?: string;
 }
 
+/**
+ * DbscanBlackspotDetectionLayers Component
+ * @state_management Manages local `data` for DBSCAN clusters, `loading`/`error` states, and `hovered` state for map interactions. Uses `useRef` to debounce popup dismissal during hover transitions.
+ * @hooks_usage Uses `useEffect` for data fetching tied to filter changes and map event binding (`mousemove`).
+ * @param {Object} props - Component properties.
+ * @param {DashboardFilters} props.filters - Global dashboard filters applied to the backend query.
+ * @param {Function} [props.fetchFn] - Override function for fetching data.
+ * @param {Function} [props.exportFn] - Override function for exporting CSV data.
+ */
 export default function DbscanBlackspotDetectionLayers({
   filters,
   fetchFn,

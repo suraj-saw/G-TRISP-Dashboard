@@ -1,9 +1,20 @@
-// frontend/src/features/auth/ForgotPassword.tsx
+/**
+ * @file ForgotPassword.tsx
+ * @description React component for handling the password recovery process.
+ * @responsibility Provides a UI form for users to request a password reset link. Handles API communication and displays feedback regarding email dispatch (or test mode link rendering).
+ * @dependencies react-router-dom, axios
+ */
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import API from "../../api/axios";
 import { ROUTES } from "../../config/constants";
 
+/**
+ * ForgotPassword Component
+ * @component_responsibility Manages the form state and lifecycle of the forgot password request.
+ * @state_management Uses local state for `email`, submission `status`, API `message`, and an optional `resetLink` (exposed during test/dev modes).
+ * @returns {JSX.Element} The rendered form layout.
+ */
 function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");

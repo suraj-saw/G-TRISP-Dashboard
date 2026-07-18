@@ -1,7 +1,8 @@
-// frontend/src/components/admin/AddAccidentModal.tsx
 /**
- * Modal form for admins to manually add a Surat accident record.
- * Matches the AdminPanel's indigo/slate glass-morphism aesthetic.
+ * @file AddAccidentModal.tsx
+ * @description Provides a multi-step modal form for administrators to manually input individual accident records for the Surat district.
+ * @responsibility Handles data collection, step-by-step navigation, form validation, and API submission for creating a new accident entry.
+ * @dependencies framer-motion (animations), lucide-react (icons), axios (API requests).
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -178,6 +179,12 @@ const STEPS = [
 // Sub-components
 // ---------------------------------------------------------------------------
 
+/**
+ * Renders a standard styled form label.
+ * @param {Object} props - Component props.
+ * @param {React.ReactNode} props.children - Label text.
+ * @param {boolean} [props.required] - If true, appends a red asterisk indicating a required field.
+ */
 function Label({
   children,
   required,
@@ -193,6 +200,15 @@ function Label({
   );
 }
 
+/**
+ * Renders a standard styled text or numeric input field.
+ * @param {Object} props - Component props.
+ * @param {string} props.value - Current value of the input.
+ * @param {function} props.onChange - Callback to update the value.
+ * @param {string} [props.type="text"] - HTML input type.
+ * @param {string} [props.placeholder] - Placeholder text.
+ * @param {string} [props.min] - Minimum value for number inputs.
+ */
 function Input({
   value,
   onChange,
@@ -218,6 +234,14 @@ function Input({
   );
 }
 
+/**
+ * Renders a standard styled dropdown select menu.
+ * @param {Object} props - Component props.
+ * @param {string} props.value - Currently selected option.
+ * @param {function} props.onChange - Callback to update the value.
+ * @param {string[]} props.options - Array of available string options.
+ * @param {string} [props.placeholder] - Default disabled placeholder option.
+ */
 function Select({
   value,
   onChange,
@@ -249,6 +273,13 @@ function Select({
   );
 }
 
+/**
+ * Renders a combined Label and number-type Input, commonly used for casualty and vehicle counts.
+ * @param {Object} props - Component props.
+ * @param {string} props.value - Current numeric value (as a string).
+ * @param {function} props.onChange - Callback to update the value.
+ * @param {string} props.label - Text for the associated label.
+ */
 function NumberInput({
   value,
   onChange,
@@ -284,6 +315,12 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 // Step panels
 // ---------------------------------------------------------------------------
 
+/**
+ * Renders Step 1: Basic Information (ID, Police Station, Date, Severity).
+ * @param {Object} props - Component props.
+ * @param {FormData} props.form - Current form state.
+ * @param {function} props.update - Callback to update a specific form field.
+ */
 function StepBasicInfo({
   form,
   update,
@@ -336,6 +373,13 @@ function StepBasicInfo({
   );
 }
 
+/**
+ * Renders Step 2: Location (Coordinates, Road Name, Classification).
+ * @business_rule Coordinates are expected to be within the Surat district bounding box.
+ * @param {Object} props - Component props.
+ * @param {FormData} props.form - Current form state.
+ * @param {function} props.update - Callback to update a specific form field.
+ */
 function StepLocation({
   form,
   update,
@@ -397,6 +441,12 @@ function StepLocation({
   );
 }
 
+/**
+ * Renders Step 3: Casualties and Vehicles involved.
+ * @param {Object} props - Component props.
+ * @param {FormData} props.form - Current form state.
+ * @param {function} props.update - Callback to update a specific form field.
+ */
 function StepCasualties({
   form,
   update,
@@ -475,6 +525,12 @@ function StepCasualties({
   );
 }
 
+/**
+ * Renders Step 4: Collision details and environmental conditions.
+ * @param {Object} props - Component props.
+ * @param {FormData} props.form - Current form state.
+ * @param {function} props.update - Callback to update a specific form field.
+ */
 function StepConditions({
   form,
   update,
@@ -555,6 +611,12 @@ function StepConditions({
 // Validation
 // ---------------------------------------------------------------------------
 
+/**
+ * Validates the fields of the current step before allowing progression.
+ * @param {number} step - The step number being validated (1 to 4).
+ * @param {FormData} form - The current form state.
+ * @returns {string | null} An error message string if validation fails, or null if valid.
+ */
 function validateStep(step: number, form: FormData): string | null {
   if (step === 1) {
     if (!form.police_station.trim()) return "Police station is required.";
@@ -574,6 +636,14 @@ interface Props {
   onSuccess: (accidentId: string) => void;
 }
 
+/**
+ * AddAccidentModal Component
+ * @responsibility Orchestrates the 4-step accident entry form, manages local form state, and submits data to the backend API.
+ * @state_management Uses local state for tracking the current step, form fields (FormData), submission status, and validation errors.
+ * @data_flow Form fields are updated via a unified `update` callback -> Progress is gated by `validateStep` -> Final payload is constructed and POSTed to the API.
+ * @hooks_usage Uses useState for state, useEffect for keyboard shortcuts (Escape to close) and modal reset on open, and useCallback to stabilize the field update function.
+ * @rendering_flow Renders a step indicator and animated form bodies that swap out based on the `step` index.
+ */
 export default function AddAccidentModal({ open, onClose, onSuccess }: Props) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
@@ -581,7 +651,9 @@ export default function AddAccidentModal({ open, onClose, onSuccess }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [stepError, setStepError] = useState<string | null>(null);
 
-  // Reset on open
+  /**
+   * Resets form state completely whenever the modal is opened to prevent stale data.
+   */
   useEffect(() => {
     if (open) {
       setStep(1);
@@ -591,7 +663,9 @@ export default function AddAccidentModal({ open, onClose, onSuccess }: Props) {
     }
   }, [open]);
 
-  // Close on Escape
+  /**
+   * Listens for the Escape key to close the modal if it is open.
+   */
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -601,11 +675,20 @@ export default function AddAccidentModal({ open, onClose, onSuccess }: Props) {
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
+  /**
+   * Unified updater for any field in the FormData object.
+   * @param {keyof FormData} k - The form property key to update.
+   * @param {string} v - The new string value.
+   * @side_effects Clears the current step error to allow the user to retry progressing.
+   */
   const update = useCallback((k: keyof FormData, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
     setStepError(null);
   }, []);
 
+  /**
+   * Advances the wizard to the next step if the current step passes validation.
+   */
   const goNext = () => {
     const err = validateStep(step, form);
     if (err) {
@@ -616,11 +699,20 @@ export default function AddAccidentModal({ open, onClose, onSuccess }: Props) {
     setStep((s) => Math.min(s + 1, STEPS.length));
   };
 
+  /**
+   * Returns the wizard to the previous step, clearing any step-level validation errors.
+   */
   const goBack = () => {
     setStepError(null);
     setStep((s) => Math.max(s - 1, 1));
   };
 
+  /**
+   * Constructs the final payload from local form state, parses numbers and nulls, and submits to the backend API.
+   * @business_rule Empty strings for optional fields are converted to `null` to respect database schemas.
+   * Numeric fields are parsed to integers/floats.
+   * @side_effects Sets the submitting state during network request, and invokes onSuccess callback if successful.
+   */
   const handleSubmit = async () => {
     setSubmitting(true);
     setError(null);

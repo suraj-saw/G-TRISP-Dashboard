@@ -1,4 +1,8 @@
-// frontend/src/features/dashboard/filterConfig.ts
+/**
+ * @file filterConfig.ts
+ * @description Centralized configuration for dashboard filter options and logic.
+ * @responsibility Defines available filters, visualization variants, and utility functions for determining which filters apply to which visualization types.
+ */
 import type { DashboardFilters } from "../../types/dashboard";
 import { DEFAULT_BASE_MAP, GEO_FILTER_LABEL } from "../../config/constants";
 import { isBlackspotVisualization } from "../../utils/dashboardFilters";

@@ -1,3 +1,7 @@
+/**
+ * @file BlackspotMap.tsx
+ * @description (Currently inactive/commented out) A map visualization layer designed to show legacy blackspot heatmaps.
+ */
 // // frontend/src/components/maps/BlackspotMap.tsx
 // import { useMemo } from "react";
 // import Map, { Source, Layer } from "react-map-gl/maplibre";

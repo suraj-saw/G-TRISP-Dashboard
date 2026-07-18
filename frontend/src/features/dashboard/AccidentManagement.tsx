@@ -1,8 +1,8 @@
-// frontend/src/features/dashboard/AccidentManagement.tsx
 /**
- * Enterprise-grade data management table for accident records.
- * Features: all database columns, column visibility toggle, column pinning,
- * horizontal scroll, advanced column-specific search, pagination, edit/delete.
+ * @file AccidentManagement.tsx
+ * @description Enterprise-grade data management table for accident records.
+ * @responsibility Provides a comprehensive data table with column visibility toggling, advanced column-specific filtering, global search, pagination, and bulk actions (edit/delete).
+ * @dependencies framer-motion, lucide-react, react
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -96,6 +96,13 @@ const FILTER_OPTION_KEY: Partial<
   visibility: "visibilities",
 };
 
+/**
+ * AccidentManagement Component
+ * @component_responsibility Manages the state and rendering of the primary accident data table, including fetching data, filtering, column visibility, and row selection.
+ * @state_management Uses complex local state for pagination, debounced search, active filters, selected rows, and visible columns.
+ * @hooks_usage Uses `useEffect` for data loading and debouncing, and `useCallback` to memoize the data fetch routine.
+ * @returns {JSX.Element} The rendered data table and toolbars.
+ */
 export default function AccidentManagement() {
   const [accidents, setAccidents] = useState<AccidentRecord[]>([]);
   const [total, setTotal] = useState(0);

@@ -1,4 +1,8 @@
-// frontend/src/components/layout/FilterSelect.tsx
+/**
+ * @file FilterSelect.tsx
+ * @description A highly customized, accessible, portaled dropdown select component supporting single and multi-select modes.
+ * @responsibility Escapes container overflow clipping by rendering the dropdown menu via React Portals, and auto-positions itself (flipping up or down) based on available viewport space.
+ */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
@@ -37,6 +41,11 @@ type MenuPos =
       maxHeight: number;
     };
 
+/**
+ * FilterSelect Component
+ * @state_management Maintains `open` (dropdown visibility) and `pos` (calculated fixed coordinates for the portaled menu).
+ * @hooks_usage Uses `useLayoutEffect` to synchronously calculate menu position before paint to prevent flickering. Uses `useEffect` for global click-outside and scroll/resize repositioning listeners.
+ */
 export default function FilterSelect({
   value,
   options,
@@ -66,7 +75,10 @@ export default function FilterSelect({
     }
   }
 
-  // Position the menu from the trigger's on-screen rect (escapes overflow clipping).
+  /**
+   * Calculates the exact fixed coordinates for the dropdown menu.
+   * @business_rule Prevents the menu from being cut off by the bottom of the screen. If there's more room above the trigger than below, and the space below is insufficient, it renders upwards.
+   */
   const updatePosition = () => {
     const el = triggerRef.current;
     if (!el) return;
@@ -135,6 +147,10 @@ export default function FilterSelect({
     };
   }, [open]);
 
+  /**
+   * Handles selection toggling for multi-select, or direct selection for single-select.
+   * @param {string} optionValue - The value of the clicked option.
+   */
   const handleOptionClick = (optionValue: string) => {
     if (isMulti) {
       const arr = value as string[];

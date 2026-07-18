@@ -275,6 +275,12 @@ export const DayOfWeekSection: React.FC<{ data: TemporalAnalysisData }> = ({
   );
 };
 
+/**
+ * Renders a horizontal Bar chart grouping accidents by categorical time periods
+ * (e.g., Morning, Afternoon, Evening, Night).
+ * 
+ * Component Responsibility: Provide a broader time-of-day perspective compared to strict hourly trends.
+ */
 export const TimePeriodSection: React.FC<{ data: TemporalAnalysisData }> = ({
   data,
 }) => {
@@ -320,6 +326,12 @@ export const TimePeriodSection: React.FC<{ data: TemporalAnalysisData }> = ({
   );
 };
 
+/**
+ * Renders a Bar chart illustrating the overall seasonality by aggregating all historical data
+ * across the 12 calendar months.
+ * 
+ * Component Responsibility: Identify months that consistently exhibit higher accident rates.
+ */
 export const MonthlySeasonalitySection: React.FC<{
   data: TemporalAnalysisData;
 }> = ({ data }) => {
@@ -359,6 +371,11 @@ export const MonthlySeasonalitySection: React.FC<{
   );
 };
 
+/**
+ * Renders a Line chart showing the year-over-year trend of total accidents.
+ * 
+ * Component Responsibility: Track long-term growth or decline in accident rates.
+ */
 export const AnnualTrendSection: React.FC<{ data: TemporalAnalysisData }> = ({
   data,
 }) => {

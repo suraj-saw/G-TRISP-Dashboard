@@ -1,3 +1,8 @@
+/**
+ * @file DistrictAnalysisTabs.tsx
+ * @description Renders the tabbed navigation for switching between Spatial, Statistical, and Temporal views in the District Dashboard.
+ * @responsibility Displays navigation tabs and conditionally renders appropriate export buttons depending on the active view and feature flags.
+ */
 import React from "react";
 import ExportButton from "../layout/ExportButton";
 import BlackspotExportButton from "../layout/BlackspotExportButton";
@@ -42,6 +47,13 @@ const tabs: { id: AnalysisView; label: string; icon: string }[] = [
   },
 ];
 
+/**
+ * DistrictAnalysisTabs Component
+ * @param {Object} props - Component properties.
+ * @param {AnalysisView} props.activeView - Currently selected view ("spatial" | "statistical" | "temporal").
+ * @param {Function} props.onViewChange - Callback triggered when a tab is clicked.
+ * @param {DashboardFilters} props.filters - Global dashboard filters (passed to export buttons).
+ */
 const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
   activeView,
   onViewChange,

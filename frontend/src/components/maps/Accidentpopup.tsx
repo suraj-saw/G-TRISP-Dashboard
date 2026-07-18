@@ -1,7 +1,9 @@
-// frontend/src/components/maps/AccidentPopup.tsx
-// Shared accident detail popup used by AccidentMarkerMap, BlackspotDetectionLayers,
-// DbscanBlackspotDetectionLayers, and WeightedKdeHeatmapLayers.
-
+/**
+ * @file AccidentPopup.tsx
+ * @description Shared accident detail popup used across multiple map layers.
+ * @responsibility Renders a map-anchored tooltip displaying detailed accident metadata (severity, date, ID, type, coords).
+ * @dependencies react-map-gl/maplibre
+ */
 import { Popup } from "react-map-gl/maplibre";
 
 export interface AccidentPopupData {
@@ -21,6 +23,11 @@ interface Props {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * Normalizes severity strings from the database into standardized uppercase labels.
+ * @param {string} raw - Raw severity string from the backend.
+ * @returns {string} Standardized severity label.
+ */
 function severityLabel(raw: string): string {
   const map: Record<string, string> = {
     fatal: "FATAL",
@@ -31,6 +38,11 @@ function severityLabel(raw: string): string {
   return map[raw?.toLowerCase()] ?? raw?.toUpperCase() ?? "UNKNOWN";
 }
 
+/**
+ * Maps accident severity to specific Tailwind CSS color classes for the popup badge.
+ * @param {string} raw - Raw severity string.
+ * @returns {string} Tailwind CSS class string.
+ */
 function severityColor(raw: string): string {
   switch (raw?.toLowerCase()) {
     case "fatal":
@@ -46,6 +58,11 @@ function severityColor(raw: string): string {
   }
 }
 
+/**
+ * Formats raw ISO date strings into a readable GB format (dd MMM yyyy).
+ * @param {string} raw - Raw date string.
+ * @returns {string} Formatted date string or fallback.
+ */
 function formatDate(raw: string): string {
   if (!raw) return "—";
   // Handle ISO: "2025-08-12T..."
@@ -64,6 +81,13 @@ function formatDate(raw: string): string {
 
 // ── component ─────────────────────────────────────────────────────────────────
 
+/**
+ * AccidentPopup Component
+ * @responsibility Renders a floating, anchored popup on the map for a specific accident.
+ * @param {Object} props - Component properties.
+ * @param {AccidentPopupData} props.data - The accident metadata to display.
+ * @param {Function} props.onClose - Callback triggered when the popup is dismissed.
+ */
 export default function AccidentPopup({ data, onClose }: Props) {
   const {
     longitude,

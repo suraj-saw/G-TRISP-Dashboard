@@ -1,4 +1,9 @@
-// frontend/src/components/maps/GujaratChoroplethMap.tsx
+/**
+ * @file GujaratChoroplethMap.tsx
+ * @description A D3-based interactive choropleth map of Gujarat districts.
+ * @responsibility Fetches district boundaries (GeoJSON) and summary accident counts, renders them as SVG paths, and scales their fill color proportionally to the accident counts. Handles routing to specific district dashboards on click.
+ * @dependencies d3-geo (projection/path), d3-scale (color scaling), lucide-react (status indicators).
+ */
 
 import { useEffect, useState, useRef, useCallback } from "react";
 
@@ -42,6 +47,11 @@ interface DistrictFeature {
 
 
 
+/**
+ * GujaratChoroplethMap Component
+ * @state_management Manages data arrays (`districts`), UI state (`loading`, `error`), and `hoveredSlug` for localized DOM updates.
+ * @hooks_usage Heavy use of `useEffect` for data fetching + geometry normalizing (D3 winding rules), and `useCallback` for event handlers.
+ */
 export default function GujaratChoroplethMap() {
 
   const navigate = useNavigate();
@@ -144,6 +154,11 @@ export default function GujaratChoroplethMap() {
 
         // sized rectangle). Normalize by signed area instead.
 
+        /**
+         * Calculates the signed area of a GeoJSON coordinate ring using the shoelace formula.
+         * @param {GeoJSON.Position[]} ring - Array of coordinate pairs.
+         * @returns {number} Signed area (negative indicates clockwise winding).
+         */
         const signedArea = (ring: GeoJSON.Position[]) => {
 
           let area = 0;
@@ -164,6 +179,12 @@ export default function GujaratChoroplethMap() {
 
 
 
+        /**
+         * Enforces strict winding rules for a ring based on D3's expectations.
+         * @param {GeoJSON.Position[]} ring - The coordinate ring.
+         * @param {boolean} clockwise - Target winding direction.
+         * @returns {GeoJSON.Position[]} Oriented ring.
+         */
         const orientRing = (
 
           ring: GeoJSON.Position[],
@@ -186,6 +207,12 @@ export default function GujaratChoroplethMap() {
 
 
 
+        /**
+         * Recursively normalizes Polygon/MultiPolygon winding to fix the "inverse world mask" bug in D3 spherical projections.
+         * @business_rule D3 requires exterior rings to be clockwise and interior holes counter-clockwise.
+         * @param {GeoJSON.Geometry} geometry - Original geometry.
+         * @returns {GeoJSON.Geometry} Properly oriented geometry.
+         */
         const orientGeometry = (geometry: GeoJSON.Geometry): GeoJSON.Geometry => {
 
           if (geometry.type === "Polygon") {

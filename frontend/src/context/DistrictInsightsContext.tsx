@@ -1,3 +1,9 @@
+/**
+ * @file DistrictInsightsContext.tsx
+ * @description React context for managing statewide and district-level summary insights.
+ * @responsibility Fetches, caches, and provides access to aggregated insights (accident counts, fatalities, etc.) used primarily by tooltip cards on the statewide map.
+ * @dependencies react (Context API), gujaratDashboardApi
+ */
 import {
   createContext,
   useContext,
@@ -13,23 +19,47 @@ import {
   type GujaratWideSummary,
 } from "../api/gujaratDashboardApi";
 
-/** Context interface for district insights data */
+/**
+ * Context interface defining the state and methods for accessing district insights.
+ */
 interface Ctx {
-  gujaratLoading: boolean; // blocks initial paint only — should be fast
-  districtsReady: boolean; // becomes true once hover data is available
+  /** True when the initial statewide overview payload is loading (blocks initial paint). */
+  gujaratLoading: boolean;
+  /** Becomes true once all district-level hover data is available. */
+  districtsReady: boolean;
+  /** True if the district-level data fetch failed. */
   districtsError: boolean;
+  /** Error message string, if an error occurred during statewide fetching. */
   error: string | null;
+  /** Cached statewide aggregated data. */
   gujarat: GujaratWideSummary | null;
+  /** Name of the currently hovered district (used to sync hover state across UI components). */
   hoveredDistrict: string | null;
+  /** Sets the currently hovered district. */
   setHoveredDistrict: (name: string | null) => void;
-  /** "found" = has data, "empty" = loaded but zero accidents, "pending" = still loading */
+  /** 
+   * Determines the data availability status for a specific district.
+   * @param name The district name
+   * @returns "found" (has data), "empty" (loaded but zero accidents), "pending" (still loading), or "unavailable" (fetch error)
+   */
   getDistrictStatus: (name: string) => "found" | "empty" | "pending" | "unavailable";
+  /** 
+   * Retrieves specific insight data for a named district.
+   * @param name The district name
+   * @returns District data or undefined if not found.
+   */
   getDistrict: (name: string) => DistrictInsight | undefined;
 }
 
 const DistrictInsightsContext = createContext<Ctx | undefined>(undefined);
 const normalize = (name: string) => name.trim().toLowerCase();
 
+/**
+ * DistrictInsightsProvider Component
+ * @component_responsibility Wrapper component that initiates parallel fetching of statewide overviews and detailed district records, managing their respective loading and error states.
+ * @state_management Manages dictionaries of `DistrictInsight` objects mapped by district name.
+ * @hooks_usage Uses `useEffect` for data fetching on mount. Uses `useMemo` to build O(1) lookup maps and stabilize the Context value to prevent unnecessary re-renders.
+ */
 export function DistrictInsightsProvider({
   children,
 }: {
@@ -143,6 +173,11 @@ export function DistrictInsightsProvider({
   );
 }
 
+/**
+ * Custom hook to consume the DistrictInsightsContext.
+ * @returns {Ctx} The district insights context value.
+ * @throws {Error} If called outside of a DistrictInsightsProvider tree.
+ */
 export function useDistrictInsights() {
   const ctx = useContext(DistrictInsightsContext);
   if (!ctx)

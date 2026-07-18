@@ -1,4 +1,9 @@
-// frontend/src/features/dashboard/AdminPanel.tsx
+/**
+ * @file AdminPanel.tsx
+ * @description Admin Control Panel for user management and system activity.
+ * @responsibility Provides interfaces to review pending registrations, manage active users, and view system notifications/activity logs.
+ * @dependencies framer-motion, lucide-react, react-router-dom
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -55,6 +60,12 @@ const itemVariants: Variants = {
   },
 };
 
+/**
+ * Renders a visual badge indicating the user's current status.
+ * @param {Object} props - Component props.
+ * @param {User["status"]} props.status - The status to render (approved, rejected, pending).
+ * @returns {JSX.Element} The styled badge.
+ */
 function StatusBadge({ status }: { status: User["status"] }) {
   const styles: Record<User["status"], string> = {
     approved: "bg-emerald-100/80 text-emerald-700 border-emerald-200/50",
@@ -78,6 +89,13 @@ function StatusBadge({ status }: { status: User["status"] }) {
   );
 }
 
+/**
+ * AdminPanel Component
+ * @component_responsibility Manages the core admin UI, including tabbed views for pending vs all users, activity logs, and actionable confirmation dialogs.
+ * @state_management Manages large sets of user data, notification state, and complex confirmation dialog parameters.
+ * @hooks_usage Heavy use of `useEffect` for continuous session polling and data refreshing, ensuring the admin sees real-time updates.
+ * @returns {JSX.Element} The rendered admin panel.
+ */
 function AdminPanel() {
   const navigate = useNavigate();
 

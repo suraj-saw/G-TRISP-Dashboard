@@ -1,3 +1,9 @@
+/**
+ * @file TemporalAnalysis.tsx
+ * @description The primary dashboard view for analyzing time-based accident patterns (hourly, daily, monthly trends).
+ * @responsibility Fetches temporal analytics via `dashboardApi`, manages local loading/error states, orchestrates the export capability, and renders a comprehensive layout of KPI cards and varied Recharts components.
+ * @dependencies recharts (charting), lucide-react (icons), ExportContext (CSV/Excel downloads).
+ */
 import { useEffect, useState } from "react";
 import { AlertCircle, CalendarDays, Clock3, Loader2, Moon, Timer } from "lucide-react";
 import { fetchTemporalAnalysis } from "../../api/dashboardApi";
@@ -45,6 +51,10 @@ const emptyTemporalData: TemporalAnalysisData = {
   },
 };
 
+/**
+ * Maps the raw temporal summary data into an array of structured objects for the KPI cards.
+ * @param {TemporalAnalysisData} data - The aggregated temporal data payload.
+ */
 const cards = (data: TemporalAnalysisData) => [
   {
     label: "Total accidents",
@@ -96,6 +106,10 @@ const SEVERITY_COLORS: Record<string, string> = {
   "Damage Only": "#94a3b8",
 };
 
+/**
+ * Custom tooltip renderer for Recharts, ensuring consistent styling across the temporal bar/line/pie charts.
+ * @param {Object} props - Standard Recharts tooltip props.
+ */
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
@@ -112,11 +126,21 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+/**
+ * TemporalAnalysis Component
+ * @responsibility Fetches data whenever global filters change, registers its state with the top-level Export button, and renders a grid of temporal insights (Heatmap, Bar, Line, Pie).
+ * @state_management Maintains `data` (the fetched TemporalAnalysisData), `loading` boolean, and `error` string.
+ * @hooks_usage Uses `useEffect` for data fetching (with an `active` flag to prevent state updates if the component unmounts during fetch) and `useExportContext` to register the PDF/CSV export handler.
+ * @param {Object} props - Component properties.
+ * @param {DashboardFilters} props.filters - Global dashboard filters to apply to the data request.
+ * @param {Function} [props.fetchFn] - Optional override for the data fetching function (useful for testing or specialized views).
+ */
 export default function TemporalAnalysis({ filters, fetchFn }: Props) {
   const [data, setData] = useState<TemporalAnalysisData>(emptyTemporalData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /** Data fetching effect triggered by any change in the `filters` dependency array. */
   useEffect(() => {
     let active = true;
     setLoading(true);

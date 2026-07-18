@@ -1,3 +1,7 @@
+/**
+ * @file ExportAnalysisButton.tsx
+ * @description (Currently inactive/commented out) Designed to handle cluster-specific or generic analysis exports (CSV/Excel/PNG).
+ */
 // import { useState, useRef, useEffect } from "react";
 // import { createPortal } from "react-dom";
 // import { Download, FileText, FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Image as ImageIcon } from "lucide-react";

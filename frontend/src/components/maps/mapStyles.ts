@@ -1,5 +1,16 @@
+/**
+ * @file mapStyles.ts
+ * @description Manages map basemap definitions (raster/vector tiles).
+ * @responsibility Provides configuration objects for various basemap styles (OpenStreetMap, Carto, Google Hybrid) used across all Maplibre components.
+ */
 // frontend/src/components/maps/mapStyles.ts
 
+/**
+ * Utility to generate a Mapbox GL Style object for a raster tile source.
+ * @param {string} id - Identifier for the source.
+ * @param {string} tileUrl - Tile URL template (e.g., /{z}/{x}/{y}).
+ * @param {string} attribution - Attribution text to display.
+ */
 function createRasterStyle(id: string, tileUrl: string, attribution: string) {
   return {
     version: 8,
@@ -133,6 +144,11 @@ export const MAP_STYLES = [
   // },
 ] as const;
 
+/**
+ * Retrieves the style URL or style object for a given basemap ID.
+ * @param {string} [baseMapId] - The ID of the requested basemap.
+ * @returns {any} The map style configuration or URL (defaults to the first defined style).
+ */
 export function getMapStyleUrl(baseMapId?: string): any {
   const current = MAP_STYLES.find((style) => style.id === baseMapId);
   return current ? current.url : MAP_STYLES[0].url;

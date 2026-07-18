@@ -1,7 +1,26 @@
+/**
+ * @file AccidentTrend.tsx
+ * @description Provides a time-series area chart visualizing the trend of accidents and fatalities over time.
+ * @responsibility Renders an interactive `recharts` AreaChart mapping time points (months) to accident/fatality counts.
+ * @dependencies recharts (charting library).
+ */
+
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import type { TimeSeriesPoint } from "../../types/dashboard";
 
+/**
+ * AccidentTrend Component
+ * @responsibility Displays an area chart for accident data trends.
+ * @rendering_flow 
+ * 1. Checks if `data` is empty or undefined, rendering a fallback UI if so.
+ * 2. Uses `ResponsiveContainer` to adapt to parent width/height.
+ * 3. Renders two `Area` overlays: one for general accidents (filled with gradient) and one for fatalities (outline only).
+ * @param {Object} props - Component properties.
+ * @param {TimeSeriesPoint[]} props.data - Array of time-series objects containing monthly accident and fatality metrics.
+ * @returns {JSX.Element} The rendered chart or a fallback message.
+ */
 export const AccidentTrend = ({ data }: { data: TimeSeriesPoint[] }) => {
+  // Edge case: Handle empty or missing dataset gracefully
   if (!data || data.length === 0) return <div className="h-[260px] flex items-center justify-center text-sm text-gray-400">No data available</div>;
 
   return (

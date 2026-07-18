@@ -1,4 +1,8 @@
-// frontend/src/components/maps/SuratBaseMap.tsx
+/**
+ * @file SuratBaseMap.tsx
+ * @description The foundational map component for rendering spatial data specifically for the city of Surat.
+ * @responsibility Manages the core Maplibre instance, handles viewport resizing, fetches the Surat city boundary, applies an inverted polygon mask, and exposes imperative map controls.
+ */
 import {
   useEffect,
   useRef,
@@ -36,6 +40,12 @@ const WORLD_RING: GeoJSON.Position[] = [
   [-180, -90],
 ];
 
+/**
+ * Constructs an inverted polygon (mask) to obscure areas outside the Surat city boundary.
+ * @business_rule Creates a massive outer bounding box (`WORLD_RING`) and subtracts the city geometries, creating a "hole".
+ * @param {GeoJSON.FeatureCollection} fc - The feature collection representing the boundary.
+ * @returns {GeoJSON.Feature<GeoJSON.Polygon>} The inverted polygon feature.
+ */
 function buildMask(
   fc: GeoJSON.FeatureCollection
 ): GeoJSON.Feature<GeoJSON.Polygon> {
@@ -54,6 +64,11 @@ function buildMask(
   };
 }
 
+/**
+ * Calculates the bounding box (bbox) for a given FeatureCollection.
+ * @param {GeoJSON.FeatureCollection} fc - The feature collection.
+ * @returns {[number, number, number, number] | null} Bounding box as [minLng, minLat, maxLng, maxLat].
+ */
 function getBbox(
   fc: GeoJSON.FeatureCollection
 ): [number, number, number, number] | null {
@@ -96,6 +111,11 @@ interface Props {
   overlays?: ReactNode;
 }
 
+/**
+ * SuratBaseMap Component
+ * @state_management Manages map loading, mask geometry, and error states.
+ * @hooks_usage Uses `useCallback` for memoized bounds fitting, `useEffect` for data fetching and resize loops, and `useImperativeHandle` to expose `resize` to parent components.
+ */
 const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
   (
     {

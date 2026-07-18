@@ -1,14 +1,12 @@
-// frontend/src/components/layout/TopBar.tsx
+/**
+ * @file TopBar.tsx
+ * @description The primary global application header.
+ * @responsibility Displays branding, toggles the sidebar, provides navigation to the Admin Panel, and manages the user profile dropdown including the logout flow.
+ */
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ChevronDown,
-  LogOut,
-  PanelLeft,
-  Mail,
-  Info,
-} from "lucide-react";
+import { ChevronDown, LogOut, PanelLeft, Mail, Info } from "lucide-react";
 
 import NotificationBell from "./NotificationBell";
 import type { User } from "../../types/user";
@@ -16,6 +14,9 @@ import { TOPBAR_HEIGHT_PX, TOPBAR_Z_INDEX } from "../../config/layout";
 import ConfirmDialog from "../common/ConfirmDialog";
 import { ROUTES } from "../../config/constants";
 
+/**
+ * Props for the TopBar component.
+ */
 interface Props {
   appName: string;
   user: User;
@@ -27,6 +28,11 @@ interface Props {
   adminPanelPath?: string;
 }
 
+/**
+ * TopBar Component
+ * @state_management Controls the profile dropdown visibility (`open`) and the logout confirmation dialog (`logoutDialogOpen`).
+ * @hooks_usage Uses `useNavigate` for routing, `useEffect` for clicking-outside-to-close behavior on the dropdown.
+ */
 function TopBar({
   appName,
   user,
@@ -38,10 +44,20 @@ function TopBar({
   adminPanelPath,
 }: Props) {
   const navigate = useNavigate();
+
+  // State for toggling the user profile dropdown menu
   const [open, setOpen] = useState(false);
+
+  // State for toggling the logout confirmation modal
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+
+  // Ref to track clicks outside the dropdown menu
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Effect to handle "click outside" logic for the user dropdown.
+   * Closes the dropdown if the user clicks anywhere else on the document.
+   */
   useEffect(() => {
     const closeDropdown = (event: MouseEvent) => {
       if (
@@ -55,19 +71,26 @@ function TopBar({
     return () => document.removeEventListener("mousedown", closeDropdown);
   }, []);
 
+  /**
+   * Executes the actual logout process and closes all menus.
+   */
   const handleLogoutConfirm = () => {
     setLogoutDialogOpen(false);
     setOpen(false);
     onLogout();
   };
 
+  /**
+   * Dismisses the logout confirmation dialog without logging out.
+   */
   const handleLogoutCancel = () => {
     setLogoutDialogOpen(false);
   };
 
   return (
-    <header
-      style={{ height: `${TOPBAR_HEIGHT_PX}px` }}
+    <>
+      <header
+        style={{ height: `${TOPBAR_HEIGHT_PX}px` }}
       className={`
         ${TOPBAR_Z_INDEX}
         w-full
@@ -77,7 +100,7 @@ function TopBar({
         border-b border-slate-100
       `}
     >
-      {/* LEFT SIDE */}
+      {/* LEFT SIDE: Sidebar Toggle & Branding */}
       <div className="flex items-center gap-4">
         {onToggleSidebar && (
           <button
@@ -106,14 +129,16 @@ function TopBar({
           </button>
         )}
 
+        {/* Divider */}
         <span className="hidden sm:block h-5 w-px bg-slate-200" aria-hidden />
 
+        {/* App Title */}
         <h1 className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 to-indigo-950 bg-clip-text text-transparent">
           {appName}
         </h1>
       </div>
 
-      {/* RIGHT SIDE */}
+      {/* RIGHT SIDE: Navigation & Profile Dropdown */}
       <div className="flex items-center gap-3">
         {/* About Button */}
         <button
@@ -128,7 +153,7 @@ function TopBar({
           <span className="hidden lg:inline">About</span>
         </button>
 
-        {/* Admin Panel Button (styled exactly like the target dashboard's pill buttons) */}
+        {/* Admin Panel Button */}
         {adminPanelPath && (
           <button
             onClick={() => navigate(adminPanelPath)}
@@ -144,12 +169,14 @@ function TopBar({
           </button>
         )}
 
+        {/* Notification Bell */}
         {showNotificationBell && (
           <div className="p-0.5 rounded-xl hover:bg-slate-50 transition-colors">
             <NotificationBell count={notificationCount} />
           </div>
         )}
 
+        {/* Divider */}
         <span className="hidden sm:block h-5 w-px bg-slate-200" aria-hidden />
 
         {/* User Profile Dropdown */}
@@ -211,7 +238,7 @@ function TopBar({
                 animate-in fade-in slide-in-from-top-2 duration-200
               "
             >
-              {/* HEADER — Styled with target dashboard's rich Indigo theme */}
+              {/* DROPDOWN HEADER */}
               <div className="px-5 pt-6 pb-5 bg-gradient-to-br from-indigo-900 to-slate-900">
                 <div className="flex items-center gap-3.5">
                   <div
@@ -245,7 +272,7 @@ function TopBar({
                 </div>
               </div>
 
-              {/* BODY */}
+              {/* DROPDOWN BODY */}
               <div className="p-2">
                 <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-slate-50 transition-colors">
                   <div className="h-8 w-8 shrink-0 rounded-lg bg-indigo-50 flex items-center justify-center">
@@ -263,7 +290,7 @@ function TopBar({
 
                 <div className="my-1 h-px bg-slate-100" />
 
-                {/* LOGOUT */}
+                {/* LOGOUT TRIGGER */}
                 <button
                   onClick={() => setLogoutDialogOpen(true)}
                   className="
@@ -286,7 +313,12 @@ function TopBar({
           )}
         </div>
       </div>
+    </header>
 
+      {/* 
+        LOGOUT CONFIRMATION MODAL 
+        Now properly centered based on ConfirmDialog's flex layout 
+      */}
       <ConfirmDialog
         open={logoutDialogOpen}
         title="Sign out"
@@ -297,7 +329,7 @@ function TopBar({
         onConfirm={handleLogoutConfirm}
         onCancel={handleLogoutCancel}
       />
-    </header>
+    </>
   );
 }
 

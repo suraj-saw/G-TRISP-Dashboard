@@ -1,3 +1,8 @@
+/**
+ * @file HourDayHeatmap.tsx
+ * @description Renders a dense 24x7 heatmap visualization of accident frequency by hour and day of the week.
+ * @responsibility Maps 2D temporal data (hour vs day) into a color-scaled CSS grid, ensuring consistent weekday ordering.
+ */
 import type { HourDayCount } from "../../types/dashboard";
 import { WEEKDAY_ORDER } from "../../config/constants";
 
@@ -5,6 +10,10 @@ interface Props {
   data: HourDayCount[];
 }
 
+/**
+ * Formats a 24-hour integer into a compact 12-hour string (e.g., 0 -> "12a", 13 -> "1p").
+ * @param {number} hour - Integer from 0 to 23.
+ */
 const hourLabel = (hour: number): string => {
   if (hour === 0) return "12a";
   if (hour === 12) return "12p";
@@ -24,6 +33,12 @@ const HEATMAP_COLORS = [
 const HEATMAP_COLOR_LOW = "#FDE68A";
 const HEATMAP_COLOR_EMPTY = "#F1F5F9";
 
+/**
+ * Determines the cell color based on the ratio of its count to the global maximum.
+ * @business_rule Scales colors relative to the dataset's peak, ensuring the heatmap highlights relative severity regardless of absolute volume.
+ * @param {number} count - Accident count for the specific cell.
+ * @param {number} max - Maximum accident count across all cells in the current dataset.
+ */
 const colorFor = (count: number, max: number): string => {
   if (!count || !max) return HEATMAP_COLOR_EMPTY;
   const ratio = count / max;
@@ -36,10 +51,21 @@ const colorFor = (count: number, max: number): string => {
 // How frequently to render an hour label (every N hours)
 const HOUR_LABEL_INTERVAL = 3;
 
+/**
+ * HourDayHeatmap Component
+ * @param {Object} props - Component properties.
+ * @param {HourDayCount[]} props.data - Array of accident counts mapped to a specific day and hour.
+ */
 export default function HourDayHeatmap({ data }: Props) {
+  /** 
+   * Pre-computes a O(1) lookup map for fast grid rendering.
+   * Key format: "DayName-Hour" (e.g., "Monday-14").
+   */
   const lookup = new Map(
     data.map((item) => [`${item.day}-${item.hour}`, item.count])
   );
+  
+  /** Computes the global maximum to calibrate the color scale. */
   const max = Math.max(0, ...data.map((item) => item.count));
 
   return (

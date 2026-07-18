@@ -1,3 +1,10 @@
+/**
+ * @file ImportRecordsModal.tsx
+ * @description Provides a modal interface for administrators to upload and import accident records from CSV/Excel files.
+ * @responsibility Handles file selection, validation (via API), previewing valid/invalid rows, and committing the final import.
+ * @dependencies framer-motion (animations), lucide-react (icons), adminAccidentsApi (API integration).
+ */
+
 import { useCallback, useState } from "react";
 import type { ChangeEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,14 +25,25 @@ import {
   type ValidationIssueRow,
 } from "../../api/adminAccidentsApi";
 
+/**
+ * Props for the ImportRecordsModal component.
+ * @property {boolean} open - Determines if the modal is visible.
+ * @property {function} onClose - Callback invoked to close the modal.
+ * @property {function} onSuccess - Callback invoked when records are successfully imported, returning the count.
+ */
 interface Props {
   open: boolean;
   onClose: () => void;
   onSuccess: (count: number) => void;
 }
 
+/** Represents the current stage of the import workflow. */
 type Step = "select" | "preview" | "importing" | "done";
 
+/**
+ * Detailed error response structure from the import API.
+ * Contains information about missing columns or row-level validation issues.
+ */
 interface ErrorDetail {
   error: string;
   message: string;
@@ -36,6 +54,14 @@ interface ErrorDetail {
   duplicates?: string[];
 }
 
+/**
+ * Renders a list of validation issues (e.g., invalid rows, duplicates) with their corresponding row numbers and error messages.
+ * @param {Object} props - Component properties.
+ * @param {string} props.title - The heading for this issue list.
+ * @param {ValidationIssueRow[]} props.rows - Array of rows that failed validation.
+ * @param {"rose" | "amber"} props.tone - Color theme for the issue list depending on severity.
+ * @returns {JSX.Element | null} The rendered issue list or null if no rows exist.
+ */
 function IssueList({
   title,
   rows,
@@ -68,13 +94,24 @@ function IssueList({
   );
 }
 
+/**
+ * ImportRecordsModal Component
+ * @responsibility Orchestrates the multi-step process of importing accident records from a file.
+ * @state_management Uses local state for tracking workflow steps, file selection, validation metrics, data previews, and loading states.
+ * @data_flow File is selected -> Sent to API for validation -> API returns valid/invalid row subsets -> Valid rows are confirmed by user -> Valid rows sent to API for final import.
+ * @hooks_usage Uses useState for state and useCallback for resetting state efficiently.
+ * @rendering_flow Conditionally renders the body based on the current 'step' ("select", "preview", "importing", "done").
+ */
 export default function ImportRecordsModal({ open, onClose, onSuccess }: Props) {
+  // --- Workflow & UI State ---
   const [step, setStep] = useState<Step>("select");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorDetail, setErrorDetail] = useState<ErrorDetail | null>(null);
+  
+  // --- Validation Metrics & Data State ---
   const [totalRows, setTotalRows] = useState(0);
   const [validCount, setValidCount] = useState(0);
   const [invalidCount, setInvalidCount] = useState(0);
@@ -86,6 +123,10 @@ export default function ImportRecordsModal({ open, onClose, onSuccess }: Props) 
   const [duplicateRows, setDuplicateRows] = useState<ValidationIssueRow[]>([]);
   const [importedCount, setImportedCount] = useState(0);
 
+  /**
+   * Resets all component states to their initial values.
+   * @side_effects Clears selected file, resets workflow step, wipes validation data, and clears errors.
+   */
   const reset = useCallback(() => {
     setStep("select");
     setFile(null);
@@ -105,11 +146,18 @@ export default function ImportRecordsModal({ open, onClose, onSuccess }: Props) 
     setImportedCount(0);
   }, []);
 
+  /**
+   * Handles modal closure, ensuring all internal state is reset so the next open starts fresh.
+   */
   const handleClose = () => {
     reset();
     onClose();
   };
 
+  /**
+   * Updates the selected file from the input and clears any previous validation errors.
+   * @param {ChangeEvent<HTMLInputElement>} event - The file input change event.
+   */
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0] || null;
     setFile(nextFile);
@@ -117,6 +165,11 @@ export default function ImportRecordsModal({ open, onClose, onSuccess }: Props) 
     setErrorDetail(null);
   };
 
+  /**
+   * Uploads the selected file to the server for validation without committing to the database.
+   * @business_rule Only parses and validates data, identifying duplicates and invalid formats.
+   * @side_effects Updates component state with validation statistics, row previews, and transitions to the "preview" step.
+   */
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
@@ -131,12 +184,13 @@ export default function ImportRecordsModal({ open, onClose, onSuccess }: Props) 
       setDuplicateCount(res.duplicate_count);
       setPreview(res.preview);
       setColumns(res.columns);
-      setValidRows(res.data);
+      setValidRows(res.data); // These are the rows that passed validation
       setInvalidRows(res.invalid_rows || []);
       setDuplicateRows(res.duplicate_rows || []);
       setStep("preview");
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
+      // Extract detailed validation issues if available
       if (typeof detail === "object" && detail !== null) {
         setErrorDetail(detail as ErrorDetail);
         setError(detail.message || "File validation failed.");
@@ -148,6 +202,10 @@ export default function ImportRecordsModal({ open, onClose, onSuccess }: Props) 
     }
   };
 
+  /**
+   * Sends the validated rows to the backend for final insertion into the database.
+   * @side_effects Transitions state to "importing", then "done" upon success, and sets the number of inserted records.
+   */
   const handleImport = async () => {
     setImporting(true);
     setStep("importing");
@@ -163,12 +221,15 @@ export default function ImportRecordsModal({ open, onClose, onSuccess }: Props) 
       } else {
         setError(typeof detail === "string" ? detail : "Import failed.");
       }
-      setStep("preview");
+      setStep("preview"); // Fall back to preview if import fails
     } finally {
       setImporting(false);
     }
   };
 
+  /**
+   * Concludes the import workflow and invokes the success callback to trigger table refreshes.
+   */
   const handleDone = () => {
     onSuccess(importedCount);
     handleClose();

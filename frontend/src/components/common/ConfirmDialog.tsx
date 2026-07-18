@@ -1,5 +1,17 @@
 import { AlertTriangle } from "lucide-react";
 
+/**
+ * Props for the ConfirmDialog component.
+ * @interface ConfirmDialogProps
+ * @property {boolean} open - Controls the visibility of the dialog.
+ * @property {string} title - The main heading text for the dialog.
+ * @property {string} message - The descriptive body text.
+ * @property {string} [confirmText="Confirm"] - Text for the primary action button.
+ * @property {string} [cancelText="Cancel"] - Text for the secondary/cancel button.
+ * @property {() => void} onConfirm - Callback fired when the confirm button is clicked.
+ * @property {() => void} onCancel - Callback fired when the cancel button or background is clicked.
+ * @property {boolean} [danger=false] - If true, styles the confirm button with a destructive (red) theme.
+ */
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -11,6 +23,10 @@ interface ConfirmDialogProps {
   danger?: boolean;
 }
 
+/**
+ * ConfirmDialog Component
+ * A reusable modal dialog for confirming user actions (e.g., sign out, delete).
+ */
 export default function ConfirmDialog({
   open,
   title,
@@ -21,19 +37,26 @@ export default function ConfirmDialog({
   onCancel,
   danger = false,
 }: ConfirmDialogProps) {
+  // Do not render anything if the dialog is not open
   if (!open) return null;
 
   return (
+    /* 
+      OVERLAY CONTAINER
+      'fixed inset-0' ensures it takes up the entire viewport height/width.
+      'flex items-center justify-center' strictly centers the modal box horizontally and vertically. 
+    */
     <div
       className="
         fixed inset-0
         z-[9999]
-        flex items-center justify-center
+        flex items-center justify-center 
         bg-slate-900/35
         backdrop-blur-[2px]
         p-4
       "
     >
+      {/* DIALOG BOX */}
       <div
         className="
           w-full max-w-[380px]
@@ -46,7 +69,7 @@ export default function ConfirmDialog({
         "
       >
         <div className="px-6 pt-6 pb-5">
-          {/* Icon */}
+          {/* Header Icon */}
           <div className="flex justify-center">
             <div
               className="
@@ -64,17 +87,17 @@ export default function ConfirmDialog({
             </div>
           </div>
 
-          {/* Title */}
+          {/* Dialog Title */}
           <h2 className="mt-5 text-center text-xl font-bold text-slate-900">
             {title}
           </h2>
 
-          {/* Message */}
+          {/* Dialog Message */}
           <p className="mt-2 text-center text-sm leading-6 text-slate-500">
             {message}
           </p>
 
-          {/* Buttons */}
+          {/* Action Buttons */}
           <div className="mt-7 flex justify-center gap-3">
             <button
               onClick={onCancel}
