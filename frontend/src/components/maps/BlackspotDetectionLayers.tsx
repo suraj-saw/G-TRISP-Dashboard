@@ -317,7 +317,7 @@ export default function BlackspotDetectionLayers({
   fetchFn,
   exportFn,
   heatmapData,
-  analysisLabel = "Blackspot detection",
+  analysisLabel = "MoRTH Blackspot (Greedy)",
   crashLabel = "crashes",
 }: Props) {
   const { current: mapRef } = useMap();

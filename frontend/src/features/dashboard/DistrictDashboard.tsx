@@ -41,6 +41,9 @@ import {
   RotateCcw,
   AlertTriangle,
   ArrowLeft,
+  Calendar,
+  AlertCircle,
+  Cloud,
 } from "lucide-react";
 
 import {
@@ -56,6 +59,8 @@ import {
   fetchGujaratPedestrianDbscanBlackspots,
   fetchGujaratIrcGreedyBlackspots,
   fetchGujaratIrcGridBlackspots,
+  fetchGujaratPedestrianIrcGreedyBlackspots,
+  fetchGujaratPedestrianIrcGridBlackspots,
   fetchGujaratTemporalAnalysis,
   exportGujaratBlackspotCrashes,
 } from "../../api/gujaratDashboardApi";
@@ -389,7 +394,13 @@ export default function DistrictDashboard() {
   const [talukaOptions, setTalukaOptions] = useState<
     { value: string; label: string }[]
   >([]);
-  const [openPanels, setOpenPanels] = useState({ map: true, data: true });
+  const [openPanels, setOpenPanels] = useState({ 
+    map: true, 
+    time: true, 
+    location: true, 
+    incident: false, 
+    environment: false 
+  });
 
   const [allData, setAllData] = useState<DashboardData>(emptyDashboardData);
   const [data, setData] = useState<DashboardData>(emptyDashboardData);
@@ -692,7 +703,18 @@ export default function DistrictDashboard() {
               : current.severity,
           };
         }
-        return { ...current, [filter.id]: nextValue };
+
+        const newFilters = { ...current, [filter.id]: nextValue };
+        
+        // Handle redundancy between Year and Date Range
+        if (filter.id === "year" && Array.isArray(nextValue) && nextValue.length > 0) {
+          newFilters.date_from = "";
+          newFilters.date_to = "";
+        } else if ((filter.id === "date_from" || filter.id === "date_to") && nextValue) {
+          newFilters.year = [];
+        }
+
+        return newFilters;
       });
     };
 
@@ -794,72 +816,62 @@ export default function DistrictDashboard() {
             </div>
 
             {(() => {
-              const MAP_FILTER_IDS = [
-                "baseMap",
-                "visualization_type",
-                "visualization_variant",
-              ];
-              const mapFilters = activeFilterConfig.filter((f) =>
-                MAP_FILTER_IDS.includes(f.id)
-              );
-              const dataFilters = activeFilterConfig.filter(
-                (f) => !MAP_FILTER_IDS.includes(f.id)
-              );
-              const togglePanel = (key: "map" | "data") =>
+              const MAP_FILTER_IDS = ["baseMap", "visualization_type", "visualization_variant"];
+              const TIME_FILTER_IDS = ["date_from", "date_to", "year", "month", "day", "time_period"];
+              const LOCATION_FILTER_IDS = ["taluka", "police_station"];
+              const INCIDENT_FILTER_IDS = ["severity", "collision_type"];
+              const ENVIRONMENT_FILTER_IDS = ["road_classification", "weather_condition", "light_condition"];
+
+              const mapFilters = activeFilterConfig.filter((f) => MAP_FILTER_IDS.includes(f.id));
+              const timeFilters = activeFilterConfig.filter((f) => TIME_FILTER_IDS.includes(f.id));
+              const locationFilters = activeFilterConfig.filter((f) => LOCATION_FILTER_IDS.includes(f.id));
+              const incidentFilters = activeFilterConfig.filter((f) => INCIDENT_FILTER_IDS.includes(f.id));
+              const environmentFilters = activeFilterConfig.filter((f) => ENVIRONMENT_FILTER_IDS.includes(f.id));
+
+              const togglePanel = (key: keyof typeof openPanels) =>
                 setOpenPanels((prev) => ({ ...prev, [key]: !prev[key] }));
 
-              return (
-                <>
-                  {analysisView === "spatial" && mapFilters.length > 0 && (
-                    <section className="rounded-xl border border-[#E4E8F4] bg-white shadow-sm overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => togglePanel("map")}
-                        aria-expanded={openPanels.map}
-                        className="flex w-full items-center gap-2 bg-[#1e3a8a] px-3.5 py-2.5 transition hover:bg-[#1c346f]"
-                      >
-                        <Layers size={13} className="text-white/75" />
-                        <h2 className="flex-1 text-left text-[11px] font-bold uppercase tracking-wider text-white">
-                          Map Settings
-                        </h2>
-                        <ChevronDown
-                          size={15}
-                          className={`text-white/75 transition-transform duration-200 ${openPanels.map ? "rotate-180" : ""}`}
-                        />
-                      </button>
-                      {openPanels.map && (
-                        <div className="flex flex-col gap-3 p-3">
-                          {mapFilters.map(renderFilter)}
-                        </div>
-                      )}
-                    </section>
-                  )}
+              const renderAccordion = (
+                key: keyof typeof openPanels,
+                title: string,
+                filters: typeof activeFilterConfig,
+                IconComponent: React.ElementType
+              ) => {
+                if (filters.length === 0) return null;
+                return (
+                  <section className="rounded-xl border border-[#E4E8F4] bg-white shadow-sm overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => togglePanel(key)}
+                      aria-expanded={openPanels[key]}
+                      className="flex w-full items-center gap-2 bg-[#1e3a8a] px-3.5 py-2.5 transition hover:bg-[#1c346f]"
+                    >
+                      <IconComponent size={13} className="text-white/75" />
+                      <h2 className="flex-1 text-left text-[11px] font-bold uppercase tracking-wider text-white">
+                        {title}
+                      </h2>
+                      <ChevronDown
+                        size={15}
+                        className={`text-white/75 transition-transform duration-200 ${openPanels[key] ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {openPanels[key] && (
+                      <div className="flex flex-col gap-3 p-3">
+                        {filters.map(renderFilter)}
+                      </div>
+                    )}
+                  </section>
+                );
+              };
 
-                  {dataFilters.length > 0 && (
-                    <section className="rounded-xl border border-[#E4E8F4] bg-white shadow-sm overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => togglePanel("data")}
-                        aria-expanded={openPanels.data}
-                        className="flex w-full items-center gap-2 bg-[#1e3a8a] px-3.5 py-2.5 transition hover:bg-[#1c346f]"
-                      >
-                        <Filter size={13} className="text-white/75" />
-                        <h2 className="flex-1 text-left text-[11px] font-bold uppercase tracking-wider text-white">
-                          Data Filters
-                        </h2>
-                        <ChevronDown
-                          size={15}
-                          className={`text-white/75 transition-transform duration-200 ${openPanels.data ? "rotate-180" : ""}`}
-                        />
-                      </button>
-                      {openPanels.data && (
-                        <div className="flex flex-col gap-3 p-3">
-                          {dataFilters.map(renderFilter)}
-                        </div>
-                      )}
-                    </section>
-                  )}
-                </>
+              return (
+                <div className="flex flex-col gap-3">
+                  {analysisView === "spatial" && renderAccordion("map", "Map Settings", mapFilters, Layers)}
+                  {renderAccordion("time", "Time Period", timeFilters, Calendar)}
+                  {renderAccordion("location", "Location & Admin", locationFilters, MapPin)}
+                  {renderAccordion("incident", "Incident Details", incidentFilters, AlertCircle)}
+                  {renderAccordion("environment", "Environment", environmentFilters, Cloud)}
+                </div>
               );
             })()}
 
@@ -963,7 +975,7 @@ export default function DistrictDashboard() {
                           heatmapData={data.heatmap.filter(
                             isPedestrianAccident
                           )}
-                          analysisLabel="pedestrian greedy blackspot detection"
+                          analysisLabel="Pedestrian MoRTH Blackspot (Greedy)"
                           crashLabel="pedestrian crashes"
                         />
                       ) : isBlackspotDetection ? (
@@ -990,7 +1002,7 @@ export default function DistrictDashboard() {
                             )
                           }
                           exportFn={exportGujaratBlackspotCrashes}
-                          analysisLabel="pedestrian DBSCAN blackspot detection"
+                          analysisLabel="Pedestrian MoRTH Blackspot (DBSCAN)"
                           crashLabel="pedestrian crashes"
                         />
                       ) : isDbscanBlackspot ? (
@@ -1003,6 +1015,18 @@ export default function DistrictDashboard() {
                           }
                           exportFn={exportGujaratBlackspotCrashes}
                         />
+                      ) : isIrcGreedyBlackspot && isPedestrianVariant ? (
+                        <IrcBlackspotDetectionLayers
+                          key="pedestrian-irc-greedy-blackspot"
+                          filters={filters}
+                          heatmapData={data.heatmap.filter(isPedestrianAccident)}
+                          fetchFn={(f) =>
+                            fetchGujaratPedestrianIrcGreedyBlackspots(f, districtName)
+                          }
+                          exportFn={exportGujaratBlackspotCrashes}
+                          analysisLabel="Pedestrian IRC 131 Blackspot (Greedy)"
+                          crashLabel="pedestrian crashes"
+                        />
                       ) : isIrcGreedyBlackspot ? (
                         <IrcBlackspotDetectionLayers
                           key="irc-greedy-blackspot"
@@ -1012,7 +1036,19 @@ export default function DistrictDashboard() {
                             fetchGujaratIrcGreedyBlackspots(f, districtName)
                           }
                           exportFn={exportGujaratBlackspotCrashes}
-                          analysisLabel="IRC greedy blackspot detection"
+                          analysisLabel="IRC 131 Blackspot (Greedy)"
+                        />
+                      ) : isIrcGridBlackspot && isPedestrianVariant ? (
+                        <IrcBlackspotDetectionLayers
+                          key="pedestrian-irc-grid-blackspot"
+                          filters={filters}
+                          heatmapData={data.heatmap.filter(isPedestrianAccident)}
+                          fetchFn={(f) =>
+                            fetchGujaratPedestrianIrcGridBlackspots(f, districtName)
+                          }
+                          exportFn={exportGujaratBlackspotCrashes}
+                          analysisLabel="Pedestrian IRC 131 Blackspot (Grid)"
+                          crashLabel="pedestrian crashes"
                         />
                       ) : isIrcGridBlackspot ? (
                         <IrcBlackspotDetectionLayers
@@ -1023,7 +1059,7 @@ export default function DistrictDashboard() {
                             fetchGujaratIrcGridBlackspots(f, districtName)
                           }
                           exportFn={exportGujaratBlackspotCrashes}
-                          analysisLabel="IRC grid blackspot detection"
+                          analysisLabel="IRC 131 Blackspot (Grid)"
                         />
                       ) : (
                         <VisualizationLayers

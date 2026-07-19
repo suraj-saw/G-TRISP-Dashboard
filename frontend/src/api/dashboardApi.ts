@@ -330,6 +330,30 @@ export const fetchIrcGridBlackspots = async (
 };
 
 /**
+ * Fetch Pedestrian IRC Greedy Blackspots
+ * @param filters Dashboard filter state
+ */
+export const fetchPedestrianIrcGreedyBlackspots = async (
+  filters: DashboardFilters
+): Promise<BlackspotData> => {
+  const params = getParams(filters);
+  const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-irc-greedy-blackspots`, { params });
+  return data;
+};
+
+/**
+ * Fetch Pedestrian IRC Grid Blackspots
+ * @param filters Dashboard filter state
+ */
+export const fetchPedestrianIrcGridBlackspots = async (
+  filters: DashboardFilters
+): Promise<BlackspotData> => {
+  const params = getParams(filters);
+  const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-irc-grid-blackspots`, { params });
+  return data;
+};
+
+/**
  * Download CSV file of crashes associated with specific blackspots.
  * @param crashIds List of accident IDs
  * @param filename Desired filename for the download

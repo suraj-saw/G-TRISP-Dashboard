@@ -50,10 +50,10 @@ export const VISUALIZATION_OPTIONS = [
   { value: "density_heatmap", label: "Density Heatmap" },
   // { value: "kde_heatmap", label: "Kernel Density Heatmap (KDE)" },
   // { value: "weighted_kde_heatmap", label: "Severity-Weighted KDE Heatmap" },
-  { value: "blackspot", label: "Blackspot Detection" },
-  { value: "dbscan_blackspot", label: "DBSCAN Blackspot Detection" },
-  { value: "irc_greedy_blackspot", label: "IRC Blackspot Detection (Greedy)" },
-  { value: "irc_grid_blackspot", label: "IRC Blackspot Detection (Grid)" },
+  { value: "blackspot", label: "MoRTH Blackspot (Greedy)" },
+  { value: "dbscan_blackspot", label: "MoRTH Blackspot (DBSCAN)" },
+  { value: "irc_greedy_blackspot", label: "IRC 131 Blackspot (Greedy)" },
+  { value: "irc_grid_blackspot", label: "IRC 131 Blackspot (Grid)" },
   { value: "temporal_analysis", label: "Temporal Analysis" },
 ];
 

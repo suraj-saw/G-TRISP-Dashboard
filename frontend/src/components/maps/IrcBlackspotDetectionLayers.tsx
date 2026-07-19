@@ -118,7 +118,7 @@ export default function IrcBlackspotDetectionLayers({
   fetchFn,
   exportFn,
   heatmapData,
-  analysisLabel = "IRC Blackspot detection",
+  analysisLabel = "IRC 131 Blackspot",
   crashLabel = "crashes",
 }: Props) {
   const { current: mapRef } = useMap();
@@ -382,23 +382,7 @@ export default function IrcBlackspotDetectionLayers({
             "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 10, 1, 15, 0.8, 17, 0.2],
           }}
         />
-        <Layer
-          id="irc-blackspot-centroids-label"
-          type="symbol"
-          layout={{
-            "text-field": ["concat", "AATC: ", ["get", "aatc"]],
-            "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-            "text-size": 12,
-            "text-offset": [0, 1.5],
-            "text-anchor": "top",
-          }}
-          paint={{
-            "text-color": "#1e293b",
-            "text-halo-color": "#ffffff",
-            "text-halo-width": 2,
-            "text-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 13, 1],
-          }}
-        />
+
       </Source>
 
       <StatusBadge>

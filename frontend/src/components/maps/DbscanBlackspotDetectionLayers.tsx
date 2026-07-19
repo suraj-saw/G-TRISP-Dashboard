@@ -64,7 +64,7 @@ export default function DbscanBlackspotDetectionLayers({
   filters,
   fetchFn,
   exportFn,
-  analysisLabel = "DBSCAN detection",
+  analysisLabel = "MoRTH Blackspot (DBSCAN)",
   crashLabel = "crashes",
 }: Props) {
   const { current: mapRef } = useMap();

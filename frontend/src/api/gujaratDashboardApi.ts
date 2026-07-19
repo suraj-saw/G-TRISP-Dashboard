@@ -308,6 +308,40 @@ export const fetchGujaratIrcGridBlackspots = async (
 };
 
 /**
+ * Fetch Pedestrian IRC Greedy blackspot data for Gujarat
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns Blackspot data structure
+ */
+export const fetchGujaratPedestrianIrcGreedyBlackspots = async (
+  filters: DashboardFilters,
+  district: string
+): Promise<BlackspotData> => {
+  const params = getParams(filters, district);
+  const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-irc-greedy-blackspots`, {
+    params,
+  });
+  return data;
+};
+
+/**
+ * Fetch Pedestrian IRC Grid blackspot data for Gujarat
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns Blackspot data structure
+ */
+export const fetchGujaratPedestrianIrcGridBlackspots = async (
+  filters: DashboardFilters,
+  district: string
+): Promise<BlackspotData> => {
+  const params = getParams(filters, district);
+  const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-irc-grid-blackspots`, {
+    params,
+  });
+  return data;
+};
+
+/**
  * Fetch KDE heatmap data for Gujarat
  * @param filters - Dashboard filter options
  * @param district - District to scope the data
