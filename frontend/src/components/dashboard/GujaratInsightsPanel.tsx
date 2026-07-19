@@ -11,7 +11,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 import {
-  Loader2, AlertCircle, Skull, Car, ShieldCheck, MapPinOff,
+  Loader2, AlertCircle, Skull, Car, ShieldCheck, MapPinOff, Activity
 } from "lucide-react";
 import { useDistrictInsights } from "../../context/DistrictInsightsContext";
 import { useCountUp } from "../../hooks/useCountUp";
@@ -39,6 +39,22 @@ const RISK_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
   Moderate:    { bg: "bg-amber-50",   text: "text-amber-700",   dot: "bg-amber-500"   },
   High:        { bg: "bg-orange-50",  text: "text-orange-700",  dot: "bg-orange-500"  },
   "Very High": { bg: "bg-red-50",     text: "text-red-700",     dot: "bg-red-500"     },
+};
+
+/**
+ * Define explicit sort order for severity levels in the legend and pie chart
+ */
+const SEVERITY_ORDER = [
+  "Fatal",
+  "Grievous Injury",
+  "Minor Injury Hospitalized",
+  "Minor Injury Non Hospitalized",
+  "No Injury",
+];
+
+const getSeverityRank = (label: string) => {
+  const idx = SEVERITY_ORDER.indexOf(label);
+  return idx === -1 ? 99 : idx;
 };
 
 const tooltipStyle = {
@@ -139,10 +155,15 @@ export default function GujaratInsightsPanel() {
       ? `${hoveredDistrict} Insights`
       : "Gujarat Accident Insights";
 
-  /** Determines which dataset (state vs district) to use for the pie chart, filtering out zeroes. */
+  /** 
+   * Determines which dataset (state vs district) to use for the pie chart, filtering out zeroes.
+   * [MODIFICATION] Added sorting based on custom SEVERITY_ORDER for consistent visual layout.
+   */
   const severityData = useMemo(() => {
     const raw = isDistrictView ? active!.severity : (gujarat?.severity ?? []);
-    return raw.filter((s) => s.count > 0);
+    return raw
+      .filter((s) => s.count > 0)
+      .sort((a, b) => getSeverityRank(a.label) - getSeverityRank(b.label));
   }, [isDistrictView, active, gujarat]);
 
   /** Calculates total severity for percentage calculations in the pie chart legend and tooltip. */
@@ -217,16 +238,56 @@ export default function GujaratInsightsPanel() {
     );
   }
 
-  // KPIs: both views show Accidents + Fatalities only
-  const kpis = isDistrictView
-    ? [
-        { icon: <Car size={15} />,   label: "Accidents",  value: active!.total_accidents, tone: C.primary },
-        { icon: <Skull size={15} />, label: "Fatalities", value: active!.fatalities,      tone: C.danger  },
-      ]
-    : [
-        { icon: <Car size={15} />,   label: "Accidents",  value: gujarat.total_accidents,  tone: C.primary },
-        { icon: <Skull size={15} />, label: "Fatalities", value: gujarat.total_fatalities,  tone: C.danger  },
-      ];
+  /**
+   * Calculate the total number of crashes with "Fatal" or "Grievous Injury" severity.
+   * Note: We intentionally avoid wrapping this in a `useMemo` hook because this code
+   * executes AFTER several early `return` statements (for loading/error states). 
+   * Calling a hook after an early return violates React's "Rules of Hooks" and crashes the app.
+   * This array operation is very fast on a small (~6 elements) array, so memoization isn't necessary.
+   */
+  const fatalGrievousCrashes = severityData
+    .filter((s) => s.label === "Fatal" || s.label === "Grievous Injury")
+    .reduce((sum, s) => sum + s.count, 0);
+
+  /**
+   * Calculate the total number of crashes with any kind of "Minor" severity.
+   * This aggregates all three variations of minor injuries defined in the system.
+   * As above, no `useMemo` is used to prevent hooks violation after early returns.
+   */
+  const minorCrashes = severityData
+    .filter(
+      (s) =>
+        s.label === "Minor Injury" ||
+        s.label === "Minor Injury Hospitalized" ||
+        s.label === "Minor Injury Non Hospitalized"
+    )
+    .reduce((sum, s) => sum + s.count, 0);
+
+  /**
+   * Define the three KPI cards to be displayed in the insights panel.
+   * Automatically switches between district-level (active) and state-level (gujarat) data 
+   * for the "Accidents" total based on the `isDistrictView` flag.
+   */
+  const kpis = [
+    {
+      icon: <Car size={15} />,
+      label: "Accidents",
+      value: isDistrictView ? active!.total_accidents : gujarat.total_accidents,
+      tone: C.primary,
+    },
+    {
+      icon: <Skull size={15} />,
+      label: "Fatal & Grievous",
+      value: fatalGrievousCrashes,
+      tone: C.danger,
+    },
+    {
+      icon: <Activity size={15} />,
+      label: "Minor Injuries",
+      value: minorCrashes,
+      tone: "#f59e0b",
+    },
+  ];
 
   const risk = active ? (RISK_STYLES[active.risk_level] ?? RISK_STYLES.Low) : null;
 
@@ -274,7 +335,7 @@ export default function GujaratInsightsPanel() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={FADE}
-          className="grid grid-cols-2 gap-2"
+          className="grid grid-cols-3 gap-2"
         >
           {kpis.map((k) => <KpiTile key={k.label} {...k} />)}
         </motion.div>
@@ -356,7 +417,15 @@ export default function GujaratInsightsPanel() {
                       <span className="w-2 h-2 rounded-sm shrink-0"
                         style={{ background: SEVERITY_COLORS[d.label] || C.neutral }} />
                       <span className="truncate">{d.label}</span>
-                      <span className="ml-auto font-bold text-slate-700 tabular-nums shrink-0">{pct}%</span>
+                      {/* Show raw count alongside percentage */}
+                      <div className="ml-auto flex items-center gap-1.5 shrink-0 tabular-nums">
+                        <span className="font-bold text-slate-700">
+                          {d.count.toLocaleString("en-IN")}
+                        </span>
+                        <span className="text-slate-400 font-semibold text-[9.5px]">
+                          ({pct}%)
+                        </span>
+                      </div>
                     </div>
                   );
                 })}

@@ -24,6 +24,10 @@ interface Props {
   crashLabel?: string;
 }
 
+/**
+ * Data structure representing a hovered feature on the map (either a blackspot cluster or an individual crash point).
+ * Contains location data, cluster metadata, and severity counts to populate the interactive map popup.
+ */
 interface HoveredIrcBlackspot {
   longitude: number;
   latitude: number;
@@ -123,11 +127,16 @@ export default function IrcBlackspotDetectionLayers({
   const [error, setError] = useState<string | null>(null);
   const [hovered, setHovered] = useState<HoveredIrcBlackspot | null>(null);
 
-  const hoverTimeoutRef = useRef<NodeJS.Timeout>();
+  // References to handle the popup dismiss delay, allowing the user to move their mouse from the cluster to the popup
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isOverPopupRef = useRef(false);
 
   const filterKey = toDataFilterKey(filters);
 
+  /**
+   * Schedules the hover popup to be dismissed after a short delay.
+   * If the user moves their mouse over the popup itself during this delay, it cancels the dismissal.
+   */
   const scheduleDismiss = useCallback(() => {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     hoverTimeoutRef.current = setTimeout(() => {
@@ -137,10 +146,13 @@ export default function IrcBlackspotDetectionLayers({
     }, 150);
   }, []);
 
+  /**
+   * Immediately clears any scheduled popup dismissals, keeping the popup visible.
+   */
   const cancelDismiss = useCallback(() => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = undefined;
+      hoverTimeoutRef.current = null;
     }
   }, []);
 
@@ -180,10 +192,14 @@ export default function IrcBlackspotDetectionLayers({
     };
   }, [filterKey, fetchFn]);
 
+  // --------------------------------------------------------------------------
+  // Map Interactions (Hovering, Pointer changes)
+  // --------------------------------------------------------------------------
   useEffect(() => {
     const map = mapRef?.getMap();
     if (!map) return;
 
+    // Define which map layers trigger the hover popup event
     const clusterLayers = [
       "irc-blackspot-circles-fill",
       "irc-blackspot-centroids-point",
@@ -304,7 +320,7 @@ export default function IrcBlackspotDetectionLayers({
             id="irc-blackspot-accident-halo"
             type="circle"
             paint={{
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 6, 15, 10, 17, 14],
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 4, 15, 7, 17, 10],
               "circle-color": severityColorExpression as any,
               "circle-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 13, 0.15, 15, 0.25],
               "circle-blur": 0.8,
@@ -314,10 +330,10 @@ export default function IrcBlackspotDetectionLayers({
             id="irc-blackspot-accident-points"
             type="circle"
             paint={{
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 2, 13, 3.5, 15, 5.5, 17, 8],
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 1.5, 13, 2.5, 15, 4, 17, 5.5, 19, 7],
               "circle-color": severityColorExpression as any,
               "circle-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 13, 0.65, 14, 0.85, 15, 0.95],
-              "circle-stroke-width": 1.5,
+              "circle-stroke-width": 1,
               "circle-stroke-color": "#FFFFFF",
               "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 13, 0.6, 15, 0.9],
             }}
@@ -358,12 +374,12 @@ export default function IrcBlackspotDetectionLayers({
           id="irc-blackspot-centroids-point"
           type="circle"
           paint={{
-            "circle-radius": ["interpolate", ["linear"], ["get", "crash_count"], 5, 8, 15, 12, 50, 16, 150, 20, 350, 26],
+            "circle-radius": ["interpolate", ["linear"], ["get", "crash_count"], 5, 5, 15, 8, 50, 12, 150, 16, 350, 20],
             "circle-color": IRC_CATEGORY_COLOR_EXPR as any,
-            "circle-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.95, 14, 0.85, 15, 0.65, 16, 0.3],
-            "circle-stroke-width": 3,
+            "circle-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.95, 14, 0.85, 15, 0.5, 17, 0.1],
+            "circle-stroke-width": 2,
             "circle-stroke-color": "#FFFFFF",
-            "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 10, 1, 15, 0.8, 16, 0.4],
+            "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 10, 1, 15, 0.8, 17, 0.2],
           }}
         />
         <Layer

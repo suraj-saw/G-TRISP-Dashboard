@@ -526,11 +526,11 @@ export default function Dashboard() {
           height: `calc(100vh - ${TOPBAR_HEIGHT_PX}px)`,
         }}
         className={`
-          fixed left-0 ${SIDEBAR_Z_INDEX}
+          fixed right-0 ${SIDEBAR_Z_INDEX}
           flex flex-col overflow-y-auto no-scrollbar
-          border-r border-[#E4E8F4] bg-[#F1F4FB] shadow-lg
+          border-l border-[#E4E8F4] bg-[#F1F4FB] shadow-lg
           will-change-transform ${SIDEBAR_TRANSITION}
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+          ${sidebarOpen ? "translate-x-0" : "translate-x-full"}
         `}
       >
         <div className="flex-1 px-3 py-4 flex flex-col gap-3">
@@ -636,10 +636,10 @@ export default function Dashboard() {
 
       {/* MAIN CONTENT */}
       <main
-        className="min-w-0 transition-[padding-left] duration-300 ease-in-out overflow-y-auto"
+        className="min-w-0 transition-[padding-right] duration-300 ease-in-out overflow-y-auto"
         style={{
           paddingTop: `${TOPBAR_HEIGHT_PX}px`,
-          paddingLeft: sidebarOpen ? `${SIDEBAR_WIDTH_PX}px` : "0px",
+          paddingRight: sidebarOpen ? `${SIDEBAR_WIDTH_PX}px` : "0px",
           minHeight: "100vh",
         }}
       >

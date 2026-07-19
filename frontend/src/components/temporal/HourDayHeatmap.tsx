@@ -1,3 +1,4 @@
+
 /**
  * @file HourDayHeatmap.tsx
  * @description Renders a dense 24x7 heatmap visualization of accident frequency by hour and day of the week.
@@ -23,14 +24,16 @@ const hourLabel = (hour: number): string => {
 // ---------------------------------------------------------------------------
 // Colour scale for the heatmap cells — ordered low → high
 // ---------------------------------------------------------------------------
+// [MODIFICATION] Updated to a professional, low-contrast ColorBrewer-inspired scale 
+// (Light Green -> Yellow -> Red) for a smoother, less jarring visual gradient.
 const HEATMAP_COLORS = [
-  { threshold: 0.82, color: "#B91C1C" },
-  { threshold: 0.62, color: "#EF4444" },
-  { threshold: 0.42, color: "#F97316" },
-  { threshold: 0.22, color: "#F59E0B" },
+  { threshold: 0.82, color: "#e31a1c" }, // Strong Red (Peak)
+  { threshold: 0.62, color: "#fdae61" }, // Soft Orange
+  { threshold: 0.42, color: "#fee08b" }, // Soft Yellow
+  { threshold: 0.22, color: "#a1d99b" }, // Soft Green
 ] as const;
 
-const HEATMAP_COLOR_LOW = "#FDE68A";
+const HEATMAP_COLOR_LOW = "#e5f5e0"; // Very Light Green
 const HEATMAP_COLOR_EMPTY = "#F1F5F9";
 
 /**
@@ -79,18 +82,19 @@ export default function HourDayHeatmap({ data }: Props) {
             Accident concentration by weekday and hour
           </p>
         </div>
+        {/* [MODIFICATION] Updated legend swatches to reflect the smoother Green-Yellow-Red scale */}
         <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-400">
           <span>Low</span>
-          <span className="h-2.5 w-5 rounded-sm bg-[#FDE68A]" />
-          <span className="h-2.5 w-5 rounded-sm bg-[#F97316]" />
-          <span className="h-2.5 w-5 rounded-sm bg-[#B91C1C]" />
+          <span className="h-2.5 w-5 rounded-sm bg-[#a1d99b]" />
+          <span className="h-2.5 w-5 rounded-sm bg-[#fee08b]" />
+          <span className="h-2.5 w-5 rounded-sm bg-[#e31a1c]" />
           <span>High</span>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <div className="min-w-[820px]">
-          <div className="grid grid-cols-[72px_repeat(24,minmax(22px,1fr))] gap-1">
+      <div className="w-full">
+        <div className="w-full">
+          <div className="grid grid-cols-[72px_repeat(24,minmax(0,1fr))] gap-1">
             {/* Hour header row */}
             <div />
             {Array.from({ length: 24 }, (_, hour) => (
@@ -130,3 +134,5 @@ export default function HourDayHeatmap({ data }: Props) {
     </div>
   );
 }
+
+
