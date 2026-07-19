@@ -91,7 +91,7 @@ export default function GujaratOverview({
     API.get<User>("/auth/me")
       .then((res) => {
         if (!active) return;
-        if (res.data.role === "admin" && !allowAdmin) {
+        if ((res.data.role === "admin" || res.data.role === "superadmin") && !allowAdmin) {
           navigate(ROUTES.ADMIN, { replace: true });
           return;
         }

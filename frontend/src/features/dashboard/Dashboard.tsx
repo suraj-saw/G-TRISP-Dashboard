@@ -217,7 +217,7 @@ export default function Dashboard() {
     API.get<User>("/auth/me")
       .then((res) => {
         if (!active) return;
-        if (res.data.role === "admin") {
+        if (res.data.role === "admin" || res.data.role === "superadmin") {
           navigate(ROUTES.ADMIN, { replace: true });
           return;
         }

@@ -139,15 +139,19 @@ function AdminPanel() {
     }
   }, []);
 
-  const loadAllUsers = useCallback(async () => {
+  const loadAllUsers = useCallback(async (currentRole?: string) => {
     try {
       const res = await API.get<User[]>("/admin/users");
-      // exclude admins from the management table
-      setAllUsers(res.data.filter((u) => u.role !== "admin"));
+      const role = currentRole || user?.role;
+      if (role === "superadmin") {
+        setAllUsers(res.data.filter((u) => u.role !== "superadmin"));
+      } else {
+        setAllUsers(res.data.filter((u) => u.role !== "admin" && u.role !== "superadmin"));
+      }
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [user?.role]);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -169,7 +173,7 @@ function AdminPanel() {
         const userRes = await API.get<User>("/auth/me");
 
         if (!active) return;
-        if (userRes.data.role !== "admin") {
+        if (userRes.data.role !== "admin" && userRes.data.role !== "superadmin") {
           navigate(ROUTES.DASHBOARD, { replace: true });
           return;
         }
@@ -183,7 +187,7 @@ function AdminPanel() {
 
         await Promise.all([
           loadPendingUsers(),
-          loadAllUsers(),
+          loadAllUsers(userRes.data.role),
           loadNotifications(),
         ]);
 
@@ -287,6 +291,26 @@ function AdminPanel() {
     } catch (err: any) {
       setActionError(
         err?.response?.data?.detail || "Could not update the user. Try again."
+      );
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleRoleChange = async (
+    userId: number,
+    newRole: "admin" | "user"
+  ) => {
+    setActionLoadingId(userId);
+    setActionError(null);
+    try {
+      await API.post(`/admin/users/${userId}/set-role`, {
+        role: newRole,
+      });
+      await Promise.all([loadAllUsers(), loadNotifications()]);
+    } catch (err: any) {
+      setActionError(
+        err?.response?.data?.detail || "Could not change the user's role. Try again."
       );
     } finally {
       setActionLoadingId(null);
@@ -753,15 +777,57 @@ function AdminPanel() {
                                     <div className="font-semibold text-slate-800 text-base">
                                       {u.username}
                                     </div>
-                                    <div className="text-slate-500 text-xs mt-0.5">
+                                    <div className="text-slate-500 text-xs mt-0.5 flex items-center gap-1.5">
                                       {u.email}
+                                      {u.role === "admin" && (
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">
+                                          <Shield className="w-2.5 h-2.5" />
+                                          ADMIN
+                                        </span>
+                                      )}
                                     </div>
                                   </td>
                                   <td className="py-4 px-6 hidden sm:table-cell">
                                     <StatusBadge status={u.status} />
                                   </td>
                                   <td className="py-4 px-6">
-                                    <div className="flex justify-end">
+                                    <div className="flex justify-end gap-2">
+                                      {user?.role === "superadmin" && (
+                                        u.role === "admin" ? (
+                                          <button
+                                            disabled={actionLoadingId === u.id}
+                                            onClick={() =>
+                                              openConfirmation({
+                                                title: "Demote to User",
+                                                message: `Demote ${u.username} to a normal user?`,
+                                                buttonText: "Demote",
+                                                danger: true,
+                                                action: () => handleRoleChange(u.id, "user"),
+                                              })
+                                            }
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-amber-600 bg-amber-50 hover:bg-amber-100 text-xs font-semibold disabled:opacity-50 transition-all border border-amber-200/50 cursor-pointer"
+                                          >
+                                            <ShieldAlert className="w-3.5 h-3.5" />
+                                            Demote
+                                          </button>
+                                        ) : (
+                                          <button
+                                            disabled={actionLoadingId === u.id}
+                                            onClick={() =>
+                                              openConfirmation({
+                                                title: "Promote to Admin",
+                                                message: `Promote ${u.username} to an admin?`,
+                                                buttonText: "Promote",
+                                                action: () => handleRoleChange(u.id, "admin"),
+                                              })
+                                            }
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-indigo-600 bg-indigo-50 hover:bg-indigo-100 text-xs font-semibold disabled:opacity-50 transition-all border border-indigo-200/50 cursor-pointer"
+                                          >
+                                            <Shield className="w-3.5 h-3.5" />
+                                            Promote
+                                          </button>
+                                        )
+                                      )}
                                       {u.status === "approved" ? (
                                         <button
                                           disabled={actionLoadingId === u.id}

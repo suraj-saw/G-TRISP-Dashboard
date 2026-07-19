@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, LogOut, PanelLeft, Mail, Info } from "lucide-react";
+import { ChevronDown, LogOut, PanelRight, Mail, Info } from "lucide-react";
 
 import NotificationBell from "./NotificationBell";
 import type { User } from "../../types/user";
@@ -100,38 +100,8 @@ function TopBar({
         border-b border-slate-100
       `}
     >
-      {/* LEFT SIDE: Sidebar Toggle & Branding */}
+      {/* LEFT SIDE: Branding */}
       <div className="flex items-center gap-4">
-        {onToggleSidebar && (
-          <button
-            onClick={onToggleSidebar}
-            aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-            aria-pressed={sidebarOpen}
-            className="
-              group
-              h-9 w-9
-              flex items-center justify-center
-              rounded-xl
-              border border-slate-200 bg-white
-              text-slate-500 shadow-sm
-              hover:border-indigo-600 hover:bg-indigo-50 hover:text-indigo-600
-              active:scale-95
-              transition-all duration-200
-            "
-          >
-            <PanelLeft
-              size={18}
-              strokeWidth={2}
-              className={`transition-transform duration-300 ${
-                sidebarOpen ? "" : "rotate-180"
-              }`}
-            />
-          </button>
-        )}
-
-        {/* Divider */}
-        <span className="hidden sm:block h-5 w-px bg-slate-200" aria-hidden />
-
         {/* App Title */}
         <h1 className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 to-indigo-950 bg-clip-text text-transparent">
           {appName}
@@ -312,6 +282,39 @@ function TopBar({
             </div>
           )}
         </div>
+
+        {/* Divider */}
+        {onToggleSidebar && (
+          <span className="hidden sm:block h-5 w-px bg-slate-200" aria-hidden />
+        )}
+
+        {/* Sidebar Toggle */}
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            aria-pressed={sidebarOpen}
+            className="
+              group
+              h-9 w-9
+              flex items-center justify-center
+              rounded-xl
+              border border-slate-200 bg-white
+              text-slate-500 shadow-sm
+              hover:border-indigo-600 hover:bg-indigo-50 hover:text-indigo-600
+              active:scale-95
+              transition-all duration-200
+            "
+          >
+            <PanelRight
+              size={18}
+              strokeWidth={2}
+              className={`transition-transform duration-300 ${
+                sidebarOpen ? "" : "rotate-180"
+              }`}
+            />
+          </button>
+        )}
       </div>
     </header>
 

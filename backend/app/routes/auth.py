@@ -168,7 +168,7 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)) -> Us
 
     Authorization Checks:
     - Inherits all checks from `get_current_user`.
-    - Strictly verifies that the `role` column equals 'admin'.
+    - Strictly verifies that the `role` column is either 'admin' or 'superadmin'.
 
     Args:
         current_user (User): The authenticated user resolved by `get_current_user`.
@@ -177,12 +177,36 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)) -> Us
         User: The authenticated admin user.
 
     Raises:
-        HTTPException: If the user does not have the admin role (403).
+        HTTPException: If the user does not have the admin or superadmin role (403).
     """
-    if current_user.role != "admin":
+    if current_user.role not in ["admin", "superadmin"]:
         raise HTTPException(
             status_code=403,
             detail="Not enough privileges. Admin access required.",
+        )
+    return current_user
+
+def get_current_superadmin_user(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Dependency to ensure the authenticated user has superadmin privileges.
+
+    Authorization Checks:
+    - Inherits all checks from `get_current_user`.
+    - Strictly verifies that the `role` column equals 'superadmin'.
+
+    Args:
+        current_user (User): The authenticated user resolved by `get_current_user`.
+
+    Returns:
+        User: The authenticated superadmin user.
+
+    Raises:
+        HTTPException: If the user does not have the superadmin role (403).
+    """
+    if current_user.role != "superadmin":
+        raise HTTPException(
+            status_code=403,
+            detail="Not enough privileges. Superadmin access required.",
         )
     return current_user
 
@@ -426,7 +450,7 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
             detail="The email is not registered."
         )
 
-    if user.role != "admin":
+    if user.role not in ["admin", "superadmin"]:
         if user.status == "rejected":
             logger.warning(f"Password reset requested for rejected user: {email}")
             raise HTTPException(

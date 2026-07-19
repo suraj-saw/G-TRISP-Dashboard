@@ -7,7 +7,7 @@ from typing import Literal, List
 from app.database import get_db
 from app.models.user import User
 from app.models.notification import Notification
-from app.routes.auth import get_current_admin_user
+from app.routes.auth import get_current_admin_user, get_current_superadmin_user
 from app.schemas.user_schema import UserResponse
 from app.schemas.notification_schema import NotificationResponse
 from app.core.constants import ADMIN_PREFIX
@@ -31,6 +31,10 @@ class NotificationPerAdminResponse(BaseModel):
 
 class StatusChangeRequest(BaseModel):
     status: Literal["approved", "rejected"]
+
+
+class RoleChangeRequest(BaseModel):
+    role: Literal["user", "admin"]
 
 
 @router.get("/dashboard")
@@ -75,8 +79,8 @@ def _set_user_status(
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if target.role == "admin":
-        raise HTTPException(status_code=400, detail="Cannot change status of an admin account")
+    if target.role == "superadmin" or (target.role == "admin" and decided_by.role != "superadmin"):
+        raise HTTPException(status_code=400, detail="Not enough privileges to change status of this account")
 
     if target.status != "pending":
         raise HTTPException(
@@ -119,8 +123,8 @@ def _force_set_user_status(
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if target.role == "admin":
-        raise HTTPException(status_code=400, detail="Cannot change status of an admin account")
+    if target.role == "superadmin" or (target.role == "admin" and decided_by.role != "superadmin"):
+        raise HTTPException(status_code=400, detail="Not enough privileges to change status of this account")
 
     if target.status == "pending":
         raise HTTPException(
@@ -182,6 +186,47 @@ def change_user_status(
 ):
     """Re-decide the status of an already approved or rejected user."""
     return _force_set_user_status(user_id, payload.status, db, decided_by=current_user)
+
+
+@router.post("/users/{user_id}/set-role", response_model=UserResponse)
+def change_user_role(
+    user_id: int,
+    payload: RoleChangeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin_user),
+):
+    """Change the role of a user (Superadmin only)."""
+    target = db.query(User).filter(User.id == user_id).first()
+
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if target.role == "superadmin":
+        raise HTTPException(status_code=400, detail="Cannot change role of a superadmin account")
+
+    if target.role == payload.role:
+        raise HTTPException(
+            status_code=400,
+            detail=f"User is already {payload.role}.",
+        )
+
+    old_role = target.role
+    target.role = payload.role
+
+    db.add(Notification(
+        type="role_change",
+        message=(
+            f"User '{target.username}' ({target.email}) role changed "
+            f"from {old_role} to {payload.role} by {current_user.username}."
+        ),
+        related_user_id=target.id,
+        acted_by_admin_id=current_user.id,
+        is_read=False,
+    ))
+
+    db.commit()
+    db.refresh(target)
+    return target
 
 
 @router.get("/notifications")
