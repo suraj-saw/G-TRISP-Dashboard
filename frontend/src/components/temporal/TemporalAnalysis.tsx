@@ -197,7 +197,7 @@ export default function TemporalAnalysis({ filters, fetchFn }: Props) {
       },
     });
     return () => { registerExportHandler(null); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filters.district,
     filters.year,
@@ -235,7 +235,7 @@ export default function TemporalAnalysis({ filters, fetchFn }: Props) {
 
   return (
     <div className="min-h-[calc(100vh-130px)] space-y-4 pb-10 p-4">
-      
+
       {/* ── Key Insights Panel ── */}
       {/* {data.temporal_insights && data.temporal_insights.length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -299,13 +299,13 @@ export default function TemporalAnalysis({ filters, fetchFn }: Props) {
           {data.day_of_week_distribution && data.day_of_week_distribution.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.day_of_week_distribution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <LineChart data={data.day_of_week_distribution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid stroke={GRID} vertical={false} />
                   <XAxis dataKey="day" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="count" name="Accidents" fill={CHART_BLUE} radius={[3, 3, 0, 0]} />
-                </BarChart>
+                  <Line type="monotone" dataKey="count" name="Accidents" stroke={CHART_BLUE} strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (
@@ -340,13 +340,13 @@ export default function TemporalAnalysis({ filters, fetchFn }: Props) {
           {data.monthly_seasonality && data.monthly_seasonality.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.monthly_seasonality} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <LineChart data={data.monthly_seasonality} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid stroke={GRID} vertical={false} />
                   <XAxis dataKey="month" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} interval={0} angle={-45} textAnchor="end" height={50} />
                   <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="count" name="Accidents" fill={CHART_TEAL} radius={[3, 3, 0, 0]} />
-                </BarChart>
+                  <Line type="monotone" dataKey="count" name="Accidents" stroke={CHART_TEAL} strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (
@@ -377,26 +377,21 @@ export default function TemporalAnalysis({ filters, fetchFn }: Props) {
       {/* New Temporal Charts Row 3 */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
-          <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Weekend vs Weekday</p>
-          {data.weekend_vs_weekday && data.weekend_vs_weekday.length > 0 ? (
+          <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Severity on Weekend vs Weekday</p>
+          {data.severity_by_weekend_weekday && data.severity_by_weekend_weekday.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={data.weekend_vs_weekday}
-                    dataKey="count"
-                    nameKey="label"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                  >
-                    {data.weekend_vs_weekday.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={index === 0 ? CHART_BLUE : CHART_TEAL} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 12, color: MUTED }} />
-                </PieChart>
+                <BarChart data={data.severity_by_weekend_weekday} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid stroke={GRID} vertical={false} />
+                  <XAxis dataKey="label" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(0, 0, 0, 0.04)" }} />
+                  <Legend wrapperStyle={{ fontSize: 10, color: MUTED, paddingTop: '10px' }} />
+                  <Bar dataKey="Fatal" stackId="a" fill={SEVERITY_COLORS["Fatal"]} />
+                  <Bar dataKey="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} />
+                  <Bar dataKey="Minor Injury" stackId="a" fill={SEVERITY_COLORS["Minor Injury"]} />
+                  <Bar dataKey="Damage Only" stackId="a" fill={SEVERITY_COLORS["Damage Only"]} radius={[3, 3, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
@@ -413,12 +408,10 @@ export default function TemporalAnalysis({ filters, fetchFn }: Props) {
                   <CartesianGrid stroke={GRID} vertical={false} />
                   <XAxis dataKey="hour_label" tick={{ fill: MUTED, fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={20} />
                   <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(0, 0, 0, 0.04)" }} />
                   <Legend wrapperStyle={{ fontSize: 10, color: MUTED, paddingTop: '10px' }} />
                   <Bar dataKey="Fatal" stackId="a" fill={SEVERITY_COLORS["Fatal"]} />
-                  <Bar dataKey="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} />
-                  <Bar dataKey="Minor Injury" stackId="a" fill={SEVERITY_COLORS["Minor Injury"]} />
-                  <Bar dataKey="Damage Only" stackId="a" fill={SEVERITY_COLORS["Damage Only"]} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -4,8 +4,8 @@
  * @responsibility Maps hourly data into AM/PM labels and renders it via Recharts.
  */
 import {
-  Bar,
-  BarChart,
+  Line,
+  LineChart,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
@@ -48,7 +48,7 @@ export default function HourlyChart({ data }: Props) {
       </div>
       <div className="h-[260px]">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 8, right: 10, left: -20, bottom: 8 }}>
+          <LineChart data={chartData} margin={{ top: 8, right: 10, left: -20, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EDF0F8" />
             <XAxis
               dataKey="label"
@@ -59,15 +59,14 @@ export default function HourlyChart({ data }: Props) {
             />
             <YAxis tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} />
             <Tooltip
-              cursor={{ fill: "rgba(44,110,242,0.08)" }}
               contentStyle={{
                 border: "1px solid #E4E8F4",
                 borderRadius: 10,
                 boxShadow: "0 12px 30px rgba(15,23,42,0.12)",
               }}
             />
-            <Bar dataKey="count" name="Accidents" fill="#2C6EF2" radius={[6, 6, 0, 0]} maxBarSize={28} />
-          </BarChart>
+            <Line type="monotone" dataKey="count" name="Accidents" stroke="#2C6EF2" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+          </LineChart>
         </ResponsiveContainer>
       </div>
     </div>

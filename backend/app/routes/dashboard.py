@@ -577,6 +577,10 @@ def get_temporal_analysis(
     year_only_counts = defaultdict(int)
     weekend_counts = {"Weekday": 0, "Weekend": 0}
     severity_by_hour = {h: {"Fatal": 0, "Grievous Injury": 0, "Minor Injury": 0, "Damage Only": 0} for h in range(HOURS_IN_DAY)}
+    severity_by_weekend_weekday = {
+        "Weekday": {"Fatal": 0, "Grievous Injury": 0, "Minor Injury": 0, "Damage Only": 0},
+        "Weekend": {"Fatal": 0, "Grievous Injury": 0, "Minor Injury": 0, "Damage Only": 0}
+    }
 
     for accident, dt in accidents_with_dt:
         hour     = dt.hour
@@ -592,18 +596,22 @@ def get_temporal_analysis(
         month_only_counts[dt.month] += 1
         year_only_counts[dt.year] += 1
         
-        if day_name in ["Saturday", "Sunday"]:
-            weekend_counts["Weekend"] += 1
-        else:
-            weekend_counts["Weekday"] += 1
+        is_weekend = day_name in ["Saturday", "Sunday"]
+        ww_label = "Weekend" if is_weekend else "Weekday"
+        weekend_counts[ww_label] += 1
             
         sev = safe_text(accident.severity)
-        if sev in severity_by_hour[hour]:
-            severity_by_hour[hour][sev] += 1
-        elif sev == "Grievous":
-            severity_by_hour[hour]["Grievous Injury"] += 1
-        elif sev == "Minor":
-            severity_by_hour[hour]["Minor Injury"] += 1
+        normalized_sev = sev
+        if sev == "Grievous":
+            normalized_sev = "Grievous Injury"
+        elif sev in ["Minor", "Minor Injury", "Minor Injury Hospitalized", "Minor Injury Non Hospitalized"]:
+            normalized_sev = "Minor Injury"
+        elif sev in ["Damage Only", "Damage only", "No Injury"]:
+            normalized_sev = "Damage Only"
+            
+        if normalized_sev in severity_by_hour[hour]:
+            severity_by_hour[hour][normalized_sev] += 1
+            severity_by_weekend_weekday[ww_label][normalized_sev] += 1
 
     peak_hour,      peak_hour_count   = _peak_item(hourly_counts, 0)
     peak_day,       peak_day_count    = _peak_item(day_counts, UNKNOWN_LABEL)
@@ -678,7 +686,18 @@ def get_temporal_analysis(
             {"label": "Weekday", "count": weekend_counts["Weekday"]},
             {"label": "Weekend", "count": weekend_counts["Weekend"]}
         ],
+        "severity_by_weekend_weekday": [
+            {
+                "label": "Weekday",
+                **severity_by_weekend_weekday["Weekday"]
+            },
+            {
+                "label": "Weekend",
+                **severity_by_weekend_weekday["Weekend"]
+            }
+        ],
         "severity_by_hour": [
+
             {
                 "hour": h,
                 "hour_label": _format_hour_label(h),

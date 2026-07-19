@@ -621,25 +621,29 @@ const DistrictStatisticalAnalysis: React.FC<
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart
                     data={stats.victim_composition}
-                    margin={{ top: 20, right: 20, left: -10, bottom: 5 }}
+                    margin={{ top: 20, right: 40, left: 10, bottom: 5 }}
+                    layout="vertical"
                     barGap={8}
                   >
                     <CartesianGrid
                       stroke={GRID}
-                      vertical={false}
+                      horizontal={false}
                       strokeDasharray="3 3"
                       opacity={0.4}
                     />
                     <XAxis
-                      dataKey="type"
-                      tick={{ fill: MUTED, fontSize: 12, fontWeight: 600 }}
+                      type="number"
+                      tick={{ fill: MUTED, fontSize: 11 }}
                       axisLine={false}
                       tickLine={false}
                     />
                     <YAxis
-                      tick={{ fill: MUTED, fontSize: 11 }}
+                      type="category"
+                      dataKey="type"
+                      tick={{ fill: MUTED, fontSize: 12, fontWeight: 600 }}
                       axisLine={false}
                       tickLine={false}
+                      width={80}
                     />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend
@@ -656,22 +660,22 @@ const DistrictStatisticalAnalysis: React.FC<
                       name="Fatal (Killed)"
                       stackId="a"
                       fill={SEVERITY_COLORS["Fatal"]}
-                      barSize={45}
+                      barSize={35}
                     />
                     <Bar
                       dataKey="Grievous Injury"
                       name="Grievous Injury"
                       stackId="a"
                       fill={SEVERITY_COLORS["Grievous Injury"]}
-                      barSize={45}
+                      barSize={35}
                     />
                     <Bar
                       dataKey="Minor Injury"
                       name="Minor Injury"
                       stackId="a"
                       fill={SEVERITY_COLORS["Minor Injury"]}
-                      radius={[4, 4, 0, 0]}
-                      barSize={45}
+                      radius={[0, 4, 4, 0]}
+                      barSize={35}
                     />
                   </BarChart>
                 </ResponsiveContainer>

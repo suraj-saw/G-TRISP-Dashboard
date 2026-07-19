@@ -350,6 +350,19 @@ export interface TemporalAnalysisData {
   annual_trend?: { year: number; count: number }[];
   /** Weekend vs weekday comparison (optional) */
   weekend_vs_weekday?: { label: string; count: number }[];
+  /** Severity distribution by weekend vs weekday (optional) */
+  severity_by_weekend_weekday?: {
+    /** Label (Weekday or Weekend) */
+    label: string;
+    /** Number of fatal accidents */
+    Fatal: number;
+    /** Number of grievous injury accidents */
+    "Grievous Injury": number;
+    /** Number of minor injury accidents */
+    "Minor Injury": number;
+    /** Number of damage-only accidents */
+    "Damage Only": number;
+  }[];
   /** Severity distribution by hour (optional) */
   severity_by_hour?: {
     /** Hour of the day (0-23) */
