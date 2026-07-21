@@ -222,6 +222,24 @@ export const fetchGujaratBlackspots = async (
 };
 
 /**
+ * Fetch snapped accidents data for Gujarat (Network Validation)
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns Snapped accidents data
+ */
+export const fetchGujaratSnappedAccidents = async (
+  filters: DashboardFilters,
+  district: string
+) => {
+  const params = getParams(filters, district);
+  if (filters.visualization_variant === "pedestrian") {
+    params.append("is_pedestrian", "true");
+  }
+  const { data } = await API.get(`${GUJARAT_API_BASE}/snapped-accidents`, { params });
+  return data;
+};
+
+/**
  * Fetch greedy pedestrian blackspot data for Gujarat
  * @param filters - Dashboard filter options
  * @param district - District to scope the data

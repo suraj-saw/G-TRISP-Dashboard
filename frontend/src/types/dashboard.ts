@@ -165,6 +165,18 @@ export interface HeatmapPoint {
 }
 
 /**
+ * Snapped point in the accident heatmap network visualization
+ */
+export interface SnappedHeatmapPoint extends HeatmapPoint {
+  /** Original un-snapped latitude coordinate */
+  original_latitude: number;
+  /** Original un-snapped longitude coordinate */
+  original_longitude: number;
+  /** Distance moved during snapping in meters */
+  distance_meters: number;
+}
+
+/**
  * Casualty breakdown by category (Driver, Passenger, Pedestrian)
  */
 export interface CasualtyBreakdown {

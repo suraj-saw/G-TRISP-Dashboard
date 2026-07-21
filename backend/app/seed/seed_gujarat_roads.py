@@ -51,7 +51,7 @@ _THIS_DIR = Path(__file__).resolve().parent
 _APP_DIR = _THIS_DIR.parent
 _BACKEND_DIR = _APP_DIR.parent
 
-DEFAULT_DATA_FILE = _BACKEND_DIR / "data" / "Gujarat_Roads.geojsonl"
+DEFAULT_DATA_FILE = _BACKEND_DIR / "data" / "Gujarat_Roads.geojson"
 DATA_FILE = Path(os.getenv("GUJARAT_ROADS_GEOJSONL", str(DEFAULT_DATA_FILE))).resolve()
 
 SOURCE_SRID = int(os.getenv("GUJARAT_ROADS_SOURCE_SRID", str(POSTGIS_SRID)))
@@ -160,7 +160,7 @@ def _extract_road_attributes(props: dict) -> tuple[str | None, str | None, str |
             "HIGHWAY",
         ],
     )
-    road_type = _first_present(props, ["road_type", "ROAD_TYPE", "type", "Type", "feature_type", "FEATURE_TYPE"])
+    road_type = _first_present(props, ["road_type", "ROAD_TYPE", "type", "Type", "feature_type", "FEATURE_TYPE", "surface", "SURFACE"])
     return road_name, road_class, road_type
 
 
@@ -192,14 +192,15 @@ def seed_gujarat_roads(force: bool = False) -> None:
         batch: list[GujaratRoad] = []
 
         with DATA_FILE.open("r", encoding="utf-8") as fh:
-            for line_no, line in enumerate(fh, start=1):
-                s = line.strip()
-                if not s:
-                    continue
+            try:
+                data = json.load(fh)
+                features = data.get("features", []) if isinstance(data, dict) else []
+            except Exception as e:
+                logger.error("Failed to parse JSON file as FeatureCollection: %s", e)
+                features = []
 
-                try:
-                    feature = json.loads(s)
-                except Exception:
+            for feature_no, feature in enumerate(features, start=1):
+                if not isinstance(feature, dict):
                     skipped += 1
                     continue
 
@@ -281,8 +282,8 @@ def seed_gujarat_roads(force: bool = False) -> None:
                     inserted += len(batch)
                     batch.clear()
 
-                if (line_no % 20000) == 0:
-                    logger.info("Progress: line %d — inserted so far %d (skipped %d)", line_no, inserted, skipped)
+                if (feature_no % 20000) == 0:
+                    logger.info("Progress: feature %d — inserted so far %d (skipped %d)", feature_no, inserted, skipped)
 
         if batch:
             db.bulk_save_objects(batch)

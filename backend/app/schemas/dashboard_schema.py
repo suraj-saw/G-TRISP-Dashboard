@@ -342,3 +342,23 @@ class FilterOptions(ResponseModel):
     
     min_date: Optional[str] = None
     max_date: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Snapped Accidents (Network Validation)
+# ---------------------------------------------------------------------------
+
+class SnappedPoint(HeatmapPoint):
+    """
+    Schema for a snapped accident point which includes its snapped coordinates 
+    (latitude, longitude) as well as the original coordinates and snapping distance.
+    """
+    original_latitude: float = 0.0
+    original_longitude: float = 0.0
+    distance_meters: float = 0.0
+
+
+class SnappedAccidentResponse(ResponseModel):
+    """Schema for a collection of snapped accident points."""
+    total: int
+    data: List[SnappedPoint]

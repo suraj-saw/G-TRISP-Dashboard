@@ -18,6 +18,7 @@ import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
 import IrcBlackspotDetectionLayers from "../../components/maps/IrcBlackspotDetectionLayers";
+import SnappedAccidentLayers from "../../components/maps/SnappedAccidentLayers";
 // import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
 // import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
 // import DensityMapOverlays from "../../components/maps/DensityMapOverlays";
@@ -63,6 +64,7 @@ import {
   fetchGujaratPedestrianIrcGridBlackspots,
   fetchGujaratTemporalAnalysis,
   exportGujaratBlackspotCrashes,
+  fetchGujaratSnappedAccidents,
 } from "../../api/gujaratDashboardApi";
 import type {
   DashboardFilters,
@@ -645,6 +647,7 @@ export default function DistrictDashboard() {
   const isDbscanBlackspot = filters.visualization_type === "dbscan_blackspot";
   const isIrcGreedyBlackspot = filters.visualization_type === "irc_greedy_blackspot";
   const isIrcGridBlackspot = filters.visualization_type === "irc_grid_blackspot";
+  const isSnappedAccidents = filters.visualization_type === "snapped_accidents";
   const isLocationMarkers =
     filters.visualization_type === "location_markers" ||
     !filters.visualization_type;
@@ -1060,6 +1063,12 @@ export default function DistrictDashboard() {
                           }
                           exportFn={exportGujaratBlackspotCrashes}
                           analysisLabel="IRC 131 Blackspot (Grid)"
+                        />
+                      ) : isSnappedAccidents ? (
+                        <SnappedAccidentLayers
+                          key="snapped-accidents"
+                          filters={filters}
+                          fetchFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
                         />
                       ) : (
                         <VisualizationLayers

@@ -28,3 +28,4 @@ from app.models.gujarat_road      import GujaratRoad
 # ── Incident & Accident Event Datasets ────────────────────────────────────────
 from app.models.accident          import Accident
 # from app.models.surat_accident    import SuratAccident
+from app.models.snapped_accident  import SnappedAccident

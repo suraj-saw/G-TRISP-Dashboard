@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.accident import Accident
+from app.models.snapped_accident import SnappedAccident
 
 from app.schemas.dashboard_schema import (
     CasualtyBreakdown,
@@ -50,6 +51,8 @@ from app.schemas.dashboard_schema import (
     WeatherResponse,
     YearlyResponse,
     YearlyStats,
+    SnappedAccidentResponse,
+    SnappedPoint,
 )
 
 # Reused from the Surat schema module — the shape (hour/day/month/peak
@@ -3061,3 +3064,101 @@ def get_pedestrian_irc_grid_blackspots(
         "circles": geojson["circles"],
         "centroids": geojson["centroids"],
     }
+
+
+# ---------------------------------------------------------------------------
+# Snapped Accidents (Network Validation)
+# ---------------------------------------------------------------------------
+
+@router.get("/snapped-accidents", response_model=SnappedAccidentResponse, summary="Get pre-snapped accident locations")
+def get_snapped_accidents(
+    db: Session = Depends(get_db),
+    district: Optional[str] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    road_classification: Optional[str] = Query(None),
+    weather_condition: Optional[str] = Query(None),
+    light_condition: Optional[str] = Query(None),
+    collision_type: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    taluka: Optional[str] = Query(None),
+    police_station: Optional[str] = Query(None),
+    is_pedestrian: bool = Query(False),
+):
+    """
+    Returns accident locations that have been snapped to the nearest road network segment.
+    Maintains both original and snapped coordinates for visualization.
+    """
+    query = db.query(
+        Accident.accident_id,
+        Accident.severity,
+        Accident.district,
+        Accident.police_station,
+        Accident.road_name,
+        Accident.road_classification,
+        Accident.weather_condition,
+        Accident.light_condition,
+        Accident.type_of_collision.label("collision_type"),
+        Accident.accident_date_time,
+        Accident.pedestrian_killed,
+        Accident.pedestrian_grievous_injury,
+        Accident.pedestrian_minor_injury,
+        func.ST_Y(SnappedAccident.snapped_location).label("latitude"),
+        func.ST_X(SnappedAccident.snapped_location).label("longitude"),
+        func.ST_Y(SnappedAccident.original_location).label("original_latitude"),
+        func.ST_X(SnappedAccident.original_location).label("original_longitude"),
+        SnappedAccident.distance_meters
+    ).join(
+        SnappedAccident, Accident.id == SnappedAccident.accident_id
+    )
+
+    if is_pedestrian:
+        query = query.filter(
+            (
+                func.coalesce(Accident.pedestrian_killed, 0) +
+                func.coalesce(Accident.pedestrian_grievous_injury, 0) +
+                func.coalesce(Accident.pedestrian_minor_injury, 0)
+            ) > 0
+        )
+
+    query = apply_filters(
+        query, district, year, road_classification,
+        weather_condition, light_condition, collision_type,
+        date_from, date_to, taluka=taluka, db=db,
+        police_station=police_station
+    )
+    
+    if severity:
+        if isinstance(severity, list):
+            query = query.filter(Accident.severity.in_(severity))
+        else:
+            query = query.filter(Accident.severity == severity)
+
+    rows = query.all()
+
+    points = [
+        {
+            "accident_id": r.accident_id,
+            "severity": r.severity or "Unknown",
+            "district": r.district or "Unknown",
+            "police_station": r.police_station,
+            "road_name": r.road_name,
+            "road_classification": r.road_classification,
+            "weather_condition": r.weather_condition,
+            "light_condition": r.light_condition,
+            "collision_type": r.collision_type,
+            "accident_date_time": r.accident_date_time,
+            "pedestrian_killed": r.pedestrian_killed,
+            "pedestrian_grievous_injury": r.pedestrian_grievous_injury,
+            "pedestrian_minor_injury": r.pedestrian_minor_injury,
+            "latitude": r.latitude,
+            "longitude": r.longitude,
+            "original_latitude": r.original_latitude,
+            "original_longitude": r.original_longitude,
+            "distance_meters": r.distance_meters,
+        }
+        for r in rows
+    ]
+
+    return {"total": len(points), "data": points}

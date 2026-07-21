@@ -1,0 +1,2 @@
+Properties: {'id': 'way/62317376', 'name': None, 'name_en': None, 'name_hi': None, 'highway': 'primary', 'surface': None, 'smoothness': None, 'width': None, 'lanes': None, 'oneway': None, 'bridge': None, 'layer': None, 'source': None, 'adm0_pcode': 'IND', 'adm0_name': 'India', 'adm1_pcode': '1811400B80305611676067', 'adm1_name': 'Gujarāt', 'adm2_pcode': '76128533B97372652494648', 'adm2_name': 'Surat', 'adm3_pcode': '7132399B34487253364231', 'adm3_name': 'Chorasi', 'adm4_pcode': None, 'adm4_name': None, 'name_latin': None}
+Geometry Type: MultiLineString
