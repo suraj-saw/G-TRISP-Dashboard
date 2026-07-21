@@ -257,7 +257,8 @@ export default function GeoJsonHeatmapLayers({
           />
         )}
       </Source>
-      {hasAccidentPoints && (
+      {/* Accident markers overlay when zoomed in is intentionally removed for density heatmap */}
+      {/* {hasAccidentPoints && (
         <Source id={accidentSourceId} type="geojson" data={accidentGeojson as any}>
           <Layer
             id={accidentPointLayerId}
@@ -273,7 +274,7 @@ export default function GeoJsonHeatmapLayers({
             }}
           />
         </Source>
-      )}
+      )} */}
       {selected && (
         <Popup
           longitude={selected.longitude}

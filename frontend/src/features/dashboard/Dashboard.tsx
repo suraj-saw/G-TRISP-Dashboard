@@ -57,12 +57,12 @@ import {
   fetchPedestrianDbscanBlackspots,
   exportBlackspotCrashes,
   fetchIrcGreedyBlackspots,
-  fetchIrcGreedyBlackspots,
   fetchIrcGridBlackspots,
   fetchPedestrianIrcGreedyBlackspots,
   fetchPedestrianIrcGridBlackspots,
   fetchNetworkBlackspots,
   fetchPedestrianNetworkBlackspots,
+  fetchSnappedAccidents,
 } from "../../api/dashboardApi";
 import SuratBaseMap from "../../components/maps/SuratBaseMap";
 import SeverityLegend from "../../components/maps/SeverityLegend";
@@ -228,6 +228,20 @@ export default function Dashboard() {
   const { data: allData } = useDashboard(allDataFilters);
   const { data, loading, error } = useDashboard(filters);
 
+  const [snappedHeatmapData, setSnappedHeatmapData] = useState<HeatmapPoint[] | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (filters.visualization_type === "density_heatmap") {
+      fetchSnappedAccidents(filters).then(res => {
+        if (active) setSnappedHeatmapData(res.data);
+      }).catch(console.error);
+    } else {
+      setSnappedHeatmapData(null);
+    }
+    return () => { active = false; };
+  }, [filters]);
+
   useEffect(() => {
     let active = true;
     API.get<User>("/auth/me")
@@ -387,12 +401,14 @@ export default function Dashboard() {
 
   const activeFilterConfig = getFilterConfig(filters.visualization_type);
 
+  const visualizationType = filters.visualization_type;
+
   const isIrcGridBlackspot =
-    filters.visualization_type === "irc_grid_blackspot";
+    visualizationType === "irc_grid_blackspot";
   const isNetworkBlackspot =
-    filters.visualization_type === "network_blackspot";
+    visualizationType === "network_blackspot";
   const isTemporalAnalysis =
-    filters.visualization_type === "temporal_analysis";
+    visualizationType === "temporal_analysis";
 
   // const isDensityHeatmap = visualizationType === "density_heatmap";
   // const showDensityLegend = isDensityHeatmap || isKdeHeatmap || isWeightedKdeHeatmap;
@@ -407,12 +423,13 @@ export default function Dashboard() {
   const isPedestrianBlackspot = isBlackspotDetection && isPedestrianVariant;
   const isDbscanBlackspot = visualizationType === "dbscan_blackspot";
   const isIrcGreedyBlackspot = visualizationType === "irc_greedy_blackspot";
-  const isIrcGridBlackspot = visualizationType === "irc_grid_blackspot";
 
   const isLocationMarkers = visualizationType === "location_markers";
+  
+  const baseHeatmapData = snappedHeatmapData || data?.heatmap;
   const displayHeatmapData = isPedestrianVariant
-    ? data?.heatmap.filter(isPedestrianAccident)
-    : data?.heatmap;
+    ? baseHeatmapData?.filter(isPedestrianAccident)
+    : baseHeatmapData;
 
   const visualizationLayerType =
     isLocationMarkers && isPedestrianVariant

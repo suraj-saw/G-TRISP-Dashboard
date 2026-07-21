@@ -412,6 +412,20 @@ export default function DistrictDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [snappedHeatmapData, setSnappedHeatmapData] = useState<HeatmapPoint[] | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (filters.visualization_type === "density_heatmap" && districtName) {
+      fetchGujaratSnappedAccidents(filters, districtName).then(res => {
+        if (active) setSnappedHeatmapData(res.data);
+      }).catch(console.error);
+    } else {
+      setSnappedHeatmapData(null);
+    }
+    return () => { active = false; };
+  }, [filters, districtSlug]);
+
   // ── Auth check ──────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
@@ -657,9 +671,10 @@ export default function DistrictDashboard() {
   const isLocationMarkers =
     filters.visualization_type === "location_markers" ||
     !filters.visualization_type;
+  const baseHeatmapData = snappedHeatmapData || data.heatmap;
   const displayHeatmapData = isPedestrianVariant
-    ? data.heatmap.filter(isPedestrianAccident)
-    : data.heatmap;
+    ? baseHeatmapData.filter(isPedestrianAccident)
+    : baseHeatmapData;
 
   // const showDensityLegend = isDensityHeatmap || isKdeHeatmap || isWeightedKdeHeatmap;
   // const densityLegendTitle = isWeightedKdeHeatmap

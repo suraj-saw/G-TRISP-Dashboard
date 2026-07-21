@@ -46,9 +46,12 @@ export default function SeverityLegend({
 
   if (type === "location_markers" || type === "clusters") {
     isVisible = true;
-  } else if (type === "density_heatmap" || type.includes("blackspot")) {
+  } else if (type.includes("blackspot")) {
     // Show legend only when zoom is 12 or greater (when individual points start showing)
     isVisible = zoom >= 12;
+  } else if (type === "density_heatmap") {
+    // Density heatmap no longer shows individual accident markers when zoomed in
+    isVisible = false;
   }
 
   if (!isVisible) return null;

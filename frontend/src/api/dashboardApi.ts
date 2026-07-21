@@ -22,6 +22,7 @@ import type {
   FilterOptions,
   DashboardData,
   TemporalAnalysisData,
+  SnappedHeatmapPoint,
 } from "../types/dashboard";
 
 // ---------------------------------------------------------------------------
@@ -224,6 +225,21 @@ export const fetchTemporalAnalysis = async (
   const { data } = await API.get(`${SURAT_API_BASE}/temporal-analysis`, {
     params,
   });
+  return data;
+};
+
+/**
+ * Fetch snapped accidents data for Surat (Network Validation)
+ * Uses the same filtering logic as other dashboard endpoints.
+ * 
+ * @param filters Dashboard filter state
+ * @returns Snapped accidents data
+ */
+export const fetchSnappedAccidents = async (
+  filters: DashboardFilters
+): Promise<{ total: number; data: SnappedHeatmapPoint[] }> => {
+  const params = getParams(filters);
+  const { data } = await API.get(`${SURAT_API_BASE}/snapped-accidents`, { params });
   return data;
 };
 
