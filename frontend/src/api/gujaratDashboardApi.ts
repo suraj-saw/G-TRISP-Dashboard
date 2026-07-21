@@ -360,6 +360,41 @@ export const fetchGujaratPedestrianIrcGridBlackspots = async (
 };
 
 /**
+ * Fetch Network-constrained blackspot data for Gujarat
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns GeoJSON FeatureCollection of segments
+ */
+export const fetchGujaratNetworkBlackspots = async (
+  filters: DashboardFilters,
+  district: string
+): Promise<any> => {
+  const params = getParams(filters, district);
+  const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, {
+    params,
+  });
+  return data;
+};
+
+/**
+ * Fetch Pedestrian Network-constrained blackspot data for Gujarat
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns GeoJSON FeatureCollection of segments
+ */
+export const fetchGujaratPedestrianNetworkBlackspots = async (
+  filters: DashboardFilters,
+  district: string
+): Promise<any> => {
+  const params = getParams(filters, district);
+  params.set("is_pedestrian", "true");
+  const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, {
+    params,
+  });
+  return data;
+};
+
+/**
  * Fetch KDE heatmap data for Gujarat
  * @param filters - Dashboard filter options
  * @param district - District to scope the data

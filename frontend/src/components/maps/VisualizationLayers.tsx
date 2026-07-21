@@ -246,6 +246,7 @@ function DensityHeatmapLayers({
         "circle-stroke-color": "#FFFFFF",
         "circle-stroke-opacity": pointStrokeOpacityExpr as any,
       }}
+      showPointsOverlay={false}
     />
   );
 }
@@ -705,12 +706,8 @@ export function VisualizationLayers({
               ["zoom"],
               9,
               3,
-              11,
-              4,
-              13,
-              5.5,
               15,
-              7,
+              4,
             ],
             "circle-color": markerColor as any,
             "circle-opacity": [

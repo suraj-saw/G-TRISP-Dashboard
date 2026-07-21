@@ -224,9 +224,8 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
               ["linear"],
               ["zoom"],
               5, 2,
-              10, 3,
-              15, 4,
-              20, 5,
+              15, 3,
+              20, 4,
             ],
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "circle-color": severityColorExpression as any,
@@ -247,9 +246,8 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
               ["linear"],
               ["zoom"],
               5, 3,
-              10, 4,
-              15, 6,
-              20, 8,
+              15, 4,
+              20, 5,
             ],
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "circle-color": severityColorExpression as any,

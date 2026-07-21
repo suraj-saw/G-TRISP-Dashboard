@@ -19,6 +19,7 @@ import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLa
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
 import IrcBlackspotDetectionLayers from "../../components/maps/IrcBlackspotDetectionLayers";
 import SnappedAccidentLayers from "../../components/maps/SnappedAccidentLayers";
+import NetworkBlackspotLayers from "../../components/maps/NetworkBlackspotLayers";
 // import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
 // import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
 // import DensityMapOverlays from "../../components/maps/DensityMapOverlays";
@@ -65,6 +66,8 @@ import {
   fetchGujaratTemporalAnalysis,
   exportGujaratBlackspotCrashes,
   fetchGujaratSnappedAccidents,
+  fetchGujaratNetworkBlackspots,
+  fetchGujaratPedestrianNetworkBlackspots,
 } from "../../api/gujaratDashboardApi";
 import type {
   DashboardFilters,
@@ -647,7 +650,10 @@ export default function DistrictDashboard() {
   const isDbscanBlackspot = filters.visualization_type === "dbscan_blackspot";
   const isIrcGreedyBlackspot = filters.visualization_type === "irc_greedy_blackspot";
   const isIrcGridBlackspot = filters.visualization_type === "irc_grid_blackspot";
-  const isSnappedAccidents = filters.visualization_type === "snapped_accidents";
+  const isSnappedAccidents =
+    filters.visualization_type === "snapped_accidents";
+  const isNetworkBlackspot =
+    filters.visualization_type === "network_blackspot";
   const isLocationMarkers =
     filters.visualization_type === "location_markers" ||
     !filters.visualization_type;
@@ -1063,6 +1069,20 @@ export default function DistrictDashboard() {
                           }
                           exportFn={exportGujaratBlackspotCrashes}
                           analysisLabel="IRC 131 Blackspot (Grid)"
+                        />
+                      ) : isNetworkBlackspot && isPedestrianVariant ? (
+                        <NetworkBlackspotLayers
+                          key="pedestrian-network-blackspot"
+                          filters={filters}
+                          fetchFn={(f) => fetchGujaratPedestrianNetworkBlackspots(f, districtName)}
+                          analysisLabel="Pedestrian Network Blackspots (Segments)"
+                        />
+                      ) : isNetworkBlackspot ? (
+                        <NetworkBlackspotLayers
+                          key="network-blackspot"
+                          filters={filters}
+                          fetchFn={(f) => fetchGujaratNetworkBlackspots(f, districtName)}
+                          analysisLabel="Network Blackspots (Segments)"
                         />
                       ) : isSnappedAccidents ? (
                         <SnappedAccidentLayers

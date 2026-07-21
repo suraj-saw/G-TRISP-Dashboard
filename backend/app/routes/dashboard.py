@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.accident import Accident
 from app.models.snapped_accident import SnappedAccident
+from app.models.gujarat_road import GujaratRoad
+from app.utils.network_blackspot_utils import network_sliding_window
 
 from app.schemas.dashboard_schema import (
     CasualtyBreakdown,
@@ -3162,3 +3164,129 @@ def get_snapped_accidents(
     ]
 
     return {"total": len(points), "data": points}
+
+
+@router.get("/network-blackspots", summary="Get network-constrained blackspot segments")
+def get_network_blackspots(
+    db: Session = Depends(get_db),
+    district: Optional[str] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    road_classification: Optional[str] = Query(None),
+    weather_condition: Optional[str] = Query(None),
+    light_condition: Optional[str] = Query(None),
+    collision_type: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    taluka: Optional[str] = Query(None),
+    police_station: Optional[str] = Query(None),
+    is_pedestrian: bool = Query(False),
+    window_size_m: float = Query(500.0, description="Sliding window size in meters"),
+    score_threshold: int = Query(15, description="Minimum severity score threshold")
+):
+    """
+    Computes network-constrained blackspot road segments based on snapped accidents.
+    Uses sliding window analysis along Gujarat road geometries.
+    """
+    # 1. Fetch accidents and compute their fractional position along the road
+    query = db.query(
+        Accident.id.label("accident_id"),
+        Accident.severity,
+        SnappedAccident.road_id,
+        func.ST_LineLocatePoint(GujaratRoad.geometry, SnappedAccident.snapped_location).label("fraction"),
+        func.ST_Length(func.ST_Transform(GujaratRoad.geometry, 3857)).label("road_length_m") # use Web Mercator or Geography for length
+    ).join(
+        SnappedAccident, Accident.id == SnappedAccident.accident_id
+    ).join(
+        GujaratRoad, SnappedAccident.road_id == GujaratRoad.id
+    )
+
+    if is_pedestrian:
+        query = query.filter(
+            (
+                func.coalesce(Accident.pedestrian_killed, 0) +
+                func.coalesce(Accident.pedestrian_grievous_injury, 0) +
+                func.coalesce(Accident.pedestrian_minor_injury, 0)
+            ) > 0
+        )
+
+    query = apply_filters(
+        query, district, year, road_classification,
+        weather_condition, light_condition, collision_type,
+        date_from, date_to, taluka=taluka, db=db,
+        police_station=police_station
+    )
+    
+    if severity:
+        if isinstance(severity, list):
+            query = query.filter(Accident.severity.in_(severity))
+        else:
+            query = query.filter(Accident.severity == severity)
+
+    rows = query.all()
+    
+    accidents_data = [
+        {
+            "accident_id": r.accident_id,
+            "road_id": r.road_id,
+            "severity": r.severity,
+            "fraction": r.fraction,
+            "road_length_m": r.road_length_m
+        }
+        for r in rows
+    ]
+    
+    # 2. Run sliding window algorithm to get candidate segments
+    candidate_segments = network_sliding_window(
+        accidents_data,
+        window_size_m=window_size_m,
+        score_threshold=score_threshold
+    )
+    
+    # 3. Reconstruct LineString geometry for each candidate segment using DB
+    # We will build a GeoJSON FeatureCollection directly.
+    # To do this efficiently, we can query the DB for the substrings in one go.
+    
+    if not candidate_segments:
+        return {"type": "FeatureCollection", "features": []}
+        
+    features = []
+    
+    # For performance, we can construct a case statement or temporary values to query,
+    # or just query them individually if the list is small. Better yet, since we have road_id,
+    # start_fraction, end_fraction, we can query `ST_AsGeoJSON(ST_LineSubstring(geometry, start, end))`
+    
+    # We will query ST_AsGeoJSON for each segment.
+    # Let's batch them into a single query using unnest or just a loop since number of segments
+    # is usually reasonable.
+    
+    import json
+    for seg in candidate_segments:
+        # Extract substring
+        geom_query = db.query(
+            func.ST_AsGeoJSON(
+                func.ST_LineSubstring(
+                    GujaratRoad.geometry,
+                    seg["start_fraction"],
+                    seg["end_fraction"]
+                )
+            )
+        ).filter(GujaratRoad.id == seg["road_id"]).scalar()
+        
+        if geom_query:
+            features.append({
+                "type": "Feature",
+                "geometry": json.loads(geom_query),
+                "properties": {
+                    "road_id": seg["road_id"],
+                    "start_m": round(seg["start_m"], 2),
+                    "end_m": round(seg["end_m"], 2),
+                    "score": seg["score"],
+                    "accident_count": seg["accident_count"]
+                }
+            })
+            
+    return {
+        "type": "FeatureCollection",
+        "features": features
+    }

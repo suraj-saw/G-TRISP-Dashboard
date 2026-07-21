@@ -13,6 +13,7 @@ import type { User } from "../../types/user";
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
 import IrcBlackspotDetectionLayers from "../../components/maps/IrcBlackspotDetectionLayers";
+import NetworkBlackspotLayers from "../../components/maps/NetworkBlackspotLayers";
 
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
@@ -60,6 +61,8 @@ import {
   fetchIrcGridBlackspots,
   fetchPedestrianIrcGreedyBlackspots,
   fetchPedestrianIrcGridBlackspots,
+  fetchNetworkBlackspots,
+  fetchPedestrianNetworkBlackspots,
 } from "../../api/dashboardApi";
 import SuratBaseMap from "../../components/maps/SuratBaseMap";
 import SeverityLegend from "../../components/maps/SeverityLegend";
@@ -384,9 +387,12 @@ export default function Dashboard() {
 
   const activeFilterConfig = getFilterConfig(filters.visualization_type);
 
-  const visualizationType = filters.visualization_type || "location_markers";
-
-  const isTemporalAnalysis = visualizationType === "temporal_analysis";
+  const isIrcGridBlackspot =
+    filters.visualization_type === "irc_grid_blackspot";
+  const isNetworkBlackspot =
+    filters.visualization_type === "network_blackspot";
+  const isTemporalAnalysis =
+    filters.visualization_type === "temporal_analysis";
 
   // const isDensityHeatmap = visualizationType === "density_heatmap";
   // const showDensityLegend = isDensityHeatmap || isKdeHeatmap || isWeightedKdeHeatmap;
@@ -755,6 +761,20 @@ export default function Dashboard() {
                       fetchFn={fetchIrcGridBlackspots}
                       exportFn={exportBlackspotCrashes}
                       analysisLabel="IRC 131 Blackspot (Grid)"
+                    />
+                  ) : isNetworkBlackspot && isPedestrianVariant ? (
+                    <NetworkBlackspotLayers
+                      key="pedestrian-network-blackspot"
+                      filters={filters}
+                      fetchFn={fetchPedestrianNetworkBlackspots}
+                      analysisLabel="Pedestrian Network Blackspots (Segments)"
+                    />
+                  ) : isNetworkBlackspot ? (
+                    <NetworkBlackspotLayers
+                      key="network-blackspot"
+                      filters={filters}
+                      fetchFn={fetchNetworkBlackspots}
+                      analysisLabel="Network Blackspots (Segments)"
                     />
                   ) : (
                     <VisualizationLayers

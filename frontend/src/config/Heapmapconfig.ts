@@ -83,9 +83,9 @@ export const POINT_STROKE_OPACITY: [number, number][] = [
 ];
 
 export const POINT_RADIUS: [number, number][] = [
-  [12, 2.5],
-  [14, 5],
-  [16, 8],
+  [12, 3],
+  [14, 3.5],
+  [16, 4.5],
 ];
 
 // ---------------------------------------------------------------------------

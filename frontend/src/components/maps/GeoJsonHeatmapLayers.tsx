@@ -21,6 +21,7 @@ interface Props {
   circlePaint?: Record<string, unknown>;
   accidentPoints?: HeatmapPoint[];
   inspectDensity?: boolean;
+  showPointsOverlay?: boolean;
 }
 
 const SEVERITY_COLORS = {
@@ -76,8 +77,9 @@ export default function GeoJsonHeatmapLayers({
   weightProperty,
   precomputedSurface = false,
   circlePaint,
-  accidentPoints,
+  accidentPoints = [],
   inspectDensity = false,
+  showPointsOverlay = true,
 }: Props) {
   const { current: mapRef } = useMap();
   const [selected, setSelected] = useState<{
@@ -246,7 +248,7 @@ export default function GeoJsonHeatmapLayers({
             paint={kdeSurfaceCirclePaint as any}
           />
         )}
-        {(!precomputedSurface || !hasAccidentPoints) && (
+        {(!precomputedSurface || !hasAccidentPoints) && showPointsOverlay && (
           <Layer
             id={samplePointLayerId}
             type="circle"
@@ -263,7 +265,7 @@ export default function GeoJsonHeatmapLayers({
             minzoom={12}
             paint={{
               "circle-color": severityColorExpression as any,
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 1, 14, 2.2, 16, 4.2, 18, 5.6] as any,
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 1.5, 14, 2.5, 16, 3.5, 18, 4] as any,
               "circle-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 13.5, 0.18, 15, 0.7, 17, 0.95] as any,
               "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 12, 0.1, 15, 0.8, 17, 1.2] as any,
               "circle-stroke-color": "#FFFFFF",

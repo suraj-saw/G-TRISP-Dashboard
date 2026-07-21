@@ -354,6 +354,29 @@ export const fetchPedestrianIrcGridBlackspots = async (
 };
 
 /**
+ * Fetch Network-constrained Blackspots
+ */
+export const fetchNetworkBlackspots = async (
+  filters: DashboardFilters
+): Promise<any> => {
+  const params = getParams(filters);
+  const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, { params });
+  return data;
+};
+
+/**
+ * Fetch Pedestrian Network-constrained Blackspots
+ */
+export const fetchPedestrianNetworkBlackspots = async (
+  filters: DashboardFilters
+): Promise<any> => {
+  const params = getParams(filters);
+  params.set("is_pedestrian", "true");
+  const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, { params });
+  return data;
+};
+
+/**
  * Download CSV file of crashes associated with specific blackspots.
  * @param crashIds List of accident IDs
  * @param filename Desired filename for the download
