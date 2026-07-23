@@ -46,6 +46,8 @@ export default function SeverityLegend({
 
   if (type === "location_markers" || type === "clusters") {
     isVisible = true;
+  } else if (type.includes("network_blackspot")) {
+    isVisible = false;
   } else if (type.includes("blackspot")) {
     // Show legend only when zoom is 12 or greater (when individual points start showing)
     isVisible = zoom >= 12;

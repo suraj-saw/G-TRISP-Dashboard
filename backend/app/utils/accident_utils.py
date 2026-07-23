@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Optional, List
 from dateutil.relativedelta import relativedelta
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import extract
 from app.models.accident import Accident
 from app.utils.taluka_utils import apply_taluka_spatial_filter
@@ -186,17 +187,27 @@ def validate_observation_period(accidents: List, selected_years: Optional[List[i
     """
     from app.core.constants import MIN_ANALYSIS_YEARS
     
-    if selected_years:
-        # Directly evaluate based on user input parameters
-        num_years = len(set(selected_years))
-    else:
-        # Fallback: Extract years from the dataset itself if no explicit filter was provided
-        distinct_years = set()
-        for a in accidents:
-            dt = parse_accident_datetime_from_str(a.accident_date_time)
-            if dt:
-                distinct_years.add(dt.year)
-        num_years = len(distinct_years)
+    try:
+        if selected_years:
+            # Directly evaluate based on user input parameters
+            num_years = len(set(selected_years))
+        else:
+            # Fallback: Extract years from the dataset itself if no explicit filter was provided
+            distinct_years = set()
+            for a in accidents:
+                if not hasattr(a, "accident_date_time"):
+                    continue
+                    
+                val = a.accident_date_time
+                if isinstance(val, datetime):
+                    distinct_years.add(val.year)
+                elif isinstance(val, str):
+                    dt = parse_accident_datetime_from_str(val)
+                    if dt:
+                        distinct_years.add(dt.year)
+            num_years = len(distinct_years)
+    except Exception as e:
+        return f"Error in validate_observation_period: {str(e)}"
     
     if num_years < MIN_ANALYSIS_YEARS:
         return (

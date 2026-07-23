@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, Body
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import func, distinct, case
 from sqlalchemy.orm import Session
@@ -3182,7 +3182,7 @@ def get_network_blackspots(
     police_station: Optional[str] = Query(None),
     is_pedestrian: bool = Query(False),
     window_size_m: float = Query(500.0, description="Sliding window size in meters"),
-    score_threshold: int = Query(15, description="Minimum severity score threshold")
+    min_qualifying_crashes: int = Query(3, description="Minimum qualifying crashes")
 ):
     """
     Computes network-constrained blackspot road segments based on snapped accidents.
@@ -3192,6 +3192,7 @@ def get_network_blackspots(
     query = db.query(
         Accident.id.label("accident_id"),
         Accident.severity,
+        Accident.accident_date_time,
         SnappedAccident.road_id,
         func.ST_LineLocatePoint(GujaratRoad.geometry, SnappedAccident.snapped_location).label("fraction"),
         func.ST_Length(func.ST_Transform(GujaratRoad.geometry, 3857)).label("road_length_m") # use Web Mercator or Geography for length
@@ -3225,6 +3226,10 @@ def get_network_blackspots(
 
     rows = query.all()
     
+    validation_error = validate_observation_period(rows, selected_years=year)
+    if validation_error:
+        return JSONResponse(status_code=400, content={"detail": validation_error})
+    
     accidents_data = [
         {
             "accident_id": r.accident_id,
@@ -3240,7 +3245,7 @@ def get_network_blackspots(
     candidate_segments = network_sliding_window(
         accidents_data,
         window_size_m=window_size_m,
-        score_threshold=score_threshold
+        min_qualifying_crashes=min_qualifying_crashes
     )
     
     # 3. Reconstruct LineString geometry for each candidate segment using DB
@@ -3282,6 +3287,13 @@ def get_network_blackspots(
                     "start_m": round(seg["start_m"], 2),
                     "end_m": round(seg["end_m"], 2),
                     "score": seg["score"],
+                    "priority_label": seg.get("priority_label", "Unknown"),
+                    "priority_color": seg.get("priority_color", "#DC2626"),
+                    "qualifying_count": seg.get("qualifying_count", 0),
+                    "fatal_count": seg.get("fatal_count", 0),
+                    "grievous_count": seg.get("grievous_count", 0),
+                    "minor_hospitalized_count": seg.get("minor_hospitalized_count", 0),
+                    "minor_non_hospitalized_count": seg.get("minor_non_hospitalized_count", 0),
                     "accident_count": seg["accident_count"]
                 }
             })

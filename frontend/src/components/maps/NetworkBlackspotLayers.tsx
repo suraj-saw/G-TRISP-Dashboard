@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import type { DashboardFilters } from "../../types/dashboard";
 
 interface Props {
@@ -17,6 +17,13 @@ interface HoveredSegment {
   end_m: number;
   score: number;
   accident_count: number;
+  priority_label?: string;
+  priority_color?: string;
+  qualifying_count?: number;
+  fatal_count?: number;
+  grievous_count?: number;
+  minor_hospitalized_count?: number;
+  minor_non_hospitalized_count?: number;
 }
 
 export default function NetworkBlackspotLayers({
@@ -44,7 +51,11 @@ export default function NetworkBlackspotLayers({
       } catch (err) {
         if (mounted) {
           console.error("Failed to load network blackspots:", err);
-          setError("Failed to analyze network blackspots.");
+          setError(
+            err?.response?.status
+              ? `Request failed (${err.response.status}): ${err.response.data?.detail || err.message}`
+              : err?.message || "Failed to analyze network blackspots."
+          );
         }
       } finally {
         if (mounted) setLoading(false);
@@ -77,6 +88,13 @@ export default function NetworkBlackspotLayers({
           end_m: f.properties?.end_m,
           score: f.properties?.score,
           accident_count: f.properties?.accident_count,
+          priority_label: f.properties?.priority_label,
+          priority_color: f.properties?.priority_color,
+          qualifying_count: f.properties?.qualifying_count,
+          fatal_count: f.properties?.fatal_count,
+          grievous_count: f.properties?.grievous_count,
+          minor_hospitalized_count: f.properties?.minor_hospitalized_count,
+          minor_non_hospitalized_count: f.properties?.minor_non_hospitalized_count,
         });
       } else {
         map.getCanvas().style.cursor = "";
@@ -91,7 +109,7 @@ export default function NetworkBlackspotLayers({
 
     map.on("mousemove", onMove);
     map.on("mouseout", onLeave);
-    
+
     return () => {
       map.off("mousemove", onMove);
       map.off("mouseout", onLeave);
@@ -99,18 +117,42 @@ export default function NetworkBlackspotLayers({
     };
   }, [mapRef]);
 
+  const StatusBadge = ({ children }: { children: React.ReactNode }) => (
+    <div className="pointer-events-none absolute top-4 left-4 z-20">
+      <div className="pointer-events-auto rounded-full border border-slate-200/50 bg-white/90 px-3 py-2 shadow-xl backdrop-blur-md text-[11px] font-medium text-slate-700 flex items-center gap-2 transition-all duration-300 hover:bg-white/95">
+        {children}
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-lg border border-slate-200 flex items-center space-x-2 z-50">
-        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-        <span className="text-sm font-medium text-slate-700">
-          Computing network blackspots...
-        </span>
-      </div>
+      <StatusBadge>
+        <Loader2 size={14} className="animate-spin text-indigo-500" />
+        Running {analysisLabel}…
+      </StatusBadge>
     );
   }
 
-  if (error || !data) return null;
+  if (error) {
+    return (
+      <StatusBadge>
+        <AlertCircle size={14} className="text-red-500" />
+        <span className="text-red-600 font-semibold">{error}</span>
+      </StatusBadge>
+    );
+  }
+
+  if (!data || data.features?.length === 0) {
+    return (
+      <StatusBadge>
+        <AlertCircle size={14} className="text-amber-500" />
+        <span>
+          No network segments found for the given criteria.
+        </span>
+      </StatusBadge>
+    );
+  }
 
   return (
     <>
@@ -119,19 +161,18 @@ export default function NetworkBlackspotLayers({
           id="network-blackspot-line-bg"
           type="line"
           paint={{
-            "line-color": "#FFFFFF",
+            "line-color": "#000000",
             "line-width": ["interpolate", ["linear"], ["zoom"], 10, 4, 15, 10],
-            "line-opacity": 0.8,
-            "line-blur": 2,
+            "line-opacity": 0.6,
           }}
         />
         <Layer
           id="network-blackspot-line"
           type="line"
           paint={{
-            "line-color": "#DC2626", // Red
+            "line-color": ["coalesce", ["get", "priority_color"], "#DC2626"],
             "line-width": ["interpolate", ["linear"], ["zoom"], 10, 2, 15, 6],
-            "line-opacity": 0.9,
+            "line-opacity": 1.0,
           }}
         />
       </Source>
@@ -144,24 +185,68 @@ export default function NetworkBlackspotLayers({
           closeButton={false}
           closeOnClick={false}
           offset={12}
-          className="accident-popup"
+          className="z-50 accident-popup"
         >
-          <div className="bg-white rounded-lg shadow-xl overflow-hidden" style={{ minWidth: 200, fontFamily: "inherit" }}>
-            <div className="bg-red-600 text-white px-3 py-1.5 text-xs font-bold uppercase tracking-wide">
-              {analysisLabel}
+          <div className="w-72 overflow-hidden rounded-xl bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div
+              className="px-4 py-2 text-[10px] font-bold tracking-widest text-white uppercase"
+              style={{
+                backgroundColor: hovered.priority_color ?? "#DC2626",
+              }}
+            >
+              {hovered.priority_label?.replace(/Blackspot/gi, "Segment") ?? "Unknown Segment"}
             </div>
-            <div className="p-3 text-sm text-slate-700 space-y-2">
-              <div>
-                <span className="font-bold text-lg text-red-600 leading-none">{hovered.accident_count}</span>
-                <span className="text-slate-500 ml-1 text-xs uppercase tracking-wide">crashes in segment</span>
+
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-extrabold text-slate-800">
+                    Network Segment
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-x-2 gap-y-1 pt-2 border-t border-slate-100">
-                <div className="text-slate-500 text-xs">Road ID</div>
-                <div className="font-medium text-right text-xs truncate">{hovered.road_id}</div>
-                <div className="text-slate-500 text-xs">Length</div>
-                <div className="font-medium text-right text-xs">{(hovered.end_m - hovered.start_m).toFixed(0)}m</div>
-                <div className="text-slate-500 text-xs">Severity Score</div>
-                <div className="font-medium text-right text-xs">{hovered.score}</div>
+
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                <div className="flex flex-col items-center p-1.5 rounded-lg bg-red-50 border border-red-100">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                    Fatal
+                  </span>
+                  <span className="text-sm font-bold text-[#4C1D1D]">
+                    {hovered.fatal_count ?? "—"}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center p-1.5 rounded-lg bg-orange-50 border border-orange-100">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider text-center leading-tight">
+                    Grievous
+                  </span>
+                  <span className="text-sm font-bold text-[#DC2626]">
+                    {hovered.grievous_count ?? "—"}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center p-1.5 rounded-lg bg-amber-50 border border-amber-100">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider text-center leading-tight">
+                    Min Hosp
+                  </span>
+                  <span className="text-sm font-bold text-[#EA580C]">
+                    {hovered.minor_hospitalized_count ?? "—"}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center p-1.5 rounded-lg bg-yellow-50 border border-yellow-100">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider text-center leading-tight">
+                    Min Non
+                  </span>
+                  <span className="text-sm font-bold text-[#F59E0B]">
+                    {hovered.minor_non_hospitalized_count ?? "—"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-xs text-slate-500 text-center">
+                <span className="font-bold text-slate-700">
+                  {hovered.accident_count.toLocaleString()}
+                </span>{" "}
+                total crashes ({hovered.qualifying_count ?? 0} qualifying) within{" "}
+                {(hovered.end_m - hovered.start_m).toFixed(0)}m segment
               </div>
             </div>
           </div>

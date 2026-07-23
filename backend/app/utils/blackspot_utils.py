@@ -219,13 +219,16 @@ def _build_qualification_reasons(qualifying_count: int) -> list[str]:
     return reasons
 
 
-def priority_label_and_color(score: int) -> tuple[str, str]:
+def priority_label_and_color(score: int, qualifying_count: int = 5) -> tuple[str, str]:
     """
     Return the (label, hex_colour) tier for a given priority score.
 
     Iterates PRIORITY_LEVELS from highest to lowest threshold.  Falls back to
     "Identified Blackspot" with a neutral amber colour if no threshold is met.
     """
+    if qualifying_count < 5:
+        return "Potential Segment", "#EAB308"
+        
     for threshold, label, color in PRIORITY_LEVELS:
         if score >= threshold:
             return label, color
