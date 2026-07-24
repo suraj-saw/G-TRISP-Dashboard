@@ -2728,6 +2728,12 @@ def get_irc_greedy_blackspots(
         else:
             road_network_km = DEFAULT_ROAD_NETWORK_KM
     
+    base_query = apply_filters(
+        db.query(Accident),
+        district, year, None, None, None, None, date_from, date_to, taluka=None, db=db, police_station=None
+    )
+    total_network_crashes = base_query.count()
+
     query = apply_filters(
         db.query(Accident),
         district, year, road_classification,
@@ -2772,7 +2778,7 @@ def get_irc_greedy_blackspots(
     if years_of_data < 1.0:
         years_of_data = 1.0
 
-    blackspots = irc_greedy_blackspots(points, radius_m=radius_m, road_network_km=road_network_km, years_of_data=years_of_data)
+    blackspots = irc_greedy_blackspots(points, radius_m=radius_m, road_network_km=road_network_km, years_of_data=years_of_data, total_network_crashes=total_network_crashes)
     geojson = irc_blackspots_to_geojson(blackspots, radius_m=radius_m)
 
     return {
@@ -2817,6 +2823,12 @@ def get_irc_grid_blackspots(
         else:
             road_network_km = DEFAULT_ROAD_NETWORK_KM
     
+    base_query = apply_filters(
+        db.query(Accident),
+        district, year, None, None, None, None, date_from, date_to, taluka=None, db=db, police_station=None
+    )
+    total_network_crashes = base_query.count()
+
     query = apply_filters(
         db.query(Accident),
         district, year, road_classification,
@@ -2861,7 +2873,7 @@ def get_irc_grid_blackspots(
     if years_of_data < 1.0:
         years_of_data = 1.0
 
-    blackspots = irc_grid_blackspots(points, radius_m=radius_m, spacing_m=spacing_m, road_network_km=road_network_km, years_of_data=years_of_data)
+    blackspots = irc_grid_blackspots(points, radius_m=radius_m, spacing_m=spacing_m, road_network_km=road_network_km, years_of_data=years_of_data, total_network_crashes=total_network_crashes)
     geojson = irc_blackspots_to_geojson(blackspots, radius_m=radius_m)
 
     return {
@@ -2905,6 +2917,12 @@ def get_pedestrian_irc_greedy_blackspots(
         else:
             road_network_km = DEFAULT_ROAD_NETWORK_KM
     
+    base_query = apply_filters(
+        db.query(Accident),
+        district, year, None, None, None, None, date_from, date_to, taluka=None, db=db, police_station=None
+    )
+    total_network_crashes = base_query.count()
+
     query = apply_filters(
         db.query(Accident),
         district, year, road_classification,
@@ -2957,7 +2975,7 @@ def get_pedestrian_irc_greedy_blackspots(
     if years_of_data < 1.0:
         years_of_data = 1.0
 
-    blackspots = irc_greedy_blackspots(points, radius_m=radius_m, road_network_km=road_network_km, years_of_data=years_of_data)
+    blackspots = irc_greedy_blackspots(points, radius_m=radius_m, road_network_km=road_network_km, years_of_data=years_of_data, total_network_crashes=total_network_crashes)
     geojson = irc_blackspots_to_geojson(blackspots, radius_m=radius_m)
 
     return {
@@ -3002,6 +3020,12 @@ def get_pedestrian_irc_grid_blackspots(
         else:
             road_network_km = DEFAULT_ROAD_NETWORK_KM
     
+    base_query = apply_filters(
+        db.query(Accident),
+        district, year, None, None, None, None, date_from, date_to, taluka=None, db=db, police_station=None
+    )
+    total_network_crashes = base_query.count()
+
     query = apply_filters(
         db.query(Accident),
         district, year, road_classification,
@@ -3054,7 +3078,7 @@ def get_pedestrian_irc_grid_blackspots(
     if years_of_data < 1.0:
         years_of_data = 1.0
 
-    blackspots = irc_grid_blackspots(points, radius_m=radius_m, spacing_m=spacing_m, road_network_km=road_network_km, years_of_data=years_of_data)
+    blackspots = irc_grid_blackspots(points, radius_m=radius_m, spacing_m=spacing_m, road_network_km=road_network_km, years_of_data=years_of_data, total_network_crashes=total_network_crashes)
     geojson = irc_blackspots_to_geojson(blackspots, radius_m=radius_m)
 
     return {

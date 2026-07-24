@@ -289,7 +289,17 @@ export default function DbscanBlackspotDetectionLayers({
           type="fill"
           paint={{
             "fill-color": PRIORITY_COLOR_EXPR as any,
-            "fill-opacity": 0.15,
+            "fill-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              0.25,
+              13,
+              0.15,
+              15,
+              0.08,
+            ],
           }}
         />
         <Layer
@@ -297,9 +307,29 @@ export default function DbscanBlackspotDetectionLayers({
           type="line"
           paint={{
             "line-color": PRIORITY_COLOR_EXPR as any,
-            "line-width": 1.5,
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              2,
+              14,
+              1.5,
+              16,
+              1,
+            ],
             "line-dasharray": [3, 2],
-            "line-opacity": 0.8,
+            "line-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              0.9,
+              15,
+              0.6,
+              17,
+              0.3,
+            ],
           }}
         />
       </Source>
@@ -310,50 +340,122 @@ export default function DbscanBlackspotDetectionLayers({
         data={data.centroids as any}
       >
         <Layer
+          id="dbscan-centroids-shadow"
+          type="circle"
+          paint={{
+            "circle-radius": [
+              "*",
+              [
+                "interpolate",
+                ["linear"],
+                ["get", "crash_count"],
+                5,
+                7,
+                15,
+                11,
+                50,
+                16,
+                150,
+                22,
+                350,
+                28,
+              ],
+              [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                8,
+                0.3,
+                12,
+                0.6,
+                15,
+                1,
+              ],
+            ],
+            "circle-color": "#000000",
+            "circle-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              0,
+              12,
+              0.15,
+              14,
+              0.2,
+              17,
+              0.05,
+            ],
+            "circle-blur": 1.5,
+          }}
+        />
+        <Layer
           id="dbscan-centroids-point"
           type="circle"
           paint={{
             "circle-radius": [
-              "interpolate",
-              ["linear"],
-              ["get", "crash_count"],
-              5,
-              5,
-              15,
-              8,
-              50,
-              12,
-              150,
-              16,
-              350,
-              20,
+              "*",
+              [
+                "interpolate",
+                ["linear"],
+                ["get", "crash_count"],
+                5,
+                5,
+                15,
+                8,
+                50,
+                12,
+                150,
+                16,
+                350,
+                20,
+              ],
+              [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                8,
+                0.3,
+                12,
+                0.6,
+                15,
+                1,
+              ],
             ],
             "circle-color": PRIORITY_COLOR_EXPR as any,
             "circle-opacity": [
               "interpolate",
               ["linear"],
               ["zoom"],
-              10,
-              0.95,
-              14,
+              8,
+              0.7,
+              12,
               0.85,
               15,
-              0.5,
-              17,
-              0.1,
+              0.95,
             ],
-            "circle-stroke-width": 2,
+            "circle-stroke-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              8,
+              0.5,
+              12,
+              1.5,
+              15,
+              2.5,
+            ],
             "circle-stroke-color": "#FFFFFF",
             "circle-stroke-opacity": [
               "interpolate",
               ["linear"],
               ["zoom"],
-              10,
-              1,
-              15,
+              8,
+              0.5,
+              12,
               0.8,
-              17,
-              0.2,
+              15,
+              1,
             ],
           }}
         />

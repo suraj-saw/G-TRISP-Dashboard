@@ -63,12 +63,14 @@ def irc_greedy_blackspots(
     radius_m: float = 250.0,
     road_network_km: float = 1900.0,
     years_of_data: float = 3.0,
+    total_network_crashes: Optional[int] = None,
 ) -> List[IrcBlackspot]:
     n = len(points)
     if n == 0:
         return []
 
-    M = compute_M(n, road_network_km, years_of_data)
+    crashes_for_m = total_network_crashes if total_network_crashes is not None else n
+    M = compute_M(crashes_for_m, road_network_km, years_of_data)
     min_crashes = int(math.ceil(3.0 * M * years_of_data))
     if min_crashes < 1:
         min_crashes = 1
@@ -159,12 +161,14 @@ def irc_grid_blackspots(
     spacing_m: float = 50.0,
     road_network_km: float = 1900.0,
     years_of_data: float = 3.0,
+    total_network_crashes: Optional[int] = None,
 ) -> List[IrcBlackspot]:
     n = len(points)
     if n == 0:
         return []
 
-    M = compute_M(n, road_network_km, years_of_data)
+    crashes_for_m = total_network_crashes if total_network_crashes is not None else n
+    M = compute_M(crashes_for_m, road_network_km, years_of_data)
     min_crashes = int(math.ceil(3.0 * M * years_of_data))
     if min_crashes < 1:
         min_crashes = 1
@@ -178,15 +182,20 @@ def irc_grid_blackspots(
     x0, x1 = min(xs) - radius_m, max(xs) + radius_m
     y0, y1 = min(ys) - radius_m, max(ys) + radius_m
 
-    # Create grid points
-    grid_pts = []
-    cx = x0
-    while cx <= x1:
-        cy = y0
-        while cy <= y1:
-            grid_pts.append((cx, cy))
-            cy += spacing_m
-        cx += spacing_m
+    # Create grid points only around actual crash locations
+    # to avoid scanning massive empty areas of the bounding box.
+    valid_grid_indices = set()
+    for x, y in zip(xs, ys):
+        min_i = int(math.floor((x - radius_m - x0) / spacing_m))
+        max_i = int(math.ceil((x + radius_m - x0) / spacing_m))
+        min_j = int(math.floor((y - radius_m - y0) / spacing_m))
+        max_j = int(math.ceil((y + radius_m - y0) / spacing_m))
+        
+        for i in range(min_i, max_i + 1):
+            for j in range(min_j, max_j + 1):
+                valid_grid_indices.add((i, j))
+                
+    grid_pts = [(x0 + i * spacing_m, y0 + j * spacing_m) for (i, j) in valid_grid_indices]
 
     # Bucket crashes into spatial grid for fast radius lookup
     cell_size = max(radius_m, 1.0)

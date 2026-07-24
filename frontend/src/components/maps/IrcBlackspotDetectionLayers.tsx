@@ -351,7 +351,7 @@ export default function IrcBlackspotDetectionLayers({
           type="fill"
           paint={{
             "fill-color": IRC_CATEGORY_COLOR_EXPR as any,
-            "fill-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.35, 13, 0.2, 15, 0.1],
+            "fill-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.45, 13, 0.3, 15, 0.15],
           }}
         />
         <Layer
@@ -359,8 +359,9 @@ export default function IrcBlackspotDetectionLayers({
           type="line"
           paint={{
             "line-color": IRC_CATEGORY_COLOR_EXPR as any,
-            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 2, 14, 1.5, 16, 1],
-            "line-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.9, 15, 0.7, 17, 0.4],
+            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 2.5, 14, 2, 16, 1.5],
+            "line-dasharray": [2, 1],
+            "line-opacity": ["interpolate", ["linear"], ["zoom"], 10, 1, 15, 0.8, 17, 0.5],
           }}
         />
       </Source>
@@ -371,18 +372,35 @@ export default function IrcBlackspotDetectionLayers({
         data={data.centroids as any}
       >
         <Layer
+          id="irc-blackspot-centroids-shadow"
+          type="circle"
+          paint={{
+            "circle-radius": [
+              "*",
+              ["interpolate", ["linear"], ["get", "crash_count"], 5, 7, 15, 11, 50, 16, 150, 22, 350, 28],
+              ["interpolate", ["linear"], ["zoom"], 8, 0.3, 12, 0.6, 15, 1]
+            ],
+            "circle-color": "#000000",
+            "circle-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0, 12, 0.15, 14, 0.2, 17, 0.05],
+            "circle-blur": 1.5,
+          }}
+        />
+        <Layer
           id="irc-blackspot-centroids-point"
           type="circle"
           paint={{
-            "circle-radius": ["interpolate", ["linear"], ["get", "crash_count"], 5, 5, 15, 8, 50, 12, 150, 16, 350, 20],
+            "circle-radius": [
+              "*",
+              ["interpolate", ["linear"], ["get", "crash_count"], 5, 5, 15, 8, 50, 12, 150, 16, 350, 20],
+              ["interpolate", ["linear"], ["zoom"], 8, 0.3, 12, 0.6, 15, 1]
+            ],
             "circle-color": IRC_CATEGORY_COLOR_EXPR as any,
-            "circle-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.95, 14, 0.85, 15, 0.5, 17, 0.1],
-            "circle-stroke-width": 2,
+            "circle-opacity": ["interpolate", ["linear"], ["zoom"], 8, 0.7, 12, 0.85, 15, 0.95],
+            "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 8, 0.5, 12, 1.5, 15, 2.5],
             "circle-stroke-color": "#FFFFFF",
-            "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 10, 1, 15, 0.8, 17, 0.2],
+            "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 8, 0.5, 12, 0.8, 15, 1],
           }}
         />
-
       </Source>
 
       <StatusBadge>
