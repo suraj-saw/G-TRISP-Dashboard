@@ -1,12 +1,84 @@
 import { useEffect, useState } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
 import { Loader2, AlertCircle } from "lucide-react";
-import type { DashboardFilters } from "../../types/dashboard";
+import type { DashboardFilters, HeatmapPoint, SnappedHeatmapPoint } from "../../types/dashboard";
+
+const SEVERITY_COLORS = {
+  Fatal: "#B91C1C",
+  "Grievous Injury": "#EA580C",
+  "Minor Injury Hospitalized": "#F59E0B",
+  "Minor Injury Non Hospitalized": "#FBBF24",
+  "No Injury": "#65A30D",
+  default: "#64748B",
+} as const;
+
+const severityColorExpression = [
+  "case",
+  ["in", "fatal", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+  SEVERITY_COLORS.Fatal,
+  ["in", "grievous", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+  SEVERITY_COLORS["Grievous Injury"],
+  [
+    "in",
+    "minor injury hospitalized",
+    ["downcase", ["coalesce", ["get", "severity"], ""]],
+  ],
+  SEVERITY_COLORS["Minor Injury Hospitalized"],
+  [
+    "in",
+    "minor injury non",
+    ["downcase", ["coalesce", ["get", "severity"], ""]],
+  ],
+  SEVERITY_COLORS["Minor Injury Non Hospitalized"],
+  [
+    "any",
+    ["in", "no injury", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+    ["in", "damage only", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+  ],
+  SEVERITY_COLORS["No Injury"],
+  SEVERITY_COLORS.default,
+] as const;
 
 interface Props {
   filters: DashboardFilters;
   fetchFn: (filters: DashboardFilters) => Promise<unknown>;
+  fetchSnappedPointsFn?: (filters: DashboardFilters) => Promise<{ total: number; data: SnappedHeatmapPoint[] }>;
   analysisLabel?: string;
+  crashLabel?: string;
+}
+
+function buildAccidentGeojson(
+  data?: SnappedHeatmapPoint[]
+): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features:
+      data
+        ?.filter(
+          (p) => Number.isFinite(p.longitude) && Number.isFinite(p.latitude)
+        )
+        .map((p) => ({
+          type: "Feature" as const,
+          geometry: {
+            type: "Point" as const,
+            coordinates: [p.longitude, p.latitude],
+          },
+          properties: {
+            accident_id: p.accident_id,
+            severity: p.severity,
+            police_station: p.police_station ?? p.district,
+            road_name: p.road_name,
+            road_classification: p.road_classification,
+            weather_condition: p.weather_condition,
+            light_condition: p.light_condition,
+            collision_type: p.collision_type,
+            accident_date_time: p.accident_date_time,
+            pedestrian_killed: p.pedestrian_killed,
+            pedestrian_grievous_injury: p.pedestrian_grievous_injury,
+            pedestrian_minor_injury: p.pedestrian_minor_injury,
+          },
+        })) || [],
+  };
 }
 
 interface HoveredSegment {
@@ -29,16 +101,33 @@ interface HoveredSegment {
 export default function NetworkBlackspotLayers({
   filters,
   fetchFn,
+  fetchSnappedPointsFn,
   analysisLabel = "Network-Constrained Blackspots",
+  crashLabel = "crashes",
 }: Props) {
   const { current: mapRef } = useMap();
+  
   const [data, setData] = useState<GeoJSON.FeatureCollection | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hovered, setHovered] = useState<HoveredSegment | null>(null);
 
+  const [snappedPointsData, setSnappedPointsData] = useState<GeoJSON.FeatureCollection | null>(null);
+
   useEffect(() => {
     let mounted = true;
+
+    if (fetchSnappedPointsFn) {
+      fetchSnappedPointsFn(filters)
+        .then((res) => {
+          if (mounted && res?.data) {
+            setSnappedPointsData(buildAccidentGeojson(res.data));
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to fetch snapped points for network blackspots:", err);
+        });
+    }
 
     const loadData = async () => {
       setLoading(true);
@@ -178,6 +267,89 @@ export default function NetworkBlackspotLayers({
           }}
         />
       </Source>
+
+      {snappedPointsData && (
+        <Source id="network-accident-points-source" type="geojson" data={snappedPointsData}>
+          <Layer
+            id="network-accident-points-halo"
+            type="circle"
+            paint={{
+              "circle-radius": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                13,
+                4,
+                15,
+                7,
+                17,
+                10,
+              ],
+              "circle-color": severityColorExpression as any,
+              "circle-opacity": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                12,
+                0,
+                13,
+                0.15,
+                15,
+                0.25,
+              ],
+              "circle-blur": 0.8,
+            }}
+          />
+          <Layer
+            id="network-accident-points"
+            type="circle"
+            paint={{
+              "circle-radius": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                12,
+                1.5,
+                13,
+                2.5,
+                15,
+                4,
+                17,
+                5.5,
+                19,
+                7,
+              ],
+              "circle-color": severityColorExpression as any,
+              "circle-opacity": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                12,
+                0,
+                13,
+                0.65,
+                14,
+                0.85,
+                15,
+                0.95,
+              ],
+              "circle-stroke-width": 1,
+              "circle-stroke-color": "#FFFFFF",
+              "circle-stroke-opacity": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                12,
+                0,
+                13,
+                0.6,
+                15,
+                0.9,
+              ],
+            }}
+          />
+        </Source>
+      )}
 
       {hovered && (
         <Popup

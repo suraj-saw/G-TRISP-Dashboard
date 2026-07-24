@@ -773,6 +773,7 @@ export default function Dashboard() {
                       key="pedestrian-network-blackspot"
                       filters={filters}
                       fetchFn={fetchPedestrianNetworkBlackspots}
+                      fetchSnappedPointsFn={fetchSnappedAccidents}
                       analysisLabel="Pedestrian Network Blackspots (Segments)"
                     />
                   ) : isNetworkBlackspot ? (
@@ -780,6 +781,7 @@ export default function Dashboard() {
                       key="network-blackspot"
                       filters={filters}
                       fetchFn={fetchNetworkBlackspots}
+                      fetchSnappedPointsFn={fetchSnappedAccidents}
                       analysisLabel="Network Blackspots (Segments)"
                     />
                   ) : isSnappedAccidents ? (

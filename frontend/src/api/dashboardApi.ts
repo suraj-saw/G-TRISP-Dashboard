@@ -97,6 +97,20 @@ const hasValue = (value?: string[]): boolean =>
 // API calls
 // ---------------------------------------------------------------------------
 
+const requestCache = new Map<string, Promise<any>>();
+
+function withCache<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  if (requestCache.has(key)) {
+    return requestCache.get(key) as Promise<T>;
+  }
+  const promise = fetcher().catch((err) => {
+    requestCache.delete(key);
+    throw err;
+  });
+  requestCache.set(key, promise);
+  return promise;
+}
+
 /**
  * Fetch filter options for the Surat dashboard.
  */
@@ -272,8 +286,11 @@ export const fetchBlackspots = async (
   filters: DashboardFilters
 ): Promise<BlackspotData> => {
   const params = getParams(filters);
-  const { data } = await API.get(`${SURAT_API_BASE}/blackspots`, { params });
-  return data;
+  const cacheKey = `blackspots_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${SURAT_API_BASE}/blackspots`, { params });
+    return data;
+  });
 };
 
 /**
@@ -284,10 +301,13 @@ export const fetchPedestrianBlackspots = async (
   filters: DashboardFilters
 ): Promise<BlackspotData> => {
   const params = getParams(filters);
-  const { data } = await API.get(`${SURAT_API_BASE}/pedestrian-blackspots`, {
-    params,
+  const cacheKey = `pedestrian_blackspots_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${SURAT_API_BASE}/pedestrian-blackspots`, {
+      params,
+    });
+    return data;
   });
-  return data;
 };
 
 /**
@@ -298,10 +318,13 @@ export const fetchDbscanBlackspots = async (
   filters: DashboardFilters
 ): Promise<BlackspotData> => {
   const params = getParams(filters);
-  const { data } = await API.get(`${SURAT_API_BASE}/dbscan-blackspots`, {
-    params,
+  const cacheKey = `dbscan_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${SURAT_API_BASE}/dbscan-blackspots`, {
+      params,
+    });
+    return data;
   });
-  return data;
 };
 
 /**
@@ -312,13 +335,16 @@ export const fetchPedestrianDbscanBlackspots = async (
   filters: DashboardFilters
 ): Promise<BlackspotData> => {
   const params = getParams(filters);
-  const { data } = await API.get(
-    `${SURAT_API_BASE}/pedestrian-dbscan-blackspots`,
-    {
-      params,
-    }
-  );
-  return data;
+  const cacheKey = `pedestrian_dbscan_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(
+      `${SURAT_API_BASE}/pedestrian-dbscan-blackspots`,
+      {
+        params,
+      }
+    );
+    return data;
+  });
 };
 
 /**
@@ -329,8 +355,11 @@ export const fetchIrcGreedyBlackspots = async (
   filters: DashboardFilters
 ): Promise<BlackspotData> => {
   const params = getParams(filters);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/irc-greedy-blackspots`, { params });
-  return data;
+  const cacheKey = `irc_greedy_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/irc-greedy-blackspots`, { params });
+    return data;
+  });
 };
 
 /**
@@ -341,8 +370,11 @@ export const fetchIrcGridBlackspots = async (
   filters: DashboardFilters
 ): Promise<BlackspotData> => {
   const params = getParams(filters);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/irc-grid-blackspots`, { params });
-  return data;
+  const cacheKey = `irc_grid_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/irc-grid-blackspots`, { params });
+    return data;
+  });
 };
 
 /**
@@ -353,8 +385,11 @@ export const fetchPedestrianIrcGreedyBlackspots = async (
   filters: DashboardFilters
 ): Promise<BlackspotData> => {
   const params = getParams(filters);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-irc-greedy-blackspots`, { params });
-  return data;
+  const cacheKey = `pedestrian_irc_greedy_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-irc-greedy-blackspots`, { params });
+    return data;
+  });
 };
 
 /**
@@ -365,8 +400,11 @@ export const fetchPedestrianIrcGridBlackspots = async (
   filters: DashboardFilters
 ): Promise<BlackspotData> => {
   const params = getParams(filters);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-irc-grid-blackspots`, { params });
-  return data;
+  const cacheKey = `pedestrian_irc_grid_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-irc-grid-blackspots`, { params });
+    return data;
+  });
 };
 
 /**
@@ -376,8 +414,11 @@ export const fetchNetworkBlackspots = async (
   filters: DashboardFilters
 ): Promise<any> => {
   const params = getParams(filters);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, { params });
-  return data;
+  const cacheKey = `network_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, { params });
+    return data;
+  });
 };
 
 /**
@@ -388,8 +429,11 @@ export const fetchPedestrianNetworkBlackspots = async (
 ): Promise<any> => {
   const params = getParams(filters);
   params.set("is_pedestrian", "true");
-  const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, { params });
-  return data;
+  const cacheKey = `pedestrian_network_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, { params });
+    return data;
+  });
 };
 
 /**
@@ -451,8 +495,11 @@ export const fetchKdeHeatmap = async (
   if (filters.visualization_variant === "pedestrian") {
     params.append("is_pedestrian", "true");
   }
-  const { data } = await API.get(`${SURAT_API_BASE}/kde-heatmap`, { params });
-  return data;
+  const cacheKey = `kde_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${SURAT_API_BASE}/kde-heatmap`, { params });
+    return data;
+  });
 };
 
 /**
@@ -466,8 +513,11 @@ export const fetchWeightedKdeHeatmap = async (
   if (filters.visualization_variant === "pedestrian") {
     params.append("is_pedestrian", "true");
   }
-  const { data } = await API.get(`${SURAT_API_BASE}/weighted-kde-heatmap`, {
-    params,
+  const cacheKey = `weighted_kde_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${SURAT_API_BASE}/weighted-kde-heatmap`, {
+      params,
+    });
+    return data;
   });
-  return data;
 };

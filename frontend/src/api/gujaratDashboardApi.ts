@@ -29,6 +29,20 @@ import type {
 } from "../types/dashboard";
 import type { BlackspotData, KdeHeatmapData } from "./dashboardApi";
 
+const requestCache = new Map<string, Promise<any>>();
+
+function withCache<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  if (requestCache.has(key)) {
+    return requestCache.get(key) as Promise<T>;
+  }
+  const promise = fetcher().catch((err) => {
+    requestCache.delete(key);
+    throw err;
+  });
+  requestCache.set(key, promise);
+  return promise;
+}
+
 /**
  * Helper utility to serialize standard DashboardFilters and district scoping
  * into URLSearchParams for GET requests.
@@ -217,8 +231,11 @@ export const fetchGujaratBlackspots = async (
   district: string
 ): Promise<BlackspotData> => {
   const params = getParams(filters, district);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/blackspots`, { params });
-  return data;
+  const cacheKey = `gujarat_blackspots_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/blackspots`, { params });
+    return data;
+  });
 };
 
 /**
@@ -250,10 +267,13 @@ export const fetchGujaratPedestrianBlackspots = async (
   district: string
 ): Promise<BlackspotData> => {
   const params = getParams(filters, district);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-blackspots`, {
-    params,
+  const cacheKey = `gujarat_pedestrian_blackspots_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-blackspots`, {
+      params,
+    });
+    return data;
   });
-  return data;
 };
 
 /**
@@ -267,10 +287,13 @@ export const fetchGujaratDbscanBlackspots = async (
   district: string
 ): Promise<BlackspotData> => {
   const params = getParams(filters, district);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/dbscan-blackspots`, {
-    params,
+  const cacheKey = `gujarat_dbscan_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/dbscan-blackspots`, {
+      params,
+    });
+    return data;
   });
-  return data;
 };
 
 /**
@@ -284,11 +307,14 @@ export const fetchGujaratPedestrianDbscanBlackspots = async (
   district: string
 ): Promise<BlackspotData> => {
   const params = getParams(filters, district);
-  const { data } = await API.get(
-    `${GUJARAT_API_BASE}/pedestrian-dbscan-blackspots`,
-    { params }
-  );
-  return data;
+  const cacheKey = `gujarat_pedestrian_dbscan_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(
+      `${GUJARAT_API_BASE}/pedestrian-dbscan-blackspots`,
+      { params }
+    );
+    return data;
+  });
 };
 
 /**
@@ -302,10 +328,13 @@ export const fetchGujaratIrcGreedyBlackspots = async (
   district: string
 ): Promise<BlackspotData> => {
   const params = getParams(filters, district);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/irc-greedy-blackspots`, {
-    params,
+  const cacheKey = `gujarat_irc_greedy_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/irc-greedy-blackspots`, {
+      params,
+    });
+    return data;
   });
-  return data;
 };
 
 /**
@@ -319,10 +348,13 @@ export const fetchGujaratIrcGridBlackspots = async (
   district: string
 ): Promise<BlackspotData> => {
   const params = getParams(filters, district);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/irc-grid-blackspots`, {
-    params,
+  const cacheKey = `gujarat_irc_grid_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/irc-grid-blackspots`, {
+      params,
+    });
+    return data;
   });
-  return data;
 };
 
 /**
@@ -336,10 +368,13 @@ export const fetchGujaratPedestrianIrcGreedyBlackspots = async (
   district: string
 ): Promise<BlackspotData> => {
   const params = getParams(filters, district);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-irc-greedy-blackspots`, {
-    params,
+  const cacheKey = `gujarat_pedestrian_irc_greedy_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-irc-greedy-blackspots`, {
+      params,
+    });
+    return data;
   });
-  return data;
 };
 
 /**
@@ -353,10 +388,13 @@ export const fetchGujaratPedestrianIrcGridBlackspots = async (
   district: string
 ): Promise<BlackspotData> => {
   const params = getParams(filters, district);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-irc-grid-blackspots`, {
-    params,
+  const cacheKey = `gujarat_pedestrian_irc_grid_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-irc-grid-blackspots`, {
+      params,
+    });
+    return data;
   });
-  return data;
 };
 
 /**
@@ -370,10 +408,13 @@ export const fetchGujaratNetworkBlackspots = async (
   district: string
 ): Promise<any> => {
   const params = getParams(filters, district);
-  const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, {
-    params,
+  const cacheKey = `gujarat_network_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, {
+      params,
+    });
+    return data;
   });
-  return data;
 };
 
 /**
@@ -388,10 +429,13 @@ export const fetchGujaratPedestrianNetworkBlackspots = async (
 ): Promise<any> => {
   const params = getParams(filters, district);
   params.set("is_pedestrian", "true");
-  const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, {
-    params,
+  const cacheKey = `gujarat_pedestrian_network_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, {
+      params,
+    });
+    return data;
   });
-  return data;
 };
 
 /**
@@ -408,8 +452,11 @@ export const fetchGujaratKdeHeatmap = async (
   if (filters.visualization_variant === "pedestrian") {
     params.append("is_pedestrian", "true");
   }
-  const { data } = await API.get(`${GUJARAT_API_BASE}/kde-heatmap`, { params });
-  return data;
+  const cacheKey = `gujarat_kde_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/kde-heatmap`, { params });
+    return data;
+  });
 };
 
 /**
@@ -426,10 +473,13 @@ export const fetchGujaratWeightedKdeHeatmap = async (
   if (filters.visualization_variant === "pedestrian") {
     params.append("is_pedestrian", "true");
   }
-  const { data } = await API.get(`${GUJARAT_API_BASE}/weighted-kde-heatmap`, {
-    params,
+  const cacheKey = `gujarat_weighted_kde_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/weighted-kde-heatmap`, {
+      params,
+    });
+    return data;
   });
-  return data;
 };
 
 /**

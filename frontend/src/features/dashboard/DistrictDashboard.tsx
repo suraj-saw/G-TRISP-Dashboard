@@ -1090,6 +1090,7 @@ export default function DistrictDashboard() {
                           key="pedestrian-network-blackspot"
                           filters={filters}
                           fetchFn={(f) => fetchGujaratPedestrianNetworkBlackspots(f, districtName)}
+                          fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
                           analysisLabel="Pedestrian Network Blackspots (Segments)"
                         />
                       ) : isNetworkBlackspot ? (
@@ -1097,6 +1098,7 @@ export default function DistrictDashboard() {
                           key="network-blackspot"
                           filters={filters}
                           fetchFn={(f) => fetchGujaratNetworkBlackspots(f, districtName)}
+                          fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
                           analysisLabel="Network Blackspots (Segments)"
                         />
                       ) : isSnappedAccidents ? (
