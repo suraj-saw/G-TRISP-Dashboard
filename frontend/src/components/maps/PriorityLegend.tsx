@@ -18,7 +18,7 @@ export default function PriorityLegend({
   visualizationLayerType,
 }: PriorityLegendProps) {
   const { current: map } = useMap();
-  const [zoom, setZoom] = useState(map?.getZoom() || 0);
+  const [, setZoom] = useState(map?.getZoom() || 0);
 
   useEffect(() => {
     if (!map) return;

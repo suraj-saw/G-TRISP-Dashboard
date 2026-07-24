@@ -5,7 +5,7 @@ import type { DashboardFilters } from "../../types/dashboard";
 
 interface Props {
   filters: DashboardFilters;
-  fetchFn: (filters: DashboardFilters) => Promise<any>;
+  fetchFn: (filters: DashboardFilters) => Promise<unknown>;
   analysisLabel?: string;
 }
 
@@ -32,7 +32,7 @@ export default function NetworkBlackspotLayers({
   analysisLabel = "Network-Constrained Blackspots",
 }: Props) {
   const { current: mapRef } = useMap();
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<GeoJSON.FeatureCollection | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hovered, setHovered] = useState<HoveredSegment | null>(null);
@@ -46,15 +46,16 @@ export default function NetworkBlackspotLayers({
       try {
         const result = await fetchFn(filters);
         if (mounted) {
-          setData(result);
+          setData(result as GeoJSON.FeatureCollection);
         }
-      } catch (err) {
+      } catch (err: unknown) {
         if (mounted) {
           console.error("Failed to load network blackspots:", err);
+          const error = err as { response?: { status?: number; data?: { detail?: string } }; message?: string };
           setError(
-            err?.response?.status
-              ? `Request failed (${err.response.status}): ${err.response.data?.detail || err.message}`
-              : err?.message || "Failed to analyze network blackspots."
+            error?.response?.status
+              ? `Request failed (${error.response.status}): ${error.response.data?.detail || error.message}`
+              : error?.message || "Failed to analyze network blackspots."
           );
         }
       } finally {
@@ -73,7 +74,7 @@ export default function NetworkBlackspotLayers({
     const map = mapRef?.getMap();
     if (!map) return;
 
-    const onMove = (e: any) => {
+    const onMove = (e: import("react-map-gl/maplibre").MapLayerMouseEvent) => {
       const features = map.queryRenderedFeatures(e.point, {
         layers: ["network-blackspot-line"],
       });

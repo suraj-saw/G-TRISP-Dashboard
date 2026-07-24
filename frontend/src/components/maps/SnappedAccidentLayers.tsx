@@ -3,8 +3,8 @@
  * @description Renders network-snapped accident locations and the snapping path connecting the original to the snapped location.
  */
 
-import { useEffect, useMemo, useState, useCallback } from "react";
-import { Source, Layer, Popup } from "react-map-gl/maplibre";
+import { useEffect, useMemo, useState } from "react";
+import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
 import { Loader2 } from "lucide-react";
 import type { DashboardFilters } from "../../types/dashboard";
 import type { SnappedHeatmapPoint } from "../../types/dashboard";
@@ -108,9 +108,10 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
         if (!active) return;
         setData(res);
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (!active) return;
-        setError(err.message || "Failed to fetch snapped accidents");
+        const error = err as { message?: string };
+        setError(error?.message || "Failed to fetch snapped accidents");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -125,6 +126,7 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
     if (!data || !data.data) {
       return {
         points: { type: "FeatureCollection", features: [] } as GeoJSON.FeatureCollection,
+        originalPoints: { type: "FeatureCollection", features: [] } as GeoJSON.FeatureCollection,
         lines: { type: "FeatureCollection", features: [] } as GeoJSON.FeatureCollection,
       };
     }
@@ -166,18 +168,44 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
     };
   }, [data]);
 
-  const onHover = useCallback((e: import("react-map-gl/maplibre").MapLayerMouseEvent) => {
-    if (e.features && e.features.length > 0) {
-      const feature = e.features[0];
-      setHoveredPoint({
-        ...feature.properties,
-        longitude: e.lngLat.lng,
-        latitude: e.lngLat.lat,
-      } as HoveredPoint);
-    } else {
+  const { current: mapRef } = useMap();
+
+  useEffect(() => {
+    const map = mapRef?.getMap();
+    if (!map) return;
+
+    const onMove = (e: import("react-map-gl/maplibre").MapLayerMouseEvent) => {
+      const features = map.queryRenderedFeatures(e.point, {
+        layers: ["snapped-hover-targets", "snapped-points-layer", "snapped-original-points-layer"],
+      });
+      if (features.length > 0) {
+        map.getCanvas().style.cursor = "pointer";
+        const feature = features[0];
+        setHoveredPoint({
+          ...feature.properties,
+          longitude: e.lngLat.lng,
+          latitude: e.lngLat.lat,
+        } as HoveredPoint);
+      } else {
+        map.getCanvas().style.cursor = "";
+        setHoveredPoint(null);
+      }
+    };
+
+    const onLeave = () => {
+      map.getCanvas().style.cursor = "";
       setHoveredPoint(null);
-    }
-  }, []);
+    };
+
+    map.on("mousemove", onMove);
+    map.on("mouseout", onLeave);
+
+    return () => {
+      map.off("mousemove", onMove);
+      map.off("mouseout", onLeave);
+      map.getCanvas().style.cursor = "";
+    };
+  }, [mapRef]);
 
   if (loading) {
     return (
@@ -205,8 +233,7 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
           id="snapped-lines-layer"
           type="line"
           paint={{
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            "line-color": severityColorExpression as any,
+            "line-color": severityColorExpression as unknown as import("maplibre-gl").ExpressionSpecification,
             "line-width": 2,
             "line-opacity": 0.6,
             "line-dasharray": [2, 2],
@@ -227,8 +254,7 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
               15, 3,
               20, 4,
             ],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            "circle-color": severityColorExpression as any,
+            "circle-color": severityColorExpression as unknown as import("maplibre-gl").ExpressionSpecification,
             "circle-stroke-width": 1,
             "circle-stroke-color": "#ffffff",
             "circle-opacity": 0.4, // lower opacity for original points
@@ -249,8 +275,7 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
               15, 4,
               20, 5,
             ],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            "circle-color": severityColorExpression as any,
+            "circle-color": severityColorExpression as unknown as import("maplibre-gl").ExpressionSpecification,
             "circle-stroke-width": 1,
             "circle-stroke-color": "#ffffff",
             "circle-opacity": 0.9,
@@ -264,8 +289,6 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
             "circle-radius": 15,
             "circle-color": "transparent",
           }}
-          onMouseMove={onHover}
-          onMouseLeave={() => setHoveredPoint(null)}
         />
       </Source>
 

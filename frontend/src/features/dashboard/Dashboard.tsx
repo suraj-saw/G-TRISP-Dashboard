@@ -14,6 +14,7 @@ import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
 import IrcBlackspotDetectionLayers from "../../components/maps/IrcBlackspotDetectionLayers";
 import NetworkBlackspotLayers from "../../components/maps/NetworkBlackspotLayers";
+import SnappedAccidentLayers from "../../components/maps/SnappedAccidentLayers";
 
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
@@ -228,20 +229,6 @@ export default function Dashboard() {
   const { data: allData } = useDashboard(allDataFilters);
   const { data, loading, error } = useDashboard(filters);
 
-  const [snappedHeatmapData, setSnappedHeatmapData] = useState<HeatmapPoint[] | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    if (filters.visualization_type === "density_heatmap") {
-      fetchSnappedAccidents(filters).then(res => {
-        if (active) setSnappedHeatmapData(res.data);
-      }).catch(console.error);
-    } else {
-      setSnappedHeatmapData(null);
-    }
-    return () => { active = false; };
-  }, [filters]);
-
   useEffect(() => {
     let active = true;
     API.get<User>("/auth/me")
@@ -409,6 +396,8 @@ export default function Dashboard() {
     visualizationType === "network_blackspot";
   const isTemporalAnalysis =
     visualizationType === "temporal_analysis";
+  const isSnappedAccidents =
+    visualizationType === "snapped_accidents";
 
   // const isDensityHeatmap = visualizationType === "density_heatmap";
   // const showDensityLegend = isDensityHeatmap || isKdeHeatmap || isWeightedKdeHeatmap;
@@ -426,7 +415,7 @@ export default function Dashboard() {
 
   const isLocationMarkers = visualizationType === "location_markers";
   
-  const baseHeatmapData = snappedHeatmapData || data?.heatmap;
+  const baseHeatmapData = data?.heatmap;
   const displayHeatmapData = isPedestrianVariant
     ? baseHeatmapData?.filter(isPedestrianAccident)
     : baseHeatmapData;
@@ -434,7 +423,7 @@ export default function Dashboard() {
   const visualizationLayerType =
     isLocationMarkers && isPedestrianVariant
       ? "pedestrian_accidents"
-      : visualizationType;
+      : visualizationType || "location_markers";
 
   // Build a human-readable subtitle for the overlay
   // const overlaySubtitle = useMemo(() => {
@@ -792,6 +781,12 @@ export default function Dashboard() {
                       filters={filters}
                       fetchFn={fetchNetworkBlackspots}
                       analysisLabel="Network Blackspots (Segments)"
+                    />
+                  ) : isSnappedAccidents ? (
+                    <SnappedAccidentLayers
+                      key="snapped-accidents"
+                      filters={filters}
+                      fetchFn={fetchSnappedAccidents}
                     />
                   ) : (
                     <VisualizationLayers
