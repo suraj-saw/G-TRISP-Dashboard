@@ -239,6 +239,26 @@ export const fetchGujaratBlackspots = async (
 };
 
 /**
+ * Fetch road network data for Gujarat
+ * @param district - District to scope the data
+ * @returns GeoJSON feature collection of the road network
+ */
+export const fetchGujaratRoadNetwork = async (
+  district: string
+): Promise<any> => {
+  const params = new URLSearchParams();
+  if (district && district !== "All Districts") {
+    params.append("district", district);
+  }
+  
+  const cacheKey = `gujarat_road_network_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/road-network`, { params });
+    return data;
+  });
+};
+
+/**
  * Fetch snapped accidents data for Gujarat (Network Validation)
  * @param filters - Dashboard filter options
  * @param district - District to scope the data

@@ -119,6 +119,7 @@ interface Props {
   height?: string;
   sidebarOpen?: boolean;
   baseMap?: string;
+  hideBaseMap?: boolean;
   /** Boundary GeoJSON, fetched by the parent (e.g. DistrictDashboard). */
   boundary: GeoJSON.FeatureCollection | null;
   boundaryLoading?: boolean;
@@ -139,6 +140,7 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
       height = "calc(100vh - 80px)",
       sidebarOpen,
       baseMap = "positron",
+      hideBaseMap = false,
       boundary,
       boundaryLoading = false,
       boundaryError = null,
@@ -269,7 +271,9 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
     }, [sidebarOpen, mapLoaded, fitToBounds, applyMaxBounds]);
 
     const handleMapLoad = useCallback(() => setMapLoaded(true), []);
-    const mapStyleUrl = getMapStyleUrl(baseMap);
+    const mapStyleUrl = hideBaseMap 
+      ? { version: 8, sources: {}, layers: [] } 
+      : getMapStyleUrl(baseMap);
 
     const onContextMenu = useCallback((e: MapLayerMouseEvent) => {
       e.preventDefault();

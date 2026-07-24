@@ -22,6 +22,7 @@ from app.database import get_db
 from app.models.accident import Accident
 from app.models.snapped_accident import SnappedAccident
 from app.models.gujarat_road import GujaratRoad
+from app.models.gujarat_district import GujaratDistrict
 from app.utils.network_blackspot_utils import network_sliding_window
 
 from app.schemas.dashboard_schema import (
@@ -3319,6 +3320,66 @@ def get_network_blackspots(
                     "minor_hospitalized_count": seg.get("minor_hospitalized_count", 0),
                     "minor_non_hospitalized_count": seg.get("minor_non_hospitalized_count", 0),
                     "accident_count": seg["accident_count"]
+                }
+            })
+            
+    return {
+        "type": "FeatureCollection",
+        "features": features
+    }
+
+
+@router.get("/road-network")
+def get_road_network(
+    district: List[str] = Query(None, description="Districts to fetch road network for"),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns the road network linestrings for the specified district(s) as a GeoJSON FeatureCollection.
+    """
+    if not district:
+        return {"type": "FeatureCollection", "features": []}
+    
+    # Base query for roads intersecting the selected district(s)
+    query = db.query(
+        GujaratRoad.id,
+        GujaratRoad.road_name,
+        GujaratRoad.road_classification,
+        GujaratRoad.road_type,
+        GujaratRoad.properties,
+        func.ST_AsGeoJSON(func.ST_Simplify(GujaratRoad.geometry, 0.0005)).label("geom_json")
+    ).join(
+        GujaratDistrict,
+        func.ST_Intersects(GujaratRoad.geometry, GujaratDistrict.geometry)
+    ).filter(
+        GujaratDistrict.shape_name.in_(district)
+    )
+    
+    # We may get duplicate roads if a road crosses multiple selected districts, 
+    # but the distinct() or processing below will handle it if needed.
+    # To keep it simple, we just execute.
+    rows = query.distinct().all()
+    
+    import json
+    features = []
+    for r in rows:
+        if r.geom_json:
+            props = r.properties or {}
+            
+            # Extract road_name with fallbacks
+            r_name = r.road_name or props.get("road_name") or props.get("ROAD_NAME") or props.get("name") or props.get("Name") or props.get("ROUTE_NAME") or props.get("RoadName")
+            
+            # Extract road_classification with fallbacks (especially for OSM data which uses 'highway' or 'fclass')
+            r_class = r.road_classification or props.get("road_classification") or props.get("ROAD_CLASSIFICATION") or props.get("classification") or props.get("Classification") or props.get("highway") or props.get("HIGHWAY") or props.get("fclass") or props.get("type") or props.get("TYPE")
+            
+            features.append({
+                "type": "Feature",
+                "geometry": json.loads(r.geom_json),
+                "properties": {
+                    "id": r.id,
+                    "road_name": safe_text(r_name),
+                    "road_classification": safe_text(r_class),
+                    "road_type": safe_text(r.road_type)
                 }
             })
             

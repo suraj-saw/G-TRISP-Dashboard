@@ -20,6 +20,8 @@ import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspo
 import IrcBlackspotDetectionLayers from "../../components/maps/IrcBlackspotDetectionLayers";
 import SnappedAccidentLayers from "../../components/maps/SnappedAccidentLayers";
 import NetworkBlackspotLayers from "../../components/maps/NetworkBlackspotLayers";
+import RoadNetworkLayers from "../../components/maps/RoadNetworkLayers";
+import RoadNetworkLegend from "../../components/maps/RoadNetworkLegend";
 // import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
 // import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
 // import DensityMapOverlays from "../../components/maps/DensityMapOverlays";
@@ -68,6 +70,7 @@ import {
   fetchGujaratSnappedAccidents,
   fetchGujaratNetworkBlackspots,
   fetchGujaratPedestrianNetworkBlackspots,
+  fetchGujaratRoadNetwork,
 } from "../../api/gujaratDashboardApi";
 import type {
   DashboardFilters,
@@ -413,6 +416,7 @@ export default function DistrictDashboard() {
   const [error, setError] = useState<string | null>(null);
 
   const [snappedHeatmapData, setSnappedHeatmapData] = useState<HeatmapPoint[] | null>(null);
+  const [roadNetworkData, setRoadNetworkData] = useState<GeoJSON.FeatureCollection | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -425,6 +429,18 @@ export default function DistrictDashboard() {
     }
     return () => { active = false; };
   }, [filters, districtSlug]);
+
+  useEffect(() => {
+    let active = true;
+    if (filters.visualization_type === "road_network" && districtName) {
+      fetchGujaratRoadNetwork(districtName).then(res => {
+        if (active) setRoadNetworkData(res);
+      }).catch(console.error);
+    } else {
+      setRoadNetworkData(null);
+    }
+    return () => { active = false; };
+  }, [filters.visualization_type, districtName]);
 
   // ── Auth check ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -653,6 +669,9 @@ export default function DistrictDashboard() {
 
   const activeFilterConfig = useMemo(() => {
     const base = analysisView === "temporal" ? TEMPORAL_FILTERS : MAP_FILTERS;
+    if (filters.visualization_type === "road_network") {
+      return base.filter((filter) => filter.id !== "baseMap" && filter.id !== "visualization_variant");
+    }
     return isBlackspotVisualization(filters.visualization_type)
       ? base.filter((filter) => filter.id !== "severity")
       : base;
@@ -668,6 +687,8 @@ export default function DistrictDashboard() {
     filters.visualization_type === "snapped_accidents";
   const isNetworkBlackspot =
     filters.visualization_type === "network_blackspot";
+  const isRoadNetwork =
+    filters.visualization_type === "road_network";
   const isLocationMarkers =
     filters.visualization_type === "location_markers" ||
     !filters.visualization_type;
@@ -797,7 +818,7 @@ export default function DistrictDashboard() {
         districtName={districtName}
         mapRef={mapRef}
       />
-      <div className="min-h-screen bg-[#F1F4FB]">
+      <div className="fixed inset-0 bg-[#F1F4FB] overflow-hidden">
         <div className={`fixed left-0 right-0 top-0 ${TOPBAR_Z_INDEX}`}>
           <TopBar
             appName={`G-TRISP · ${districtName || "District"}`}
@@ -910,14 +931,13 @@ export default function DistrictDashboard() {
         </aside>
 
         <main
-          className="min-w-0 transition-[padding-right] duration-300 ease-in-out overflow-y-auto"
+          className="absolute inset-0 min-w-0 transition-[padding-right] duration-300 ease-in-out flex flex-col"
           style={{
             paddingTop: `${TOPBAR_HEIGHT_PX}px`,
             paddingRight: sidebarOpen ? `${SIDEBAR_WIDTH_PX}px` : "0px",
-            minHeight: "100vh",
           }}
         >
-          <div className="flex flex-col gap-4 p-4">
+          <div className="flex flex-1 flex-col gap-4 p-4 min-h-0">
             {(error || boundaryError) && (
               <div className="flex items-start gap-3 rounded-xl border border-[#FECACA] bg-[#FFF5F5] px-4 py-3 text-sm text-[#B91C1C]">
                 <AlertTriangle size={16} className="mt-0.5 shrink-0" />
@@ -931,8 +951,7 @@ export default function DistrictDashboard() {
             )}
 
             <div
-              className="flex w-full flex-col overflow-hidden rounded-2xl border border-[#E4E8F4] bg-white shadow-xl"
-              style={{ height: `calc(100vh - ${TOPBAR_HEIGHT_PX}px - 2rem)` }}
+              className="flex w-full flex-1 flex-col overflow-hidden rounded-2xl border border-[#E4E8F4] bg-white shadow-xl min-h-0"
             >
               <DistrictAnalysisTabs
                 activeView={analysisView}
@@ -982,6 +1001,7 @@ export default function DistrictDashboard() {
                       height="100%"
                       sidebarOpen={sidebarOpen}
                       baseMap={filters.baseMap || DEFAULT_BASE_MAP}
+                      hideBaseMap={isRoadNetwork}
                       boundary={boundary}
                       boundaryLoading={boundaryLoading}
                       boundaryError={boundaryError}
@@ -1107,6 +1127,11 @@ export default function DistrictDashboard() {
                           filters={filters}
                           fetchFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
                         />
+                      ) : isRoadNetwork ? (
+                        <RoadNetworkLayers
+                          key="road-network"
+                          geojsonData={roadNetworkData}
+                        />
                       ) : (
                         <VisualizationLayers
                           key={`${visualizationLayerType}-${filters.visualization_variant || "accident"}`}
@@ -1118,6 +1143,7 @@ export default function DistrictDashboard() {
                       <SeverityLegend
                         visualizationLayerType={visualizationLayerType}
                       />
+                      <RoadNetworkLegend isVisible={isRoadNetwork} />
                     </DistrictBaseMap>
                     {!loading &&
                       !error &&
