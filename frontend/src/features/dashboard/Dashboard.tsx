@@ -14,6 +14,7 @@ import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
 import IrcBlackspotDetectionLayers from "../../components/maps/IrcBlackspotDetectionLayers";
 import NetworkBlackspotLayers from "../../components/maps/NetworkBlackspotLayers";
+import RiskCorridorLayers from "../../components/maps/RiskCorridorLayers";
 import SnappedAccidentLayers from "../../components/maps/SnappedAccidentLayers";
 
 import TopBar from "../../components/layout/TopBar";
@@ -63,10 +64,13 @@ import {
   fetchPedestrianIrcGridBlackspots,
   fetchNetworkBlackspots,
   fetchPedestrianNetworkBlackspots,
+  fetchRiskCorridors,
+  fetchPedestrianRiskCorridors,
   fetchSnappedAccidents,
 } from "../../api/dashboardApi";
 import SuratBaseMap from "../../components/maps/SuratBaseMap";
 import SeverityLegend from "../../components/maps/SeverityLegend";
+import RiskCorridorLegend from "../../components/maps/RiskCorridorLegend";
 import { MAP_STYLES } from "../../components/maps/mapStyles";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
 import LocationMarkersInsights from "../../components/charts/LocationMarkersInsights";
@@ -394,10 +398,15 @@ export default function Dashboard() {
     visualizationType === "irc_grid_blackspot";
   const isNetworkBlackspot =
     visualizationType === "network_blackspot";
+  const isRiskCorridors =
+    visualizationType === "risk_corridors";
   const isTemporalAnalysis =
     visualizationType === "temporal_analysis";
   const isSnappedAccidents =
     visualizationType === "snapped_accidents";
+  const isLocationMarkers =
+    visualizationType === "location_markers" ||
+    !visualizationType;
 
   // const isDensityHeatmap = visualizationType === "density_heatmap";
   // const showDensityLegend = isDensityHeatmap || isKdeHeatmap || isWeightedKdeHeatmap;
@@ -412,8 +421,6 @@ export default function Dashboard() {
   const isPedestrianBlackspot = isBlackspotDetection && isPedestrianVariant;
   const isDbscanBlackspot = visualizationType === "dbscan_blackspot";
   const isIrcGreedyBlackspot = visualizationType === "irc_greedy_blackspot";
-
-  const isLocationMarkers = visualizationType === "location_markers";
   
   const baseHeatmapData = data?.heatmap;
   const displayHeatmapData = isPedestrianVariant
@@ -784,6 +791,22 @@ export default function Dashboard() {
                       fetchSnappedPointsFn={fetchSnappedAccidents}
                       analysisLabel="Network Blackspots (Segments)"
                     />
+                  ) : isRiskCorridors && isPedestrianVariant ? (
+                    <RiskCorridorLayers
+                      key="pedestrian-risk-corridors"
+                      filters={filters}
+                      fetchFn={fetchPedestrianRiskCorridors}
+                      fetchSnappedPointsFn={fetchSnappedAccidents}
+                      analysisLabel="Pedestrian Risk Corridors"
+                    />
+                  ) : isRiskCorridors ? (
+                    <RiskCorridorLayers
+                      key="risk-corridors"
+                      filters={filters}
+                      fetchFn={fetchRiskCorridors}
+                      fetchSnappedPointsFn={fetchSnappedAccidents}
+                      analysisLabel="Risk Corridors"
+                    />
                   ) : isSnappedAccidents ? (
                     <SnappedAccidentLayers
                       key="snapped-accidents"
@@ -798,9 +821,15 @@ export default function Dashboard() {
                       selectedSeverity={filters.severity}
                     />
                   )}
-                  <SeverityLegend
-                    visualizationLayerType={visualizationLayerType}
-                  />
+                  {filters.visualization_type === "risk_corridors" ? (
+                    <RiskCorridorLegend
+                      visualizationLayerType={visualizationLayerType}
+                    />
+                  ) : (
+                    <SeverityLegend
+                      visualizationLayerType={visualizationLayerType}
+                    />
+                  )}
                 </SuratBaseMap>
               </div>
             )}

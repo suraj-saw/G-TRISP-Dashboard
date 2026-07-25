@@ -189,3 +189,21 @@ MIN_ANALYSIS_YEARS: int = 3
 # ---------------------------------------------------------------------------
 KDE_RADIUS_METERS: float = 500.0
 KDE_PIXEL_METERS: float = 25.0
+
+# ---------------------------------------------------------------------------
+# Risk Corridor Analysis
+# ---------------------------------------------------------------------------
+
+# Default maximum gap distance (meters) between adjacent blackspot segments
+# to merge them into a single continuous risk corridor.
+CORRIDOR_MERGE_THRESHOLD_M: float = 100.0
+
+# Priority thresholds based on the calculated priority score
+# (which is usually a combination of weighted severity, density, etc.)
+CORRIDOR_PRIORITY_THRESHOLDS = {
+    "Critical": 250,
+    "Very High": 150,
+    "High": 100,
+    "Medium": 50,
+    "Low": 0,
+}

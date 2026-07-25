@@ -459,6 +459,55 @@ export const fetchGujaratPedestrianNetworkBlackspots = async (
 };
 
 /**
+ * Fetch Risk Corridors data for Gujarat
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns GeoJSON FeatureCollection of corridors
+ */
+export const fetchGujaratRiskCorridors = async (
+  filters: DashboardFilters,
+  district: string
+): Promise<any> => {
+  const params = getParams(filters, district);
+  // Override default thresholds to ensure long, continuous corridors rather than disjointed blackspots
+  params.append("window_size_m", "1000");
+  params.append("merge_threshold_m", "2000");
+  
+  const cacheKey = `gujarat_risk_corridors_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/risk-corridors`, {
+      params,
+    });
+    return data;
+  });
+};
+
+/**
+ * Fetch Pedestrian Risk Corridors data for Gujarat
+ * @param filters - Dashboard filter options
+ * @param district - District to scope the data
+ * @returns GeoJSON FeatureCollection of corridors
+ */
+export const fetchGujaratPedestrianRiskCorridors = async (
+  filters: DashboardFilters,
+  district: string
+): Promise<any> => {
+  const params = getParams(filters, district);
+  params.set("is_pedestrian", "true");
+  // Override default thresholds to ensure long, continuous corridors rather than disjointed blackspots
+  params.append("window_size_m", "1000");
+  params.append("merge_threshold_m", "2000");
+
+  const cacheKey = `gujarat_pedestrian_risk_corridors_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/risk-corridors`, {
+      params,
+    });
+    return data;
+  });
+};
+
+/**
  * Fetch KDE heatmap data for Gujarat
  * @param filters - Dashboard filter options
  * @param district - District to scope the data

@@ -12,10 +12,15 @@ from collections import defaultdict
 from datetime import datetime
 from typing import List, Optional
 
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, Query, Body
+# pyrefly: ignore [missing-import]
 from fastapi.responses import StreamingResponse, JSONResponse
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
+# pyrefly: ignore [missing-import]
 from sqlalchemy import func, distinct, case
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -24,6 +29,7 @@ from app.models.snapped_accident import SnappedAccident
 from app.models.gujarat_road import GujaratRoad
 from app.models.gujarat_district import GujaratDistrict
 from app.utils.network_blackspot_utils import network_sliding_window
+from app.utils.corridor_utils import generate_risk_corridors, rank_corridors
 
 from app.schemas.dashboard_schema import (
     CasualtyBreakdown,
@@ -752,6 +758,7 @@ def get_blackspots(
     # Validate observation period
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
+        # pyrefly: ignore [missing-import]
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=400,
@@ -828,6 +835,7 @@ def get_pedestrian_blackspots(
     # Validate observation period
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
+        # pyrefly: ignore [missing-import]
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=400,
@@ -898,6 +906,7 @@ def get_dbscan_blackspots(
     # Validate observation period
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
+        # pyrefly: ignore [missing-import]
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=400,
@@ -970,6 +979,7 @@ def get_pedestrian_dbscan_blackspots(
     # Validate observation period
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
+        # pyrefly: ignore [missing-import]
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=400,
@@ -1668,6 +1678,7 @@ def export_blackspots(
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
 ):
+    # pyrefly: ignore [missing-import]
     from fastapi.responses import StreamingResponse
     from datetime import datetime as dt
     from app.utils.export_utils import (
@@ -1691,6 +1702,7 @@ def export_blackspots(
     # Validate observation period
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
+        # pyrefly: ignore [missing-import]
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=400,
@@ -1839,6 +1851,7 @@ def _risk_level(total_accidents: int, sorted_totals: list[int]) -> str:
 # ---------------------------------------------------------------------------
 
 import logging
+# pyrefly: ignore [missing-import]
 from sqlalchemy import case, distinct, extract, text
 
 logger = logging.getLogger(__name__)
@@ -2647,6 +2660,7 @@ def export_dashboard_data(
     police_station: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
+    # pyrefly: ignore [missing-import]
     from fastapi.responses import StreamingResponse
     from app.utils.export_utils import build_accident_csv, build_accident_excel
     
@@ -2715,6 +2729,7 @@ def get_irc_greedy_blackspots(
     road_network_km: Optional[float] = Query(None, ge=1.0),
     db: Session = Depends(get_db),
 ):
+    # pyrefly: ignore [missing-import]
     from fastapi.responses import JSONResponse
     from app.utils.irc_blackspot_utils import (
         irc_greedy_blackspots, 
@@ -2810,6 +2825,7 @@ def get_irc_grid_blackspots(
     spacing_m: float = Query(50.0, ge=10.0),
     db: Session = Depends(get_db),
 ):
+# pyrefly: ignore [missing-import]
     from fastapi.responses import JSONResponse
     from app.utils.irc_blackspot_utils import (
         irc_grid_blackspots,
@@ -2904,6 +2920,7 @@ def get_pedestrian_irc_greedy_blackspots(
     road_network_km: Optional[float] = Query(None, ge=1.0),
     db: Session = Depends(get_db),
 ):
+    # pyrefly: ignore [missing-import]
     from fastapi.responses import JSONResponse
     from app.utils.irc_blackspot_utils import (
         irc_greedy_blackspots, 
@@ -3006,7 +3023,8 @@ def get_pedestrian_irc_grid_blackspots(
     road_network_km: Optional[float] = Query(None, ge=1.0),
     spacing_m: float = Query(50.0, ge=10.0),
     db: Session = Depends(get_db),
-):
+):  
+    # pyrefly: ignore [missing-import]
     from fastapi.responses import JSONResponse
     from app.utils.irc_blackspot_utils import (
         irc_grid_blackspots,
@@ -3131,10 +3149,10 @@ def get_snapped_accidents(
         Accident.pedestrian_killed,
         Accident.pedestrian_grievous_injury,
         Accident.pedestrian_minor_injury,
-        func.ST_Y(SnappedAccident.snapped_location).label("latitude"),
-        func.ST_X(SnappedAccident.snapped_location).label("longitude"),
-        func.ST_Y(SnappedAccident.original_location).label("original_latitude"),
-        func.ST_X(SnappedAccident.original_location).label("original_longitude"),
+        func.ST_Y(SnappedAccident.snapped_location).label("snapped_lat"),
+        func.ST_X(SnappedAccident.snapped_location).label("snapped_lon"),
+        func.ST_Y(SnappedAccident.original_location).label("orig_lat"),
+        func.ST_X(SnappedAccident.original_location).label("orig_lon"),
         SnappedAccident.distance_meters
     ).join(
         SnappedAccident, Accident.id == SnappedAccident.accident_id
@@ -3179,10 +3197,10 @@ def get_snapped_accidents(
             "pedestrian_killed": r.pedestrian_killed,
             "pedestrian_grievous_injury": r.pedestrian_grievous_injury,
             "pedestrian_minor_injury": r.pedestrian_minor_injury,
-            "latitude": r.latitude,
-            "longitude": r.longitude,
-            "original_latitude": r.original_latitude,
-            "original_longitude": r.original_longitude,
+            "latitude": r.snapped_lat,
+            "longitude": r.snapped_lon,
+            "original_latitude": r.orig_lat,
+            "original_longitude": r.orig_lon,
             "distance_meters": r.distance_meters,
         }
         for r in rows
@@ -3328,6 +3346,172 @@ def get_network_blackspots(
         "features": features
     }
 
+
+@router.get("/risk-corridors", summary="Get risk corridors")
+def get_risk_corridors(
+    db: Session = Depends(get_db),
+    district: Optional[str] = Query(None),
+    year: Optional[List[int]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
+    road_classification: Optional[str] = Query(None),
+    weather_condition: Optional[str] = Query(None),
+    light_condition: Optional[str] = Query(None),
+    collision_type: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    taluka: Optional[str] = Query(None),
+    police_station: Optional[str] = Query(None),
+    is_pedestrian: bool = Query(False),
+    window_size_m: float = Query(500.0, description="Sliding window size in meters"),
+    min_qualifying_crashes: int = Query(3, description="Minimum qualifying crashes"),
+    merge_threshold_m: float = Query(100.0, description="Merge threshold in meters")
+):
+    """
+    Computes continuous risk corridors based on blackspot segments.
+    """
+    # 1. Fetch accidents and compute their fractional position along the road
+    query = db.query(
+        Accident.id.label("accident_id"),
+        Accident.severity,
+        Accident.accident_date_time,
+        SnappedAccident.road_id,
+        func.ST_LineLocatePoint(GujaratRoad.geometry, SnappedAccident.snapped_location).label("fraction"),
+        func.ST_Length(func.ST_Transform(GujaratRoad.geometry, 3857)).label("road_length_m")
+    ).join(
+        SnappedAccident, Accident.id == SnappedAccident.accident_id
+    ).join(
+        GujaratRoad, SnappedAccident.road_id == GujaratRoad.id
+    )
+
+    if is_pedestrian:
+        query = query.filter(
+            (
+                func.coalesce(Accident.pedestrian_killed, 0) +
+                func.coalesce(Accident.pedestrian_grievous_injury, 0) +
+                func.coalesce(Accident.pedestrian_minor_injury, 0)
+            ) > 0
+        )
+
+    query = apply_filters(
+        query, district, year, road_classification,
+        weather_condition, light_condition, collision_type,
+        date_from, date_to, taluka=taluka, db=db,
+        police_station=police_station
+    )
+    
+    if severity:
+        if isinstance(severity, list):
+            query = query.filter(Accident.severity.in_(severity))
+        else:
+            query = query.filter(Accident.severity == severity)
+
+    rows = query.all()
+    
+    validation_error = validate_observation_period(rows, selected_years=year)
+    if validation_error:
+        return JSONResponse(status_code=400, content={"detail": validation_error})
+    
+    accidents_data = [
+        {
+            "accident_id": r.accident_id,
+            "road_id": r.road_id,
+            "severity": r.severity,
+            "fraction": r.fraction,
+            "road_length_m": r.road_length_m
+        }
+        for r in rows
+    ]
+    
+    # 2. Run sliding window algorithm to get candidate segments
+    candidate_segments = network_sliding_window(
+        accidents_data,
+        window_size_m=window_size_m,
+        min_qualifying_crashes=min_qualifying_crashes
+    )
+    
+    if not candidate_segments:
+        return {"type": "FeatureCollection", "features": []}
+
+    # 3. Generate risk corridors
+    corridors = generate_risk_corridors(candidate_segments, merge_distance_threshold_m=merge_threshold_m)
+
+    # 4. Fetch road metadata and lengths
+    road_ids = list({c["road_id"] for c in corridors})
+    road_meta_query = db.query(
+        GujaratRoad.id,
+        GujaratRoad.road_name,
+        GujaratRoad.road_classification,
+        GujaratRoad.properties,
+        func.ST_Length(func.ST_Transform(GujaratRoad.geometry, 3857)).label("road_length_m")
+    ).filter(GujaratRoad.id.in_(road_ids)).all()
+
+    road_lengths_map = {}
+    road_names_map = {}
+    road_class_map = {}
+
+    for rm in road_meta_query:
+        road_lengths_map[rm.id] = rm.road_length_m or 0.0
+        props = rm.properties or {}
+        r_name = rm.road_name or props.get("road_name") or props.get("ROAD_NAME") or props.get("name") or props.get("Name")
+        r_class = rm.road_classification or props.get("road_classification") or props.get("ROAD_CLASSIFICATION") or props.get("highway")
+        road_names_map[rm.id] = safe_text(r_name)
+        road_class_map[rm.id] = safe_text(r_class)
+
+    # 5. Rank corridors
+    corridors = rank_corridors(corridors, road_lengths_map)
+    
+    # 6. Reconstruct LineString geometry
+    import json
+    features = []
+    
+    for c in corridors:
+        geom_query = db.query(
+            func.ST_AsGeoJSON(
+                func.ST_LineSubstring(
+                    GujaratRoad.geometry,
+                    c["start_fraction"],
+                    c["end_fraction"]
+                )
+            ).label("geom_json"),
+            func.ST_Y(func.ST_StartPoint(func.ST_LineSubstring(GujaratRoad.geometry, c["start_fraction"], c["end_fraction"]))).label("start_lat"),
+            func.ST_X(func.ST_StartPoint(func.ST_LineSubstring(GujaratRoad.geometry, c["start_fraction"], c["end_fraction"]))).label("start_lon"),
+            func.ST_Y(func.ST_EndPoint(func.ST_LineSubstring(GujaratRoad.geometry, c["start_fraction"], c["end_fraction"]))).label("end_lat"),
+            func.ST_X(func.ST_EndPoint(func.ST_LineSubstring(GujaratRoad.geometry, c["start_fraction"], c["end_fraction"]))).label("end_lon")
+        ).filter(GujaratRoad.id == c["road_id"]).first()
+        
+        if geom_query and geom_query.geom_json:
+            features.append({
+                "type": "Feature",
+                "geometry": json.loads(geom_query.geom_json),
+                "properties": {
+                    "corridor_id": c["corridor_id"],
+                    "road_id": c["road_id"],
+                    "road_name": road_names_map.get(c["road_id"], "Unknown"),
+                    "road_classification": road_class_map.get(c["road_id"], "Unknown"),
+                    "road_length": c["road_length"],
+                    "corridor_length": round(c["corridor_length_m"], 2),
+                    "start_m": round(c["start_m"], 2),
+                    "end_m": round(c["end_m"], 2),
+                    "accident_count": c["accident_count"],
+                    "fatal_count": c["fatal_count"],
+                    "grievous_count": c["grievous_count"],
+                    "minor_hospitalized_count": c["minor_hospitalized_count"],
+                    "minor_non_hospitalized_count": c["minor_non_hospitalized_count"],
+                    "qualifying_count": c["qualifying_count"],
+                    "weighted_score": c["weighted_score"],
+                    "accident_density": round(c["accident_density"], 2),
+                    "priority_score": c["priority_score"],
+                    "priority_level": c["priority_level"],
+                    "corridor_rank": c["corridor_rank"],
+                    "start_coordinate": [geom_query.start_lon, geom_query.start_lat],
+                    "end_coordinate": [geom_query.end_lon, geom_query.end_lat],
+                }
+            })
+            
+    return {
+        "type": "FeatureCollection",
+        "features": features
+    }
 
 @router.get("/road-network")
 def get_road_network(

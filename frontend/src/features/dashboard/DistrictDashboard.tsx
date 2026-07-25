@@ -20,12 +20,14 @@ import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspo
 import IrcBlackspotDetectionLayers from "../../components/maps/IrcBlackspotDetectionLayers";
 import SnappedAccidentLayers from "../../components/maps/SnappedAccidentLayers";
 import NetworkBlackspotLayers from "../../components/maps/NetworkBlackspotLayers";
+import RiskCorridorLayers from "../../components/maps/RiskCorridorLayers";
 import RoadNetworkLayers from "../../components/maps/RoadNetworkLayers";
 import RoadNetworkLegend from "../../components/maps/RoadNetworkLegend";
 // import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
 // import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
 // import DensityMapOverlays from "../../components/maps/DensityMapOverlays";
 import SeverityLegend from "../../components/maps/SeverityLegend";
+import RiskCorridorLegend from "../../components/maps/RiskCorridorLegend";
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
 import DistrictBaseMap from "../../components/maps/DistrictBaseMap";
@@ -70,6 +72,8 @@ import {
   fetchGujaratSnappedAccidents,
   fetchGujaratNetworkBlackspots,
   fetchGujaratPedestrianNetworkBlackspots,
+  fetchGujaratRiskCorridors,
+  fetchGujaratPedestrianRiskCorridors,
   fetchGujaratRoadNetwork,
 } from "../../api/gujaratDashboardApi";
 import type {
@@ -687,6 +691,8 @@ export default function DistrictDashboard() {
     filters.visualization_type === "snapped_accidents";
   const isNetworkBlackspot =
     filters.visualization_type === "network_blackspot";
+  const isRiskCorridors =
+    filters.visualization_type === "risk_corridors";
   const isRoadNetwork =
     filters.visualization_type === "road_network";
   const isLocationMarkers =
@@ -1121,6 +1127,22 @@ export default function DistrictDashboard() {
                           fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
                           analysisLabel="Network Blackspots (Segments)"
                         />
+                      ) : isRiskCorridors && isPedestrianVariant ? (
+                        <RiskCorridorLayers
+                          key="pedestrian-risk-corridors"
+                          filters={filters}
+                          fetchFn={(f) => fetchGujaratPedestrianRiskCorridors(f, districtName)}
+                          fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
+                          analysisLabel="Pedestrian Risk Corridors"
+                        />
+                      ) : isRiskCorridors ? (
+                        <RiskCorridorLayers
+                          key="risk-corridors"
+                          filters={filters}
+                          fetchFn={(f) => fetchGujaratRiskCorridors(f, districtName)}
+                          fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
+                          analysisLabel="Risk Corridors"
+                        />
                       ) : isSnappedAccidents ? (
                         <SnappedAccidentLayers
                           key="snapped-accidents"
@@ -1140,9 +1162,15 @@ export default function DistrictDashboard() {
                           selectedSeverity={filters.severity}
                         />
                       )}
-                      <SeverityLegend
-                        visualizationLayerType={visualizationLayerType}
-                      />
+                      {filters.visualization_type === "risk_corridors" ? (
+                        <RiskCorridorLegend
+                          visualizationLayerType={visualizationLayerType}
+                        />
+                      ) : (
+                        <SeverityLegend
+                          visualizationLayerType={visualizationLayerType}
+                        />
+                      )}
                       <RoadNetworkLegend isVisible={isRoadNetwork} />
                     </DistrictBaseMap>
                     {!loading &&

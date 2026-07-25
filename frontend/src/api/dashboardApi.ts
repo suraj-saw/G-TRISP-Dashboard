@@ -437,6 +437,35 @@ export const fetchPedestrianNetworkBlackspots = async (
 };
 
 /**
+ * Fetch Risk Corridors
+ */
+export const fetchRiskCorridors = async (
+  filters: DashboardFilters
+): Promise<any> => {
+  const params = getParams(filters);
+  const cacheKey = `risk_corridors_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/risk-corridors`, { params });
+    return data;
+  });
+};
+
+/**
+ * Fetch Pedestrian Risk Corridors
+ */
+export const fetchPedestrianRiskCorridors = async (
+  filters: DashboardFilters
+): Promise<any> => {
+  const params = getParams(filters);
+  params.set("is_pedestrian", "true");
+  const cacheKey = `pedestrian_risk_corridors_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/risk-corridors`, { params });
+    return data;
+  });
+};
+
+/**
  * Download CSV file of crashes associated with specific blackspots.
  * @param crashIds List of accident IDs
  * @param filename Desired filename for the download
