@@ -56,7 +56,7 @@ function RootHandler() {
         if (!cancelled) {
           // Dynamic authorization determination logic
           const destination =
-            res.data.role === "admin" ? ROUTES.ADMIN : ROUTES.DASHBOARD;
+            (res.data.role === "admin" || res.data.role === "superadmin") ? ROUTES.ADMIN : ROUTES.DASHBOARD;
 
           // Use replace:true to pop the loading gate out of the browser history stack,
           // preventing users from hitting the "back" button directly into a re-evaluation block.

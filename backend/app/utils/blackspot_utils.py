@@ -105,11 +105,11 @@ PRIORITY_WEIGHTS: dict[str, int] = {
 #    60 ≈ 50th percentile (Medium)
 #    30 ≈ covers all valid qualifying blackspots (Low)
 PRIORITY_LEVELS: list[tuple[int, str, str]] = [
-    (200, "Critical Blackspot",        "#4C1D1D"),
-    (140, "Very High Risk Blackspot",  "#7F1D1D"),
-    (90,  "High Risk Blackspot",       "#DC2626"),
-    (60,  "Medium Risk Blackspot",     "#EA580C"),
-    (30,  "Low Risk Blackspot",        "#F97316"),
+    (200, "Critical Blackspot",        "#800026"),
+    (140, "Very High Risk Blackspot",  "#BD0026"),
+    (90,  "High Risk Blackspot",       "#E31A1C"),
+    (60,  "Medium Risk Blackspot",     "#FC4E2A"),
+    (30,  "Low Risk Blackspot",        "#FD8D3C"),
 ]
 
 # ── Backward-compatibility aliases ───────────────────────────────────────────
@@ -227,12 +227,12 @@ def priority_label_and_color(score: int, qualifying_count: int = 5) -> tuple[str
     "Identified Blackspot" with a neutral amber colour if no threshold is met.
     """
     if qualifying_count < 5:
-        return "Potential Segment", "#EAB308"
+        return "Potential Segment", "#FEB24C"
         
     for threshold, label, color in PRIORITY_LEVELS:
         if score >= threshold:
             return label, color
-    return "Identified Blackspot", "#FBBF24"
+    return "Identified Blackspot", "#FEB24C"
 
 
 # Backward-compatible public aliases used by existing map config / frontend helpers.

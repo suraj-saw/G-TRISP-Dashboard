@@ -20,21 +20,21 @@
 
 // ── Priority colour palette ───────────────────────────────────────────────────
 export const PRIORITY_COLORS = {
-  identified: "#FBBF24", // amber        — identified (sub-threshold for low)
-  low: "#F97316", // orange       — Low Risk Blackspot
-  medium: "#EA580C", // deep orange  — Medium Risk Blackspot
-  high: "#DC2626", // red          — High Risk Blackspot
-  veryHigh: "#7F1D1D", // dark burgundy— Very High Risk Blackspot
-  critical: "#4C1D1D", // near-black   — Critical Blackspot
+  identified: "#FEB24C", // light orange
+  low: "#FD8D3C", // orange
+  medium: "#FC4E2A", // orange-red
+  high: "#E31A1C", // red
+  veryHigh: "#BD0026", // dark red
+  critical: "#800026", // very dark red
 } as const;
 
 export const PRIORITY_HALO_COLORS = {
-  identified: "rgba(251,191,36,0.22)",
-  low: "rgba(249,115,22,0.26)",
-  medium: "rgba(234,88,12,0.30)",
-  high: "rgba(220,38,38,0.34)",
-  veryHigh: "rgba(127,29,29,0.40)",
-  critical: "rgba(76,29,29,0.46)",
+  identified: "rgba(254,178,76,0.22)",
+  low: "rgba(253,141,60,0.26)",
+  medium: "rgba(252,78,42,0.30)",
+  high: "rgba(227,26,28,0.34)",
+  veryHigh: "rgba(189,0,38,0.40)",
+  critical: "rgba(128,0,38,0.46)",
 } as const;
 
 // ── Priority-driven colour step expression (MapLibre GL) ──────────────────────
@@ -144,9 +144,9 @@ export const PRIORITY_SINGLE_COLOR_EXPR = [
   "Fatal",
   "#4C1D1D", // near-black maroon
   "Grievous Injury",
-  "#DC2626", // red
+  "#E31A1C", // red
   "Minor Injury Hospitalized",
-  "#EA580C", // deep orange
+  "#FC4E2A", // orange-red
   "Minor Injury Non Hospitalized",
   "#F59E0B", // amber
   "No Injury",

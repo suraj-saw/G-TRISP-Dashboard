@@ -251,10 +251,10 @@ export default function NetworkBlackspotLayers({
           id="network-blackspot-line-bg"
           type="line"
           paint={{
-            "line-color": "#000000",
+            "line-color": "#FFFFFF",
             "line-width": ["interpolate", ["linear"], ["zoom"], 10, 6, 15, 14],
-            "line-opacity": 0.4,
-            "line-blur": 2,
+            "line-opacity": 0.8,
+            "line-blur": 1,
           }}
         />
         <Layer

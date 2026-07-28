@@ -10,7 +10,7 @@
  * - UI Feedback: Display a loading overlay with progress status during generation.
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { DashboardFilters } from "../../types/dashboard";
 import DistrictStatisticalAnalysis from "../../components/dashboard/DistrictStatisticalAnalysis";
@@ -52,11 +52,21 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
 
     setProgress("Preparing print layout...");
     
-    // Wait for Recharts animations to fully complete (pie charts take longer)
+    // Wait briefly for Recharts layout calculations (animations are disabled in CSS)
     const timer = setTimeout(() => {
       setProgress("Opening print dialog...");
-      window.print();
-    }, 4000);
+      
+      // Immediately hide loading overlay BEFORE window.print() opens
+      const overlay = document.getElementById('pdf-loading-overlay');
+      if (overlay) {
+        overlay.style.display = 'none';
+      }
+
+      // Give browser 50ms to repaint without overlay before opening blocking print dialog
+      setTimeout(() => {
+        window.print();
+      }, 50);
+    }, 2000);
 
     const handleAfterPrint = () => {
       // The user closed the print dialog (either printed or cancelled)
@@ -77,6 +87,40 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
   const filterStrs: string[] = [];
   if (filters.year?.length) filterStrs.push(`Year: ${filters.year.join(", ")}`);
   if (filters.severity?.length) filterStrs.push(`Severity: ${filters.severity.join(", ")}`);
+
+  const statFilters = useMemo(
+    () => ({
+      district: actualDistrict,
+      year: filters.year?.map(String),
+      startDate: filters.date_from,
+      endDate: filters.date_to,
+      severity: filters.severity,
+      roadClassification: (filters as any).road_classification,
+      weatherCondition: filters.weather_condition,
+      lightCondition: filters.light_condition,
+      collisionType: (filters as any).collision_type,
+      taluka: (filters as any).taluka,
+      policeStation: (filters as any).police_station,
+    }),
+    [
+      actualDistrict,
+      filters.year?.join(","),
+      filters.date_from,
+      filters.date_to,
+      filters.severity?.join(","),
+      (filters as any).road_classification?.join(","),
+      filters.weather_condition?.join(","),
+      filters.light_condition?.join(","),
+      (filters as any).collision_type?.join(","),
+      (filters as any).taluka?.join(","),
+      (filters as any).police_station?.join(","),
+    ]
+  );
+
+  const temporalFetchFn = useCallback(
+    (f: any) => fetchGujaratTemporalAnalysis(f, actualDistrict),
+    [actualDistrict]
+  );
 
   return createPortal(
     <>
@@ -222,41 +266,51 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
       `}</style>
 
       {/* The visible loading overlay */}
-      <div className="pdf-loading-overlay fixed inset-0 z-[9999] flex items-center justify-center bg-white/95 backdrop-blur-sm">
-        <div className="w-[370px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
-          <div className="h-1 bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-400" />
-          <div className="px-6 py-5">
-            <div className="flex justify-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-50">
-                <div className="h-8 w-8 rounded-full border-[3px] border-blue-200 border-t-blue-600 animate-spin" />
+      <div id="pdf-loading-overlay" className="pdf-loading-overlay fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-md transition-all duration-300">
+          <div className="relative w-[360px] overflow-hidden rounded-2xl bg-white shadow-[0_20px_50px_rgba(8,_112,_184,_0.2)] ring-1 ring-slate-900/5">
+            {/* Animated top gradient line */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-400 opacity-90" />
+            
+            {/* Background decorative blobs */}
+            <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-20 -left-20 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" />
+
+            <div className="relative p-6">
+              {/* Loader animation */}
+              <div className="mb-5 flex justify-center">
+                <div className="relative flex h-16 w-16 items-center justify-center">
+                  <div className="absolute inset-0 rounded-full border-[3px] border-slate-100" />
+                  <div className="absolute inset-0 rounded-full border-[3px] border-blue-600 border-t-transparent animate-spin" />
+                  <div className="absolute inset-2 rounded-full border-[3px] border-slate-100" />
+                  <div className="absolute inset-2 rounded-full border-[3px] border-cyan-400 border-b-transparent animate-[spin_1.5s_linear_infinite_reverse]" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <svg className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                </div>
               </div>
-            </div>
-            <h2 className="mt-4 text-center text-xl font-bold text-slate-800">
-              Exporting PDF Report
-            </h2>
-            <p className="mt-1 text-center text-sm text-slate-500">
-              Please wait while your report is being prepared.
-            </p>
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  Current Step
+
+              <div className="text-center">
+                <h2 className="text-xl font-bold tracking-tight text-slate-800">
+                  Generating Report
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Gathering insights and rendering analytics...
+                </p>
+              </div>
+
+              <div className="mt-6 flex items-start gap-2.5 rounded-xl bg-indigo-50/50 p-3 text-xs text-indigo-700 ring-1 ring-indigo-100/80">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="leading-relaxed">
+                  The print dialog will open automatically. Please select <strong>Save as PDF</strong> as your destination.
                 </span>
-                <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
-                  Processing
-                </span>
               </div>
-              <p className="text-sm font-medium text-slate-700">{progress}</p>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
-                <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-blue-500 via-sky-500 to-cyan-400 animate-pulse" />
-              </div>
-            </div>
-            <div className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-center text-[11px] text-amber-700">
-              The print dialog will open automatically. Please save as PDF.
             </div>
           </div>
         </div>
-      </div>
 
       {/* The print content — wider container for better chart rendering */}
       <div 
@@ -297,19 +351,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1e3a5f', margin: 0 }}>Section 1 - Statistical Analysis</h2>
           </div>
           <DistrictStatisticalAnalysis 
-            filters={{
-              district: actualDistrict,
-              year: filters.year?.map(String),
-              startDate: filters.date_from,
-              endDate: filters.date_to,
-              severity: filters.severity,
-              roadClassification: (filters as any).road_classification,
-              weatherCondition: filters.weather_condition,
-              lightCondition: filters.light_condition,
-              collisionType: (filters as any).collision_type,
-              taluka: (filters as any).taluka,
-              policeStation: (filters as any).police_station,
-            }} 
+            filters={statFilters} 
             onDataLoaded={() => setStatLoaded(true)}
             disableAnimations={true}
             fullLabels={true}
@@ -323,7 +365,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
           </div>
           <TemporalAnalysis 
             filters={filters as any} 
-            fetchFn={(f) => fetchGujaratTemporalAnalysis(f as any, actualDistrict)}
+            fetchFn={temporalFetchFn}
             onDataLoaded={() => setTempLoaded(true)} 
           />
         </div>

@@ -73,7 +73,7 @@ export default function AccidentsPage() {
       try {
         const userRes = await API.get<User>("/auth/me");
         if (!active) return;
-        if (userRes.data.role !== "admin") {
+        if (userRes.data.role !== "admin" && userRes.data.role !== "superadmin") {
           navigate(ROUTES.DASHBOARD, { replace: true });
           return;
         }
