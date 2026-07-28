@@ -1,22 +1,18 @@
 /**
  * @file PdfReportGenerator.tsx
- * @description React component responsible for orchestrating the generation of PDF reports.
- * It fetches necessary statistical and temporal data, renders the report sections in a 
- * hidden DOM container, captures them as images using html2canvas, and uses PdfEngine
- * to assemble and download the final PDF document.
+ * @description React component responsible for orchestrating the generation of PDF reports using native browser print.
+ * It fetches necessary statistical and temporal data, renders a print-only layout, and triggers window.print().
  * 
  * Main Responsibilities:
  * - Data Fetching: Retrieve district stats and temporal analysis data.
- * - Hidden Rendering: Render charts and tables off-screen for capture.
- * - PDF Assembly: Coordinate with PdfEngine to build pages, cover, and sections.
+ * - Print Layout: Render charts and tables in a specialized hidden layout optimized for printing.
+ * - Print Trigger: Automatically invoke the browser's print dialog once the layout is ready.
  * - UI Feedback: Display a loading overlay with progress status during generation.
  */
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-// import { Loader2 } from "lucide-react";
 import { ReportRegistry } from "./ReportRegistry";
-import { PdfEngine } from "../../utils/pdfEngine";
 import {
   getDistrictStats,
   fetchGujaratTemporalAnalysis,
@@ -31,59 +27,23 @@ interface PdfReportGeneratorProps {
   filters: DashboardFilters;
   /** Optional district name to override filter value */
   districtName?: string;
-  /** Callback fired when PDF generation completes successfully */
+  /** Callback fired when PDF generation completes successfully or user cancels */
   onComplete: () => void;
-  /** Callback fired when an error occurs during PDF generation */
+  /** Callback fired when an error occurs during data fetching */
   onError: (msg: string) => void;
 }
 
-/**
- * React component that orchestrates PDF report generation.
- * 
- * Component Responsibility:
- * Manages the entire lifecycle of PDF export, from fetching required data to rendering
- * hidden components and generating the final PDF using PdfEngine.
- * 
- * State Management:
- * - `progress` (string): Tracks the current step of the PDF generation process for user feedback.
- * - `statisticalData` (any): Stores fetched statistical data required by report sections.
- * - `temporalData` (any): Stores fetched temporal data required by report sections.
- * - `dataLoaded` (boolean): Flag to determine when all data is fetched and hidden sections can be rendered.
- * 
- * Hooks Usage:
- * - `useState`: For tracking progress and data state.
- * - `useRef`: For maintaining a reference to the hidden container DOM element (`containerRef`).
- * - `useEffect`: 
- *    1. Data Loading Effect: Triggers API calls when filters or district change.
- *    2. Generation Effect: Triggers the actual PDF generation sequence once `dataLoaded` is true.
- * 
- * Rendering Flow:
- * Renders a full-screen loading overlay using `createPortal` to ensure it sits on top of all other UI.
- * Simultaneously renders a hidden `div` containing all report sections (from `ReportRegistry`) 
- * which are populated with the fetched data, ready for html2canvas to capture.
- */
 export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
   filters,
   districtName,
   onComplete,
   onError,
 }) => {
-  /** Progress text shown to the user during PDF generation */
   const [progress, setProgress] = useState<string>("Initializing...");
-  /** Reference to the hidden container where report sections are rendered */
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Data state
-  /** Statistical data for the report (e.g., accident counts, severity breakdown) */
   const [statisticalData, setStatisticalData] = useState<any>(null);
-  /** Temporal data for the report (e.g., monthly trends, hourly patterns) */
   const [temporalData, setTemporalData] = useState<any>(null);
-  /** Flag indicating whether all data has been loaded */
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  /**
-   * Effect to load report data on mount or when filters change
-   */
   useEffect(() => {
     async function loadData() {
       setProgress("Fetching data...");
@@ -104,212 +64,203 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
     loadData();
   }, [filters, districtName, onError]);
 
-  /**
-   * Effect to generate the PDF once data is loaded and the hidden DOM is updated.
-   * 
-   * Flow:
-   * 1. Wait for React to render the hidden components and Recharts to animate/draw.
-   * 2. Initialize PdfEngine and add the cover page.
-   * 3. Iterate through statistical sections, capture each as an image, and add to PDF.
-   * 4. Iterate through temporal sections, capture each as an image, and add to PDF.
-   * 5. Save the final document and trigger `onComplete` callback.
-   */
   useEffect(() => {
-    if (!dataLoaded || !containerRef.current) return;
+    if (!dataLoaded) return;
 
-    // Generate PDF once DOM is updated and charts are drawn
-    const generatePdf = async () => {
-      try {
-        setProgress("Generating document...");
-        // Wait for Recharts to render (reduced delay for better performance)
-        await new Promise((r) => setTimeout(r, 500));
+    setProgress("Preparing print layout...");
+    
+    // Wait for Recharts to render initial animations before printing
+    const timer = setTimeout(() => {
+      setProgress("Opening print dialog...");
+      window.print();
+    }, 800);
 
-        const engine = new PdfEngine();
-
-        // 1. Cover Page
-        const actualDistrict = districtName || filters.district?.[0] || "";
-        const districtStr = actualDistrict ? actualDistrict : "All Gujarat";
-        const filterStrs: string[] = [];
-        if (filters.year?.length)
-          filterStrs.push(`Year: ${filters.year.join(", ")}`);
-        if (filters.severity?.length)
-          filterStrs.push(`Severity: ${filters.severity.join(", ")}`);
-
-        engine.addCoverPage({
-          title: "Government Road Accident Analysis Report",
-          district: districtStr,
-          dateStr: new Date().toLocaleString(),
-          filters: filterStrs,
-        });
-
-        const statSections = ReportRegistry.getSections("statistical");
-        const tempSections = ReportRegistry.getSections("temporal");
-
-        // 2. Statistical Analysis
-        // Process each statistical section sequentially to manage memory and ensure proper ordering.
-        if (statSections.length > 0) {
-          engine.addNewPage("Section 1 - Statistical Analysis");
-          let index = 1;
-          for (const section of statSections) {
-            setProgress(
-              `Capturing Statistical Analysis (${index}/${statSections.length})...`
-            );
-            // Yield to main thread to prevent UI freeze and aid GC during heavy html2canvas processing.
-            await new Promise((r) => setTimeout(r, 50));
-            const capture = await engine.captureElement(
-              `report-section-${section.id}`
-            );
-            if (capture) {
-              engine.addCapturedImage(capture, section.title);
-            }
-            index++;
-          }
-        }
-
-        // 3. Temporal Analysis
-        // Process each temporal section sequentially.
-        if (tempSections.length > 0) {
-          engine.addNewPage("Section 2 - Temporal Analysis");
-          let index = 1;
-          for (const section of tempSections) {
-            setProgress(
-              `Capturing Temporal Analysis (${index}/${tempSections.length})...`
-            );
-            // Yield to main thread to prevent UI freeze during heavy html2canvas processing.
-            await new Promise((r) => setTimeout(r, 50));
-            const capture = await engine.captureElement(
-              `report-section-${section.id}`
-            );
-            if (capture) {
-              engine.addCapturedImage(capture, section.title);
-            }
-            index++;
-          }
-        }
-
-        engine.save(
-          `${districtStr.toLowerCase().replace(/\s+/g, "_")}_analysis_report.pdf`
-        );
-        onComplete();
-      } catch (err) {
-        console.error(err);
-        onError("Failed to generate PDF document.");
-      }
+    const handleAfterPrint = () => {
+      // The user closed the print dialog (either printed or cancelled)
+      onComplete();
     };
 
-    generatePdf();
-  }, [dataLoaded, filters, districtName, onComplete, onError]);
+    window.addEventListener("afterprint", handleAfterPrint);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("afterprint", handleAfterPrint);
+    };
+  }, [dataLoaded, onComplete]);
+
+  const actualDistrict = districtName || filters.district?.[0] || "";
+  const districtStr = actualDistrict ? actualDistrict : "All Gujarat";
+  const dateStr = new Date().toLocaleString();
+  const filterStrs: string[] = [];
+  if (filters.year?.length) filterStrs.push(`Year: ${filters.year.join(", ")}`);
+  if (filters.severity?.length) filterStrs.push(`Severity: ${filters.severity.join(", ")}`);
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
-      style={{
-        background: "rgba(255,255,255,0.60)",
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
-      }}
-    >
-      <div className="w-[370px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
-        {/* Top Accent */}
-        <div className="h-1 bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-400" />
+    <>
+      <style>{`
+        @media print {
+          /* Hide everything in the body EXCEPT our print container */
+          body > *:not(.print-report-container) {
+            display: none !important;
+          }
+          /* Bring the print container back onto the screen for printing */
+          .print-report-container {
+            position: relative !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+          }
+          /* Ensure the background is white for printing */
+          body {
+            background-color: white !important;
+          }
+          @page {
+            size: A4 portrait;
+            margin: 15mm;
+          }
+          /* Helper classes for printing */
+          .page-break {
+            page-break-before: always;
+          }
+          .break-inside-avoid {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+        }
+      `}</style>
 
-        <div className="px-6 py-5">
-          {/* Smooth Spinner */}
-          <div className="flex justify-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-50">
-              <div className="h-8 w-8 rounded-full border-[3px] border-blue-200 border-t-blue-600 animate-spin" />
+      {/* The visible loading overlay (hidden during print) */}
+      <div
+        className="fixed inset-0 z-[9999] flex items-center justify-center print:hidden"
+        style={{
+          background: "rgba(255,255,255,0.60)",
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
+        }}
+      >
+        <div className="w-[370px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+          <div className="h-1 bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-400" />
+          <div className="px-6 py-5">
+            <div className="flex justify-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-50">
+                <div className="h-8 w-8 rounded-full border-[3px] border-blue-200 border-t-blue-600 animate-spin" />
+              </div>
             </div>
-          </div>
-
-          {/* Title */}
-          <h2 className="mt-4 text-center text-xl font-bold text-slate-800">
-            Exporting PDF Report
-          </h2>
-
-          <p className="mt-1 text-center text-sm text-slate-500">
-            Please wait while your report is being generated.
-          </p>
-
-          {/* Status Card */}
-          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                Current Step
-              </span>
-
-              <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
-                Processing
-              </span>
+            <h2 className="mt-4 text-center text-xl font-bold text-slate-800">
+              Exporting PDF Report
+            </h2>
+            <p className="mt-1 text-center text-sm text-slate-500">
+              Please wait while your report is being prepared.
+            </p>
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Current Step
+                </span>
+                <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                  Processing
+                </span>
+              </div>
+              <p className="text-sm font-medium text-slate-700">{progress}</p>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-blue-500 via-sky-500 to-cyan-400 animate-pulse" />
+              </div>
             </div>
-
-            <p className="text-sm font-medium text-slate-700">{progress}</p>
-
-            {/* Animated Progress */}
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
-              <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-blue-500 via-sky-500 to-cyan-400 export-progress-bar" />
+            <div className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-center text-[11px] text-amber-700">
+              The print dialog will open automatically. Please save as PDF.
             </div>
-          </div>
-
-          {/* Warning */}
-          <div className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-center text-[11px] text-amber-700">
-            Please don't close or refresh this page until the PDF has been
-            downloaded.
           </div>
         </div>
       </div>
 
-      {/* 
-        Hidden render area for report sections.
-        This container is placed far off-screen so it does not affect the visible UI,
-        but it remains in the DOM so html2canvas can capture its contents.
-        We fix the width to 1024px to ensure consistent chart rendering regardless of user's screen size.
-      */}
+      {/* The print content (rendered off-screen, moved on-screen during print) */}
       {dataLoaded && (
-        <div
-          ref={containerRef}
+        <div 
+          className="print-report-container absolute bg-white z-[10000] text-slate-800"
           style={{
-            position: "absolute",
-            top: "-9999px",
-            left: "-9999px",
-            width: "1024px",
-            background: "#fff",
-            padding: "20px",
+            top: '-9999px',
+            left: '-9999px',
+            width: '1024px', // Fixed width so Recharts has a defined width to render against
           }}
         >
-          {ReportRegistry.getSections("statistical").map((section) => (
-            <div
-              id={`report-section-${section.id}`}
-              key={section.id}
-              style={{
-                marginBottom: "20px",
-                padding: "10px",
-                background: "#fff",
-              }}
-            >
-              {React.createElement(section.component, {
-                data: statisticalData,
-              })}
+          
+          {/* Header (Formerly Cover Page) */}
+          <div className="flex flex-col justify-center items-center text-center p-8 mb-4">
+            <div className="w-full bg-blue-900 text-white p-6 rounded-t-xl">
+              <h1 className="text-4xl font-bold mb-2">Government Road Accident Analysis Report</h1>
             </div>
-          ))}
+            <div className="w-full bg-slate-50 p-6 border border-slate-200 rounded-b-xl shadow-sm flex flex-row justify-between items-center">
+              <div className="text-left">
+                <h3 className="text-xl font-bold text-slate-700">District: <span className="text-blue-700">{districtStr}</span></h3>
+                <p className="text-slate-500 font-medium text-sm">Generated On: {dateStr}</p>
+              </div>
+              
+              {filterStrs.length > 0 && (
+                <div className="text-right text-sm">
+                  <h4 className="font-bold text-blue-900">Filters Applied:</h4>
+                  <p className="text-slate-700 font-medium">
+                    {filterStrs.join(" | ")}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
 
-          {ReportRegistry.getSections("temporal").map((section) => (
-            <div
-              id={`report-section-${section.id}`}
-              key={section.id}
-              style={{
-                marginBottom: "20px",
-                padding: "10px",
-                background: "#fff",
-              }}
-            >
-              {React.createElement(section.component, {
-                data: temporalData,
-              })}
+          {/* Statistical Sections */}
+          {ReportRegistry.getSections("statistical").length > 0 && (
+            <div className="px-8 mb-8">
+              <div className="border-b-2 border-blue-900 pb-2 mb-6">
+                <h2 className="text-2xl font-bold text-blue-900">Section 1 - Statistical Analysis</h2>
+              </div>
+              <div className="flex flex-col gap-6">
+                {ReportRegistry.getSections("statistical").map((section) => (
+                  <div 
+                    key={section.id} 
+                    className="break-inside-avoid w-full flex flex-col"
+                  >
+                    <div className="w-full">
+                      {React.createElement(section.component, {
+                        data: statisticalData,
+                      })}
+                    </div>
+                    <div className="text-center mt-3">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{section.title}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
+          )}
+
+          {/* Temporal Sections */}
+          {ReportRegistry.getSections("temporal").length > 0 && (
+            <div className="px-8 page-break">
+              <div className="border-b-2 border-blue-900 pb-2 mb-6">
+                <h2 className="text-2xl font-bold text-blue-900">Section 2 - Temporal Analysis</h2>
+              </div>
+              <div className="flex flex-col gap-6">
+                {ReportRegistry.getSections("temporal").map((section) => (
+                  <div 
+                    key={section.id} 
+                    className="break-inside-avoid w-full flex flex-col"
+                  >
+                    <div className="w-full">
+                      {React.createElement(section.component, {
+                        data: temporalData,
+                      })}
+                    </div>
+                    <div className="text-center mt-3">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{section.title}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
-    </div>,
+    </>,
     document.body
   );
 };
+

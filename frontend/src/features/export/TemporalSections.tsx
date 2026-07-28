@@ -286,7 +286,7 @@ export const TimePeriodSection: React.FC<{ data: TemporalAnalysisData }> = ({
 }) => {
   return (
     <ChartContainer>
-      <div style={{ width: "100%", height: "450px" }}>
+      <div style={{ width: "100%", height: "300px" }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data?.time_period_distribution || []}

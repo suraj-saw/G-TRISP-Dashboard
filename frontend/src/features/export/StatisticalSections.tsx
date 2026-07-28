@@ -173,12 +173,12 @@ const HorizontalBarSection: React.FC<{
   const chartData = getTopCategories(data, 10, nameKey);
   return (
     <ChartContainer>
-      <div style={{ width: "100%", height: "450px" }}>
+      <div style={{ width: "100%", height: "300px" }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
             layout="vertical"
-            margin={{ top: 10, right: 40, left: 10, bottom: 5 }}
+            margin={{ top: 10, right: 60, left: 10, bottom: 5 }}
           >
             <CartesianGrid
               stroke={GRID}
@@ -190,7 +190,7 @@ const HorizontalBarSection: React.FC<{
             <YAxis
               dataKey="name"
               type="category"
-              width={150}
+              width={200}
               tick={{ fill: MUTED, fontSize: 11 }}
             />
             <Bar
@@ -225,9 +225,15 @@ const HorizontalBarSection: React.FC<{
 export const StatisticalKpiSection: React.FC<{ data: DistrictStats }> = ({
   data,
 }) => {
+  const HOUR_LABELS = (h: number) => {
+    if (h === 0) return "12am";
+    if (h === 12) return "12pm";
+    return h < 12 ? `${h}am` : `${h - 12}pm`;
+  };
+
   return (
     <ChartContainer>
-      <div style={{ display: "flex", gap: "16px", width: "100%" }}>
+      <div style={{ display: "flex", gap: "16px", width: "100%", flexWrap: "wrap" }}>
         <KpiCard
           label="Total Accidents"
           value={data?.total_accidents?.toLocaleString() || "0"}
@@ -242,6 +248,16 @@ export const StatisticalKpiSection: React.FC<{ data: DistrictStats }> = ({
           label="Injuries"
           value={data?.total_injuries?.toLocaleString() || "0"}
           accent="#f97316"
+        />
+        <KpiCard
+          label="Avg / Month"
+          value={data?.avg_per_month?.toFixed(1) || "0.0"}
+          accent="#a855f7"
+        />
+        <KpiCard
+          label="Peak Hour"
+          value={data?.peak_hour == null ? "—" : HOUR_LABELS(data.peak_hour)}
+          accent="#10b981"
         />
       </div>
     </ChartContainer>
