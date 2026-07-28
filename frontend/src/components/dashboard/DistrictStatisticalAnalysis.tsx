@@ -188,7 +188,8 @@ const HorizontalCategoryChartCard: React.FC<{
   fillColor: string;
   className?: string;
   yAxisWidth?: number;
-}> = ({ title, data, fillColor, className = "", yAxisWidth = 110 }) => {
+  fullLabels?: boolean;
+}> = ({ title, data, fillColor, className = "", yAxisWidth = 110, fullLabels = false }) => {
   if (!data || data.length === 0) {
     return (
       <ChartCard title={title} className={className}>
@@ -224,9 +225,9 @@ const HorizontalCategoryChartCard: React.FC<{
             tick={{ fill: MUTED, fontSize: 11 }}
             axisLine={false}
             tickLine={false}
-            width={yAxisWidth}
+            width={fullLabels ? 220 : yAxisWidth}
             tickFormatter={(val) =>
-              typeof val === "string" && val.length > 20
+              !fullLabels && typeof val === "string" && val.length > 20
                 ? `${val.substring(0, 18)}...`
                 : val
             }
@@ -256,6 +257,9 @@ const HorizontalCategoryChartCard: React.FC<{
 
 interface DistrictStatisticalAnalysisProps {
   filters: DistrictStatsFilters;
+  onDataLoaded?: () => void;
+  disableAnimations?: boolean;
+  fullLabels?: boolean;
 }
 
 /**
@@ -267,7 +271,7 @@ interface DistrictStatisticalAnalysisProps {
  */
 const DistrictStatisticalAnalysis: React.FC<
   DistrictStatisticalAnalysisProps
-> = ({ filters }) => {
+> = ({ filters, onDataLoaded, disableAnimations = false, fullLabels = false }) => {
   const [stats, setStats] = useState<DistrictStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -286,6 +290,7 @@ const DistrictStatisticalAnalysis: React.FC<
       setError("Failed to load statistical data. Please try again.");
     } finally {
       setLoading(false);
+      if (onDataLoaded) onDataLoaded();
     }
   }, [
     filters.year,
@@ -465,6 +470,7 @@ const DistrictStatisticalAnalysis: React.FC<
                       innerRadius={60}
                       outerRadius={80}
                       paddingAngle={3}
+                      isAnimationActive={!disableAnimations}
                     >
                       {stats.severity_breakdown.map((entry, i) => (
                         <Cell
@@ -536,6 +542,7 @@ const DistrictStatisticalAnalysis: React.FC<
               data={processedRoadType}
               fillColor="rgba(168, 85, 247, 0.75)"
               yAxisWidth={100}
+              fullLabels={fullLabels}
             />
           </div>
 
@@ -546,6 +553,7 @@ const DistrictStatisticalAnalysis: React.FC<
               data={processedCollisionType}
               fillColor={CHART_TEAL}
               yAxisWidth={110}
+              fullLabels={fullLabels}
             />
 
             <ChartCard title="Vehicles Involved">
@@ -690,12 +698,14 @@ const DistrictStatisticalAnalysis: React.FC<
               data={processedWeather}
               fillColor={CHART_BLUE}
               yAxisWidth={110}
+              fullLabels={fullLabels}
             />
             <HorizontalCategoryChartCard
               title="Light Condition Analysis"
               data={processedLight}
               fillColor={CHART_PURPLE}
-              yAxisWidth={110}
+              yAxisWidth={130}
+              fullLabels={fullLabels}
             />
           </div>
 

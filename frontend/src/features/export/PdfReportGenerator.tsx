@@ -12,12 +12,10 @@
 
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ReportRegistry } from "./ReportRegistry";
-import {
-  getDistrictStats,
-  fetchGujaratTemporalAnalysis,
-} from "../../api/gujaratDashboardApi";
 import type { DashboardFilters } from "../../types/dashboard";
+import DistrictStatisticalAnalysis from "../../components/dashboard/DistrictStatisticalAnalysis";
+import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
+import { fetchGujaratTemporalAnalysis } from "../../api/gujaratDashboardApi";
 
 /**
  * Props for PdfReportGenerator component
@@ -40,40 +38,25 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
   onError,
 }) => {
   const [progress, setProgress] = useState<string>("Initializing...");
-  const [statisticalData, setStatisticalData] = useState<any>(null);
-  const [temporalData, setTemporalData] = useState<any>(null);
-  const [dataLoaded, setDataLoaded] = useState(false);
+  const [statLoaded, setStatLoaded] = useState(false);
+  const [tempLoaded, setTempLoaded] = useState(false);
+
+  // We consider it "data loaded" when BOTH components report they are done
+  const dataLoaded = statLoaded && tempLoaded;
 
   useEffect(() => {
-    async function loadData() {
+    if (!dataLoaded) {
       setProgress("Fetching data...");
-      try {
-        const actualDistrict = districtName || filters.district?.[0] || "";
-        const [stat, temp] = await Promise.all([
-          getDistrictStats({ ...filters, district: actualDistrict } as any),
-          fetchGujaratTemporalAnalysis(filters as any, actualDistrict),
-        ]);
-        setStatisticalData(stat);
-        setTemporalData(temp);
-        setDataLoaded(true);
-      } catch (e) {
-        console.error(e);
-        onError("Failed to load data for report.");
-      }
+      return;
     }
-    loadData();
-  }, [filters, districtName, onError]);
-
-  useEffect(() => {
-    if (!dataLoaded) return;
 
     setProgress("Preparing print layout...");
     
-    // Wait for Recharts to render initial animations before printing
+    // Wait for Recharts animations to fully complete (pie charts take longer)
     const timer = setTimeout(() => {
       setProgress("Opening print dialog...");
       window.print();
-    }, 800);
+    }, 4000);
 
     const handleAfterPrint = () => {
       // The user closed the print dialog (either printed or cancelled)
@@ -98,46 +81,148 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
   return createPortal(
     <>
       <style>{`
+        /* ── CRITICAL: Force browsers to print background colors ── */
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
+
+        /* ── Force 1-column layout BEFORE print (so Recharts renders full-width SVGs) ── */
+        .print-report-container .charts-row--two,
+        .print-report-container .xl\\:grid-cols-2 {
+          grid-template-columns: 1fr !important;
+          display: grid !important;
+        }
+        
+        /* ── Disable Recharts animations in print container (pie chart fix) ── */
+        .print-report-container .recharts-pie-sector,
+        .print-report-container .recharts-bar-rectangle,
+        .print-report-container .recharts-line,
+        .print-report-container .recharts-area {
+          animation: none !important;
+          transition: none !important;
+        }
+
         @media print {
-          /* Hide everything in the body EXCEPT our print container */
           body > *:not(.print-report-container) {
             display: none !important;
           }
-          /* Bring the print container back onto the screen for printing */
+          
           .print-report-container {
-            position: relative !important;
-            top: 0 !important;
-            left: 0 !important;
+            position: static !important;
+            overflow: visible !important;
             width: 100% !important;
+            z-index: auto !important;
           }
-          /* Ensure the background is white for printing */
+          
           body {
             background-color: white !important;
           }
+          
           @page {
             size: A4 portrait;
-            margin: 15mm;
+            margin: 6mm;
           }
-          /* Helper classes for printing */
+          
+          /* Remove borders, shadows from containers */
+          .chart-card, .kpi-card {
+            border: none !important;
+            box-shadow: none !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          
+          .print-report-container .rounded-xl {
+            border: none !important;
+            box-shadow: none !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+
+          /* Move chart titles below the chart */
+          .chart-card {
+            display: flex !important;
+            flex-direction: column-reverse !important;
+          }
+          
+          .chart-card-header {
+            text-align: center !important;
+            font-size: 10px !important;
+            font-weight: 700 !important;
+            color: #64748b !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.05em !important;
+            margin-top: 8px !important;
+            margin-bottom: 0 !important;
+            border-bottom: none !important;
+            background: transparent !important;
+            padding: 2px 0 !important;
+          }
+
           .page-break {
             page-break-before: always;
           }
+          
           .break-inside-avoid {
             break-inside: avoid;
             page-break-inside: avoid;
           }
+          
+          .stat-loading, .stat-empty {
+            display: none !important;
+          }
+          
+          .pdf-loading-overlay {
+            display: none !important;
+          }
+          
+          /* Compact KPIs for print */
+          .district-statistical-analysis {
+            background: white !important;
+            padding: 0 !important;
+            gap: 12px !important;
+          }
+          
+          .kpi-card {
+            padding: 8px 12px !important;
+          }
+          
+          .kpi-label {
+            font-size: 9px !important;
+          }
+          
+          .kpi-value {
+            font-size: 18px !important;
+            margin-top: 2px !important;
+          }
+          
+          .kpi-sub {
+            font-size: 9px !important;
+          }
+          
+          .kpi-row {
+            gap: 8px !important;
+          }
+          
+          .charts-row {
+            gap: 8px !important;
+          }
+          
+          /* Center Recharts SVGs */
+          .recharts-wrapper {
+            margin: 0 auto !important;
+          }
+          
+          /* Compact chart card body */
+          .chart-card-body {
+            padding: 8px 4px !important;
+          }
         }
       `}</style>
 
-      {/* The visible loading overlay (hidden during print) */}
-      <div
-        className="fixed inset-0 z-[9999] flex items-center justify-center print:hidden"
-        style={{
-          background: "rgba(255,255,255,0.60)",
-          backdropFilter: "blur(6px)",
-          WebkitBackdropFilter: "blur(6px)",
-        }}
-      >
+      {/* The visible loading overlay */}
+      <div className="pdf-loading-overlay fixed inset-0 z-[9999] flex items-center justify-center bg-white/95 backdrop-blur-sm">
         <div className="w-[370px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
           <div className="h-1 bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-400" />
           <div className="px-6 py-5">
@@ -173,92 +258,76 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
         </div>
       </div>
 
-      {/* The print content (rendered off-screen, moved on-screen during print) */}
-      {dataLoaded && (
-        <div 
-          className="print-report-container absolute bg-white z-[10000] text-slate-800"
-          style={{
-            top: '-9999px',
-            left: '-9999px',
-            width: '1024px', // Fixed width so Recharts has a defined width to render against
-          }}
-        >
-          
-          {/* Header (Formerly Cover Page) */}
-          <div className="flex flex-col justify-center items-center text-center p-8 mb-4">
-            <div className="w-full bg-blue-900 text-white p-6 rounded-t-xl">
-              <h1 className="text-4xl font-bold mb-2">Government Road Accident Analysis Report</h1>
-            </div>
-            <div className="w-full bg-slate-50 p-6 border border-slate-200 rounded-b-xl shadow-sm flex flex-row justify-between items-center">
-              <div className="text-left">
-                <h3 className="text-xl font-bold text-slate-700">District: <span className="text-blue-700">{districtStr}</span></h3>
-                <p className="text-slate-500 font-medium text-sm">Generated On: {dateStr}</p>
-              </div>
-              
-              {filterStrs.length > 0 && (
-                <div className="text-right text-sm">
-                  <h4 className="font-bold text-blue-900">Filters Applied:</h4>
-                  <p className="text-slate-700 font-medium">
-                    {filterStrs.join(" | ")}
-                  </p>
-                </div>
-              )}
-            </div>
+      {/* The print content — wider container for better chart rendering */}
+      <div 
+        className="print-report-container fixed top-0 left-0 bg-white text-slate-800"
+        style={{
+          width: '794px',
+          zIndex: -1,
+          overflowY: 'auto',
+          height: '100vh',
+        }}
+      >
+        
+        {/* Professional Header */}
+        <div style={{ margin: '16px 12px 24px', paddingBottom: '16px', borderBottom: '3px solid #1e3a5f', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ textAlign: 'left' }}>
+            <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#1e3a5f', margin: 0, textTransform: 'uppercase', letterSpacing: '0.02em' }}>G-TRISP Analytics</h1>
+            <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#64748b', margin: '4px 0 0 0' }}>Road Accident Statistical & Temporal Report</h2>
           </div>
-
-          {/* Statistical Sections */}
-          {ReportRegistry.getSections("statistical").length > 0 && (
-            <div className="px-8 mb-8">
-              <div className="border-b-2 border-blue-900 pb-2 mb-6">
-                <h2 className="text-2xl font-bold text-blue-900">Section 1 - Statistical Analysis</h2>
-              </div>
-              <div className="flex flex-col gap-6">
-                {ReportRegistry.getSections("statistical").map((section) => (
-                  <div 
-                    key={section.id} 
-                    className="break-inside-avoid w-full flex flex-col"
-                  >
-                    <div className="w-full">
-                      {React.createElement(section.component, {
-                        data: statisticalData,
-                      })}
-                    </div>
-                    <div className="text-center mt-3">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{section.title}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: '#334155', margin: 0 }}>
+              District: <span style={{ color: '#2563eb' }}>{districtStr}</span>
             </div>
-          )}
-
-          {/* Temporal Sections */}
-          {ReportRegistry.getSections("temporal").length > 0 && (
-            <div className="px-8 page-break">
-              <div className="border-b-2 border-blue-900 pb-2 mb-6">
-                <h2 className="text-2xl font-bold text-blue-900">Section 2 - Temporal Analysis</h2>
-              </div>
-              <div className="flex flex-col gap-6">
-                {ReportRegistry.getSections("temporal").map((section) => (
-                  <div 
-                    key={section.id} 
-                    className="break-inside-avoid w-full flex flex-col"
-                  >
-                    <div className="w-full">
-                      {React.createElement(section.component, {
-                        data: temporalData,
-                      })}
-                    </div>
-                    <div className="text-center mt-3">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{section.title}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0 0' }}>Generated On: {dateStr}</p>
+          </div>
         </div>
-      )}
+
+        {/* Filters Banner */}
+        {filterStrs.length > 0 && (
+          <div style={{ margin: '0 12px 20px', padding: '10px 14px', background: '#f8fafc', borderLeft: '4px solid #2563eb', borderRadius: '0 6px 6px 0' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginRight: '8px' }}>Filters Applied: </span>
+            <span style={{ fontSize: '12px', color: '#1e293b', fontWeight: 500 }}>{filterStrs.join("  •  ")}</span>
+          </div>
+        )}
+
+        {/* Statistical Sections */}
+        <div style={{ padding: '0 12px', marginBottom: '16px' }}>
+          <div style={{ borderBottom: '2px solid #1e3a5f', paddingBottom: '4px', marginBottom: '12px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1e3a5f', margin: 0 }}>Section 1 - Statistical Analysis</h2>
+          </div>
+          <DistrictStatisticalAnalysis 
+            filters={{
+              district: actualDistrict,
+              year: filters.year?.map(String),
+              startDate: filters.date_from,
+              endDate: filters.date_to,
+              severity: filters.severity,
+              roadClassification: (filters as any).road_classification,
+              weatherCondition: filters.weather_condition,
+              lightCondition: filters.light_condition,
+              collisionType: (filters as any).collision_type,
+              taluka: (filters as any).taluka,
+              policeStation: (filters as any).police_station,
+            }} 
+            onDataLoaded={() => setStatLoaded(true)}
+            disableAnimations={true}
+            fullLabels={true}
+          />
+        </div>
+
+        {/* Temporal Sections */}
+        <div className="page-break" style={{ padding: '0 12px' }}>
+          <div style={{ borderBottom: '2px solid #1e3a5f', paddingBottom: '4px', marginBottom: '12px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1e3a5f', margin: 0 }}>Section 2 - Temporal Analysis</h2>
+          </div>
+          <TemporalAnalysis 
+            filters={filters as any} 
+            fetchFn={(f) => fetchGujaratTemporalAnalysis(f as any, actualDistrict)}
+            onDataLoaded={() => setTempLoaded(true)} 
+          />
+        </div>
+      </div>
     </>,
     document.body
   );

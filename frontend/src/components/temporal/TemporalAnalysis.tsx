@@ -32,6 +32,7 @@ import {
 interface Props {
   filters: DashboardFilters;
   fetchFn?: (filters: DashboardFilters) => Promise<TemporalAnalysisData>;
+  onDataLoaded?: () => void;
 }
 
 const emptyTemporalData: TemporalAnalysisData = {
@@ -135,7 +136,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
  * @param {DashboardFilters} props.filters - Global dashboard filters to apply to the data request.
  * @param {Function} [props.fetchFn] - Optional override for the data fetching function (useful for testing or specialized views).
  */
-export default function TemporalAnalysis({ filters, fetchFn }: Props) {
+export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Props) {
   const [data, setData] = useState<TemporalAnalysisData>(emptyTemporalData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -157,7 +158,10 @@ export default function TemporalAnalysis({ filters, fetchFn }: Props) {
           setError(err.message || "Failed to load temporal analysis.");
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+          if (onDataLoaded) onDataLoaded();
+        }
       });
 
     return () => {
