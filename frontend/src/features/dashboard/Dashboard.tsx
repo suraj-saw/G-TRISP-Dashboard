@@ -22,6 +22,7 @@ import FilterSelect from "../../components/layout/FilterSelect";
 import ExportButton from "../../components/layout/ExportButton";
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
 import BlackspotExportButton from "../../components/layout/BlackspotExportButton";
+import { useIdleTimer } from "../../hooks/useIdleTimer";
 // import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
 // import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
 
@@ -265,6 +266,11 @@ export default function Dashboard() {
     }
     navigate(ROUTES.LOGIN, { replace: true });
   };
+
+  useIdleTimer({
+    onIdle: logout,
+    enabled: !sessionChecking && !!user,
+  });
 
   const years = useMemo(() => {
     if (!allData?.timeSeries) return [];

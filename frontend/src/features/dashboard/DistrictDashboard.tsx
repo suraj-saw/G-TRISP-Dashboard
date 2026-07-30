@@ -38,6 +38,7 @@ import DistrictAnalysisTabs, {
 } from "../../components/maps/Districtanalysistabs";
 import DistrictStatisticalAnalysis from "../../components/dashboard/DistrictStatisticalAnalysis";
 import { ExportProvider, useExportContext } from "../../context/ExportContext";
+import { useIdleTimer } from "../../hooks/useIdleTimer";
 import { downloadGujaratExport } from "../../api/exportApi";
 
 import {
@@ -554,6 +555,11 @@ export default function DistrictDashboard() {
     }
     navigate(ROUTES.LOGIN, { replace: true });
   };
+
+  useIdleTimer({
+    onIdle: logout,
+    enabled: !sessionChecking && !!user,
+  });
 
   const years = useMemo(
     () =>

@@ -31,6 +31,8 @@ COOKIE_SECURE   = ENVIRONMENT == "production"
 COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "strict")
 FRONTEND_URL    = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
+from datetime import datetime, timezone
+
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 # pyrefly: ignore [missing-import]
@@ -48,6 +50,7 @@ from app.services.auth_service import (
     blacklist_refresh_token,
     is_token_blacklisted,
     is_session_valid,
+    get_grace_tokens,
     check_forgot_password_rate_limit,
     create_password_reset_token,
     verify_password_reset_token,
@@ -139,7 +142,11 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired access token")
 
-    if not is_session_valid(token):
+    # Check if request is a passive background status poll (e.g. 5-sec poll)
+    is_background_poll = request.headers.get("x-background-poll", "").lower() == "true"
+    touch_session = not is_background_poll
+
+    if not is_session_valid(token, touch=touch_session):
         raise HTTPException(
             status_code=401,
             detail="Session invalidated. Please log in again.",
@@ -316,10 +323,11 @@ def refresh(request: Request, response: Response):
 
     JWT Flow:
     1. Extracts refresh token from HttpOnly cookies.
-    2. Verifies token is not blacklisted or expired.
-    3. Verifies session is still active in Redis.
-    4. Blacklists the old refresh token (sliding window logic).
-    5. Generates and returns a fresh pair of tokens.
+    2. Checks if token is in multi-tab grace window; if so, serves recent valid pair.
+    3. Verifies token is not blacklisted or expired.
+    4. Enforces strict 8-hour maximum session duration from initial login.
+    5. Reuses active session_id (so multi-tab sessions stay in sync).
+    6. Rotates tokens and returns a fresh pair.
 
     Args:
         request (Request): FastAPI request to extract cookies.
@@ -333,10 +341,17 @@ def refresh(request: Request, response: Response):
     if not token:
         raise HTTPException(status_code=401, detail="Refresh token missing")
 
+    # Multi-tab grace window check: Handles race conditions when multiple tabs refresh simultaneously
+    grace_response = get_grace_tokens(token)
+    if grace_response:
+        _set_auth_cookies(response, grace_response["access_token"], grace_response["refresh_token"])
+        return {"message": "Token refreshed successfully (grace)"}
+
     if is_token_blacklisted(token):
         raise HTTPException(status_code=401, detail="Refresh token has been revoked")
 
-    if not is_session_valid(token):
+    # Validate session exists in Redis (passive check, do not slide idle TTL)
+    if not is_session_valid(token, touch=False):
         raise HTTPException(
             status_code=401,
             detail="Session invalidated. Please log in again.",
@@ -350,19 +365,39 @@ def refresh(request: Request, response: Response):
 
         user_id_str = payload.get("sub")
         user_id     = payload.get("id")
+        session_id  = payload.get("session_id")
+        session_start_exp = payload.get("session_start_exp") or payload.get("exp")
 
         if not user_id_str or not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
 
+        # Hard 8-hour session cap check
+        now_ts = datetime.now(timezone.utc).timestamp()
+        if session_start_exp and now_ts >= float(session_start_exp):
+            raise HTTPException(
+                status_code=401,
+                detail="Maximum session duration (8 hours) reached. Please log in again.",
+            )
+
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
-    blacklist_refresh_token(token, revoke_session=False)
+    access_token, new_refresh_token = create_token_pair(
+        data={"sub": user_id_str, "id": user_id},
+        existing_session_id=session_id,
+        session_start_exp=session_start_exp,
+    )
 
-    access_token, new_refresh_token = create_token_pair({
-        "sub": user_id_str,
-        "id":  user_id,
-    })
+    # Blacklist old refresh token and register grace response for multi-tab requests
+    blacklist_refresh_token(
+        token,
+        revoke_session=False,
+        grace_new_tokens={
+            "access_token": access_token,
+            "refresh_token": new_refresh_token,
+        },
+    )
+
     _set_auth_cookies(response, access_token, new_refresh_token)
 
     return {"message": "Token refreshed successfully"}

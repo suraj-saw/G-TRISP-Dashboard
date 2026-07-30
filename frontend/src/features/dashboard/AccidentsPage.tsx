@@ -24,6 +24,7 @@ import { ROUTES } from "../../config/constants";
 import AccidentManagement from "./AccidentManagement";
 import AccidentFormModal from "../../components/admin/AccidentFormModal";
 import ImportRecordsModal from "../../components/admin/ImportRecordsModal";
+import { useIdleTimer } from "../../hooks/useIdleTimer";
 
 import type { User } from "../../types/user";
 import type { Notification } from "../../types/notification";
@@ -60,7 +61,9 @@ export default function AccidentsPage() {
 
   const loadNotifications = useCallback(async () => {
     try {
-      const res = await API.get<Notification[]>("/admin/notifications");
+      const res = await API.get<Notification[]>("/admin/notifications", {
+        headers: { "X-Background-Poll": "true" },
+      });
       setNotifications(res.data);
     } catch { /* ignore */ }
   }, []);
@@ -71,7 +74,9 @@ export default function AccidentsPage() {
 
     const poll = async () => {
       try {
-        const userRes = await API.get<User>("/auth/me");
+        const userRes = await API.get<User>("/auth/me", {
+          headers: { "X-Background-Poll": "true" },
+        });
         if (!active) return;
         if (userRes.data.role !== "admin" && userRes.data.role !== "superadmin") {
           navigate(ROUTES.DASHBOARD, { replace: true });
@@ -102,6 +107,12 @@ export default function AccidentsPage() {
     try { await API.post("/auth/logout"); } catch {}
     navigate(ROUTES.LOGIN, { replace: true });
   };
+
+  // Client-side 30-minute idle inactivity auto-logout
+  useIdleTimer({
+    onIdle: logout,
+    enabled: sessionStatus === "active",
+  });
 
   const handleAddSuccess = (accidentId: string) => {
     setAddModalOpen(false);

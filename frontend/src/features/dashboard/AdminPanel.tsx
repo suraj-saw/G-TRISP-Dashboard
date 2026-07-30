@@ -33,6 +33,7 @@ import API from "../../api/axios";
 import TopBar from "../../components/layout/TopBar";
 import { ROUTES } from "../../config/constants";
 import { Database } from "lucide-react";
+import { useIdleTimer } from "../../hooks/useIdleTimer";
 
 import type { User } from "../../types/user";
 import type { Notification } from "../../types/notification";
@@ -155,7 +156,9 @@ function AdminPanel() {
 
   const loadNotifications = useCallback(async () => {
     try {
-      const res = await API.get<Notification[]>("/admin/notifications");
+      const res = await API.get<Notification[]>("/admin/notifications", {
+        headers: { "X-Background-Poll": "true" },
+      });
       setNotifications(res.data);
     } catch {
       /* ignore */
@@ -170,7 +173,9 @@ function AdminPanel() {
 
     const poll = async () => {
       try {
-        const userRes = await API.get<User>("/auth/me");
+        const userRes = await API.get<User>("/auth/me", {
+          headers: { "X-Background-Poll": "true" },
+        });
 
         if (!active) return;
         if (userRes.data.role !== "admin" && userRes.data.role !== "superadmin") {
@@ -231,6 +236,12 @@ function AdminPanel() {
     } catch {}
     navigate(ROUTES.LOGIN, { replace: true });
   };
+
+  // Client-side 30-minute idle inactivity auto-logout
+  useIdleTimer({
+    onIdle: logout,
+    enabled: sessionStatus === "active",
+  });
 
 
 

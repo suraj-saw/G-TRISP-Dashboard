@@ -23,6 +23,7 @@ import DistrictStatisticalAnalysis from "../../components/dashboard/DistrictStat
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
 import ExportButton from "../../components/layout/ExportButton";
 import type { DashboardFilters } from "../../types/dashboard";
+import { useIdleTimer } from "../../hooks/useIdleTimer";
 
 const defaultFilters: DashboardFilters = {
   district: [],
@@ -121,6 +122,11 @@ export default function GujaratOverview({
     }
     navigate(ROUTES.LOGIN, { replace: true });
   };
+
+  useIdleTimer({
+    onIdle: logout,
+    enabled: !sessionChecking && !!user,
+  });
 
   if (sessionChecking || !user) {
     return (

@@ -75,11 +75,15 @@ SURAT_DASH_PREFIX    = "/api/surat/dashboard"
 GEO_PREFIX           = "/api/geo"
 
 # ---------------------------------------------------------------------------
-# Redis key prefixes
+# Redis key prefixes & Session Grace
 # ---------------------------------------------------------------------------
 
 REDIS_SESSION_PREFIX   = "session:"
 REDIS_BLACKLIST_PREFIX = "blacklist:"
+REDIS_GRACE_PREFIX     = "grace:"
+
+# Grace period (seconds) for multi-tab token refresh rotation handling
+TOKEN_REFRESH_GRACE_PERIOD_SECONDS: int = 15
 
 # ---------------------------------------------------------------------------
 # Sentinel / placeholder values used in data cleaning

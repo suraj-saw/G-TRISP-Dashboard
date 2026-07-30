@@ -24,6 +24,8 @@ from dotenv import load_dotenv
 from app.core.constants import (
     REDIS_SESSION_PREFIX,
     REDIS_BLACKLIST_PREFIX,
+    REDIS_GRACE_PREFIX,
+    TOKEN_REFRESH_GRACE_PERIOD_SECONDS,
     DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES,
     DEFAULT_REFRESH_TOKEN_EXPIRE_HOURS,
     DEFAULT_IDLE_TIMEOUT_MINUTES,
@@ -81,6 +83,12 @@ def _blacklist_key(token: str) -> str:
     return f"{REDIS_BLACKLIST_PREFIX}{token}"
 
 
+def _grace_key(token: str) -> str:
+    """Generate a consistent Redis key for a recently rotated token in grace period."""
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return f"{REDIS_GRACE_PREFIX}{token_hash}"
+
+
 # ---------------------------------------------------------------------------
 # Password
 # ---------------------------------------------------------------------------
@@ -124,36 +132,64 @@ def verify_password(password: str, hashed_password: str) -> bool:
 # Token creation & decoding
 # ---------------------------------------------------------------------------
 
-def create_token_pair(data: dict) -> tuple[str, str]:
+def create_token_pair(
+    data: dict,
+    existing_session_id: str | None = None,
+    session_start_exp: float | int | datetime | None = None,
+) -> tuple[str, str]:
     """
     Create a new (access_token, refresh_token) pair and register the session
     in Redis with an idle-timeout TTL.
 
     Args:
         data (dict): Payload data to embed in the JWT (must include 'id').
+        existing_session_id (str | None): Optional existing session_id to reuse across token refreshes.
+        session_start_exp (float | int | datetime | None): Optional original hard session expiration cap.
 
     Returns:
         tuple[str, str]: A tuple containing the (access_token, refresh_token).
     """
-    session_id = str(uuid.uuid4())
+    session_id = existing_session_id or str(uuid.uuid4())
     user_id    = data.get("id")
 
-    # Register the session in Redis to track activity and enforce idle timeouts
+    now_utc = datetime.now(timezone.utc)
+
+    # Determine maximum session expiration timestamp (8-hour cap from initial login)
+    if session_start_exp is None:
+        hard_cap_dt = now_utc + timedelta(hours=REFRESH_TOKEN_EXPIRE_HOURS)
+    elif isinstance(session_start_exp, (int, float)):
+        hard_cap_dt = datetime.fromtimestamp(session_start_exp, tz=timezone.utc)
+    elif isinstance(session_start_exp, datetime):
+        hard_cap_dt = session_start_exp.astimezone(timezone.utc) if session_start_exp.tzinfo else session_start_exp.replace(tzinfo=timezone.utc)
+    else:
+        hard_cap_dt = now_utc + timedelta(hours=REFRESH_TOKEN_EXPIRE_HOURS)
+
+    start_exp_ts = hard_cap_dt.timestamp()
+
+    # Register/extend the session in Redis to track activity and enforce idle timeouts
     ttl = IDLE_TIMEOUT_MINUTES * 60
     redis_client.setex(_session_key(user_id), ttl, session_id)
 
-    base_payload = {**data, "session_id": session_id}
+    base_payload = {
+        **data,
+        "session_id": session_id,
+        "session_start_exp": start_exp_ts,
+    }
 
     access_payload = {
         **base_payload,
-        "exp":  datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+        "exp":  now_utc + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
         "type": "access",
     }
     access_token = jwt.encode(access_payload, SECRET_KEY, algorithm=ALGORITHM)
 
+    # Refresh token exp is strictly capped at hard_cap_dt (8 hours from initial login)
+    standard_refresh_exp = now_utc + timedelta(hours=REFRESH_TOKEN_EXPIRE_HOURS)
+    final_refresh_exp = min(standard_refresh_exp, hard_cap_dt)
+
     refresh_payload = {
         **base_payload,
-        "exp":  datetime.now(timezone.utc) + timedelta(hours=REFRESH_TOKEN_EXPIRE_HOURS),
+        "exp":  final_refresh_exp,
         "type": "refresh",
     }
     refresh_token = jwt.encode(refresh_payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -181,15 +217,16 @@ def decode_token(token: str) -> dict:
 # Session validation
 # ---------------------------------------------------------------------------
 
-def is_session_valid(token: str) -> bool:
+def is_session_valid(token: str, touch: bool = True) -> bool:
     """
     Validate that a token's session_id matches the active session in Redis.
     
-    If successful, this function implements a "sliding window" by resetting 
+    If successful and `touch=True`, this function implements a "sliding window" by resetting 
     the session's idle-timeout TTL back to its maximum value.
 
     Args:
         token (str): The JWT string to validate.
+        touch (bool): If True, resets the Redis idle TTL countdown. Defaults to True.
 
     Returns:
         bool: True if the session is valid and active, False otherwise.
@@ -207,8 +244,9 @@ def is_session_valid(token: str) -> bool:
 
         # Verify the token belongs to the currently active session
         if stored_session_id == token_session_id:
-            # Slide the idle timeout window forward
-            redis_client.expire(key, IDLE_TIMEOUT_MINUTES * 60)
+            if touch:
+                # Slide the idle timeout window forward only on active user requests
+                redis_client.expire(key, IDLE_TIMEOUT_MINUTES * 60)
             return True
 
         return False
@@ -218,17 +256,22 @@ def is_session_valid(token: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Token revocation
+# Token revocation & multi-tab grace window
 # ---------------------------------------------------------------------------
 
-def blacklist_refresh_token(token: str, revoke_session: bool = False) -> None:
+def blacklist_refresh_token(
+    token: str,
+    revoke_session: bool = False,
+    grace_new_tokens: dict | None = None,
+) -> None:
     """
-    Add the refresh token to the blacklist and optionally delete the session.
+    Add the refresh token to the blacklist and optionally delete the session or store grace period response.
 
     Args:
         token (str): The raw refresh token string to revoke.
         revoke_session (bool): If True, deletes the user's active session 
             from Redis, forcing a re-login on all devices. Defaults to False.
+        grace_new_tokens (dict | None): Optional dict containing replacement tokens to serve during grace period.
     """
     try:
         payload = decode_token(token)
@@ -238,7 +281,7 @@ def blacklist_refresh_token(token: str, revoke_session: bool = False) -> None:
         if not exp:
             return
 
-        ttl  = int(exp - datetime.now(timezone.utc).timestamp())
+        ttl = int(exp - datetime.now(timezone.utc).timestamp())
         
         # Use Redis pipelines to ensure atomicity and reduce network round-trips
         pipe = redis_client.pipeline()
@@ -247,6 +290,14 @@ def blacklist_refresh_token(token: str, revoke_session: bool = False) -> None:
         if ttl > 0:
             pipe.setex(_blacklist_key(token), ttl, "revoked")
 
+        if grace_new_tokens and isinstance(grace_new_tokens, dict):
+            import json
+            pipe.setex(
+                _grace_key(token),
+                TOKEN_REFRESH_GRACE_PERIOD_SECONDS,
+                json.dumps(grace_new_tokens),
+            )
+
         if revoke_session and user_id:
             pipe.delete(_session_key(user_id))
 
@@ -254,6 +305,26 @@ def blacklist_refresh_token(token: str, revoke_session: bool = False) -> None:
 
     except JWTError:
         pass
+
+
+def get_grace_tokens(token: str) -> dict | None:
+    """
+    Retrieve recently rotated tokens if the token is currently in its multi-tab grace period.
+
+    Args:
+        token (str): The raw refresh token string.
+
+    Returns:
+        dict | None: The saved token response dictionary if within grace period, else None.
+    """
+    val = redis_client.get(_grace_key(token))
+    if val:
+        try:
+            import json
+            return json.loads(val)
+        except Exception:
+            return None
+    return None
 
 
 def is_token_blacklisted(token: str) -> bool:
