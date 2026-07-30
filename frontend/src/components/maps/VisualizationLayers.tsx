@@ -33,8 +33,6 @@ import {
   BS_HALO_RADIUS_EXPR,
   PRIORITY_TEXT_SIZE_EXPR,
   PRIORITY_SINGLE_COLOR_EXPR,
-  getPriorityLabel,
-  getPriorityColor,
 } from "../../config/blackspotConfig";
 
 interface Props {

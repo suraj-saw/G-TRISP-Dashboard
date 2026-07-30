@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
-import { Loader2, AlertCircle, Activity, Route, TrendingUp, AlertOctagon } from "lucide-react";
+import { Loader2, AlertCircle, Activity, Route, TrendingUp, AlertOctagon, X } from "lucide-react";
 import type { DashboardFilters, SnappedHeatmapPoint } from "../../types/dashboard";
 import {
   CORRIDOR_COLOR_EXPR,
@@ -258,6 +258,11 @@ export default function RiskCorridorLayers({
           setSelectedId(null);
         } else {
           setSelectedId(cid);
+          // Ease map to click location to prevent popup cut-off near screen edges
+          map.easeTo({
+            center: [e.lngLat.lng, e.lngLat.lat],
+            duration: 300,
+          });
           // Snap popup to click location
           setHovered({
             longitude: e.lngLat.lng,
@@ -422,104 +427,160 @@ export default function RiskCorridorLayers({
         <Popup
           longitude={hovered.longitude}
           latitude={hovered.latitude}
-          anchor="bottom"
-          closeButton={true}
+          closeButton={false}
           closeOnClick={false}
           onClose={() => {
             setSelectedId(null);
             setHovered(null);
           }}
-          offset={16}
-          className="z-50 risk-corridor-popup"
-          maxWidth="320px"
+          offset={14}
+          className="z-50 accident-popup"
+          style={
+            {
+              "--popup-bg":
+                CORRIDOR_COLORS[
+                  hovered.priority_level as keyof typeof CORRIDOR_COLORS
+                ] ?? CORRIDOR_COLORS["Very High"],
+            } as React.CSSProperties
+          }
         >
-          <div className="flex flex-col gap-2 min-w-[240px] max-w-[280px] font-sans">
-            {/* Header: Title and Priority Pill */}
-            <div className="flex justify-between items-start gap-3 border-b border-slate-100 pb-2.5">
-              <div>
-                <h3 className="text-sm font-bold text-slate-800 leading-tight">
-                  {getRoadIdentifier(hovered)}
-                </h3>
-                <div className="text-[11px] font-medium text-slate-500 mt-1 flex items-center gap-1.5">
-                  <Route className="w-3 h-3" />
-                  {(hovered.corridor_length ? (hovered.corridor_length / 1000).toFixed(2) : "0")} km 
-                  {hovered.road_classification && hovered.road_classification.toLowerCase() !== "unknown" && (
-                    <>
-                      <span>•</span>
-                      <span>{hovered.road_classification}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div 
-                className="px-2 py-1 rounded-md text-[10px] font-bold text-white whitespace-nowrap shadow-sm"
-                style={{ backgroundColor: CORRIDOR_COLORS[hovered.priority_level as keyof typeof CORRIDOR_COLORS] ?? CORRIDOR_COLORS["Very High"] }}
+          <div className="w-[185px] sm:w-[195px] overflow-hidden rounded-xl bg-white/95 backdrop-blur-md shadow-xl border border-slate-200/90 font-sans tracking-tight text-slate-800 select-none transition-all">
+            {/* Top Banner with Priority Level and Close Button */}
+            <div
+              className="px-2 py-0.5 text-[9px] font-bold tracking-wider text-white uppercase flex items-center justify-between"
+              style={{
+                backgroundColor:
+                  CORRIDOR_COLORS[
+                    hovered.priority_level as keyof typeof CORRIDOR_COLORS
+                  ] ?? CORRIDOR_COLORS["Very High"],
+              }}
+            >
+              <span className="truncate max-w-[145px]">
+                {hovered.priority_level} #{hovered.corridor_rank ?? "-"}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedId(null);
+                  setHovered(null);
+                }}
+                className="pointer-events-auto p-0.5 rounded hover:bg-white/20 text-white transition-colors shrink-0 cursor-pointer"
+                title="Close popup"
+                type="button"
               >
-                {hovered.priority_level} <span className="opacity-80 ml-0.5">#{hovered.corridor_rank ?? "-"}</span>
-              </div>
+                <X size={11} />
+              </button>
             </div>
 
-            {/* Stats Grid: Very compact */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 py-1.5">
+            {/* Main Body */}
+            <div className="p-2 space-y-1.5 text-[10px]">
+              {/* Road Header & Length */}
               <div>
-                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <AlertOctagon className="w-2.5 h-2.5" /> Crashes
+                <div
+                  className="text-[11px] font-extrabold text-slate-800 truncate"
+                  title={getRoadIdentifier(hovered)}
+                >
+                  {getRoadIdentifier(hovered)}
                 </div>
-                <div className="text-sm font-extrabold text-slate-700 mt-0.5">
-                  {hovered.accident_count.toLocaleString()} <span className="text-[10px] text-slate-400 font-medium bg-slate-100 px-1 rounded">({hovered.qualifying_count ?? 0} qual)</span>
+                <div className="text-[9px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
+                  <Route size={10} className="shrink-0 text-slate-400" />
+                  <span>
+                    {(hovered.corridor_length
+                      ? hovered.corridor_length / 1000
+                      : 0
+                    ).toFixed(2)}{" "}
+                    km
+                  </span>
+                  {hovered.road_classification &&
+                    hovered.road_classification.toLowerCase() !== "unknown" && (
+                      <>
+                        <span>•</span>
+                        <span className="truncate max-w-[80px]">
+                          {hovered.road_classification}
+                        </span>
+                      </>
+                    )}
                 </div>
               </div>
-              <div>
-                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <Activity className="w-2.5 h-2.5" /> Density
-                </div>
-                <div className="text-sm font-extrabold text-slate-700 mt-0.5">
-                  {(hovered.accident_density ?? 0).toFixed(1)} <span className="text-[10px] text-slate-400 font-medium">/km</span>
-                </div>
-              </div>
-              <div>
-                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <TrendingUp className="w-2.5 h-2.5" /> Priority Score
-                </div>
-                <div className="text-sm font-extrabold text-indigo-600 mt-0.5">{hovered.priority_score ?? 0}</div>
-              </div>
-              <div>
-                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                  Severity Wt.
-                </div>
-                <div className="text-sm font-extrabold text-orange-600 mt-0.5">{hovered.weighted_score ?? 0}</div>
-              </div>
-            </div>
 
-            {/* Severity Breakdown: Minimalist */}
-            <div className="border-t border-slate-100 pt-2.5 mt-0.5">
-              <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Severity Breakdown</div>
-              <div className="flex justify-between items-center text-center gap-1.5">
-                <div className="flex-1 bg-red-50/80 border border-red-100 rounded py-1">
-                  <div className="text-[13px] font-black text-red-700">{hovered.fatal_count ?? 0}</div>
-                  <div className="text-[8px] font-bold text-slate-500 uppercase">Fatal</div>
+              {/* 2x2 Key Metrics Grid */}
+              <div className="grid grid-cols-2 gap-1 p-1 rounded-md bg-slate-50/90 border border-slate-100/80 text-[9.5px]">
+                <div>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block leading-none">
+                    Crashes
+                  </span>
+                  <span className="font-extrabold text-slate-700 leading-tight">
+                    {hovered.accident_count.toLocaleString()}{" "}
+                    <span className="text-[8px] font-normal text-slate-400">
+                      ({hovered.qualifying_count ?? 0} qual)
+                    </span>
+                  </span>
                 </div>
-                <div className="flex-1 bg-orange-50/80 border border-orange-100 rounded py-1">
-                  <div className="text-[13px] font-black text-orange-700">{hovered.grievous_count ?? 0}</div>
-                  <div className="text-[8px] font-bold text-slate-500 uppercase">Griev</div>
+                <div>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block leading-none">
+                    Density
+                  </span>
+                  <span className="font-extrabold text-slate-700 leading-tight">
+                    {(hovered.accident_density ?? 0).toFixed(1)}/km
+                  </span>
                 </div>
-                <div className="flex-1 bg-amber-50/80 border border-amber-100 rounded py-1">
-                  <div className="text-[13px] font-black text-amber-600">{hovered.minor_hospitalized_count ?? 0}</div>
-                  <div className="text-[8px] font-bold text-slate-500 uppercase">M.Hosp</div>
+                <div>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block leading-none">
+                    Priority
+                  </span>
+                  <span className="font-extrabold text-indigo-600 leading-tight">
+                    {hovered.priority_score ?? 0}
+                  </span>
                 </div>
-                <div className="flex-1 bg-yellow-50/80 border border-yellow-100 rounded py-1">
-                  <div className="text-[13px] font-black text-yellow-600">{hovered.minor_non_hospitalized_count ?? 0}</div>
-                  <div className="text-[8px] font-bold text-slate-500 uppercase">M.Non</div>
+                <div>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block leading-none">
+                    Severity Wt
+                  </span>
+                  <span className="font-extrabold text-orange-600 leading-tight">
+                    {hovered.weighted_score ?? 0}
+                  </span>
+                </div>
+              </div>
+
+              {/* 4-Stat Severity Pills */}
+              <div className="grid grid-cols-4 gap-0.5 text-center">
+                <div className="flex flex-col items-center py-0.5 rounded bg-red-50/90 border border-red-100/80">
+                  <span className="text-[7.5px] font-bold text-red-700/80 uppercase">
+                    Fatal
+                  </span>
+                  <span className="text-[10.5px] font-black text-red-700 leading-none">
+                    {hovered.fatal_count ?? 0}
+                  </span>
+                </div>
+
+                <div className="flex flex-col items-center py-0.5 rounded bg-orange-50/90 border border-orange-100/80">
+                  <span className="text-[7.5px] font-bold text-orange-700/80 uppercase">
+                    Griev
+                  </span>
+                  <span className="text-[10.5px] font-black text-orange-700 leading-none">
+                    {hovered.grievous_count ?? 0}
+                  </span>
+                </div>
+
+                <div className="flex flex-col items-center py-0.5 rounded bg-amber-50/90 border border-amber-100/80">
+                  <span className="text-[7.5px] font-bold text-amber-700/80 uppercase">
+                    Hosp
+                  </span>
+                  <span className="text-[10.5px] font-black text-amber-700 leading-none">
+                    {hovered.minor_hospitalized_count ?? 0}
+                  </span>
+                </div>
+
+                <div className="flex flex-col items-center py-0.5 rounded bg-sky-50/90 border border-sky-100/80">
+                  <span className="text-[7.5px] font-bold text-sky-700/80 uppercase">
+                    Non-H
+                  </span>
+                  <span className="text-[10.5px] font-black text-sky-700 leading-none">
+                    {hovered.minor_non_hospitalized_count ?? 0}
+                  </span>
                 </div>
               </div>
             </div>
-            
-            {selectedId === hovered.corridor_id && (
-              <div className="mt-2 py-1.5 px-3 bg-blue-50 border border-blue-100 text-blue-700 rounded text-center text-[10px] font-bold flex items-center justify-center gap-1.5 animate-in fade-in">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
-                Corridor Selected
-              </div>
-            )}
           </div>
         </Popup>
       )}

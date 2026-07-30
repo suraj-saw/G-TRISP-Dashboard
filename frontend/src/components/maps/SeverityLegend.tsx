@@ -47,7 +47,8 @@ export default function SeverityLegend({
   if (
     type === "location_markers" ||
     type === "clusters" ||
-    type === "pedestrian_accidents"
+    type === "pedestrian_accidents" ||
+    type === "snapped_accidents"
   ) {
     isVisible = true;
   } else if (type.includes("blackspot")) {

@@ -5,9 +5,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
-import { Loader2 } from "lucide-react";
-import type { DashboardFilters } from "../../types/dashboard";
-import type { SnappedHeatmapPoint } from "../../types/dashboard";
+import { Loader2, Calendar, X } from "lucide-react";
+import type { DashboardFilters, SnappedHeatmapPoint } from "../../types/dashboard";
 import { toDataFilterKey } from "../../utils/dashboardFilters";
 
 interface Props {
@@ -16,10 +15,10 @@ interface Props {
 }
 
 const SEVERITY_COLORS = {
-  Fatal: "#78350F",
+  Fatal: "#78350F", // Dark Brown to distinguish from Orange Grievous Injury
   "Grievous Injury": "#EA580C",
   "Minor Injury Hospitalized": "#EAB308",
-  "Minor Injury Non Hospitalized": "#0284C7",
+  "Minor Injury Non Hospitalized": "#0284C7", // Distinct Sky Blue to stand out from red/orange/yellow
   "No Injury": "#16A34A",
   default: "#64748B",
 } as const;
@@ -31,17 +30,19 @@ const severityColorExpression = [
   ["in", "grievous", ["downcase", ["coalesce", ["get", "severity"], ""]]],
   SEVERITY_COLORS["Grievous Injury"],
   [
-    "in",
-    "minor injury hospitalized",
-    ["downcase", ["coalesce", ["get", "severity"], ""]],
-  ],
-  SEVERITY_COLORS["Minor Injury Hospitalized"],
-  [
-    "in",
-    "minor injury non",
-    ["downcase", ["coalesce", ["get", "severity"], ""]],
+    "any",
+    ["in", "non", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+    ["in", "non-hosp", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+    ["in", "non hosp", ["downcase", ["coalesce", ["get", "severity"], ""]]],
   ],
   SEVERITY_COLORS["Minor Injury Non Hospitalized"],
+  [
+    "any",
+    ["in", "hospitalized", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+    ["in", "hosp", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+    ["in", "minor", ["downcase", ["coalesce", ["get", "severity"], ""]]],
+  ],
+  SEVERITY_COLORS["Minor Injury Hospitalized"],
   [
     "any",
     ["in", "no injury", ["downcase", ["coalesce", ["get", "severity"], ""]]],
@@ -70,31 +71,176 @@ function formatDate(value?: string | null): string {
   });
 }
 
-const getSeverityBadgeClasses = (severity?: string | null): string => {
+const getSeverityTheme = (severity?: string | null) => {
   const s = (severity || "").toLowerCase();
-  if (s.includes("fatal"))
-    return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20";
-  if (s.includes("grievous"))
-    return "bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20";
-  if (s.includes("minor injury hospitalized"))
-    return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20";
-  if (s.includes("minor injury non"))
-    return "bg-yellow-50 text-yellow-700 ring-1 ring-inset ring-yellow-600/20";
-  if (s.includes("no injury") || s.includes("damage only"))
-    return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20";
-  return "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-600/20";
+  if (s.includes("fatal")) {
+    return {
+      label: "FATAL",
+      color: "#78350F",
+      bg: "#FFFBEB", // Warm Amber/Cream 50
+      textColor: "text-slate-800",
+      subTextColor: "text-slate-500",
+      labelColor: "text-[#78350F] font-bold",
+      borderColor: "border-[#FDE68A]",
+      ringColor: "ring-1 ring-[#78350F]/20",
+    };
+  }
+  if (s.includes("grievous")) {
+    return {
+      label: "GRIEVOUS INJURY",
+      color: "#EA580C",
+      bg: "#FFF7ED", // Orange 50
+      textColor: "text-slate-800",
+      subTextColor: "text-slate-500",
+      labelColor: "text-orange-700 font-bold",
+      borderColor: "border-orange-200/90",
+      ringColor: "ring-1 ring-orange-500/20",
+    };
+  }
+  if (s.includes("non") || s.includes("non-hosp") || s.includes("non hosp")) {
+    return {
+      label: "MINOR (NON-HOSP)",
+      color: "#0284C7",
+      bg: "#F0F9FF", // Sky Blue 50
+      textColor: "text-slate-800",
+      subTextColor: "text-slate-500",
+      labelColor: "text-sky-700 font-bold",
+      borderColor: "border-sky-200/90",
+      ringColor: "ring-1 ring-sky-500/20",
+    };
+  }
+  if (s.includes("hospitalized") || s.includes("hosp") || s.includes("minor")) {
+    return {
+      label: "MINOR (HOSPITALIZED)",
+      color: "#EAB308",
+      bg: "#FEFCE8", // Yellow 50
+      textColor: "text-slate-800",
+      subTextColor: "text-slate-500",
+      labelColor: "text-yellow-700 font-bold",
+      borderColor: "border-yellow-200/90",
+      ringColor: "ring-1 ring-yellow-500/20",
+    };
+  }
+  if (s.includes("no injury") || s.includes("damage")) {
+    return {
+      label: "NO INJURY / DAMAGE",
+      color: "#16A34A",
+      bg: "#F0FDF4", // Green 50
+      textColor: "text-slate-800",
+      subTextColor: "text-slate-500",
+      labelColor: "text-emerald-700 font-bold",
+      borderColor: "border-emerald-200/90",
+      ringColor: "ring-1 ring-emerald-500/20",
+    };
+  }
+  return {
+    label: safeText(severity).toUpperCase(),
+    color: "#64748B",
+    bg: "#F8FAFC", // Slate 50
+    textColor: "text-slate-800",
+    subTextColor: "text-slate-500",
+    labelColor: "text-slate-600 font-bold",
+    borderColor: "border-slate-200/90",
+    ringColor: "ring-1 ring-slate-400/20",
+  };
 };
 
-type HoveredPoint = SnappedHeatmapPoint & {
+type SelectedPoint = SnappedHeatmapPoint & {
   longitude: number;
   latitude: number;
 };
+
+interface SnappedAccidentPopupBodyProps {
+  selected: SelectedPoint;
+  onClose?: () => void;
+}
+
+function SnappedAccidentPopupBody({
+  selected,
+  onClose,
+}: SnappedAccidentPopupBodyProps) {
+  const theme = getSeverityTheme(selected.severity);
+
+  return (
+    <div
+      className={`rounded-xl shadow-lg p-2.5 w-[190px] sm:w-[200px] ${theme.textColor} ${theme.ringColor} border ${theme.borderColor} font-sans tracking-tight leading-tight select-text transition-all`}
+      style={{ backgroundColor: theme.bg }}
+    >
+      {/* ── Top Header: Date, ID & Close Button ── */}
+      <div className="flex items-center justify-between gap-1 pb-1.5 border-b border-slate-200/60">
+        <span className="flex items-center gap-1 text-[10.5px] font-semibold text-slate-700">
+          <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+          {formatDate(selected.accident_date_time)}
+        </span>
+        <div className="flex items-center gap-1 ml-auto">
+          {selected.accident_id && (
+            <span
+              className="font-mono text-[9.5px] text-slate-400 truncate max-w-[85px]"
+              title={`ID: ${selected.accident_id}`}
+            >
+              #{selected.accident_id}
+            </span>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-0.5 rounded-full hover:bg-slate-200/80 text-slate-400 hover:text-slate-700 transition-colors ml-1"
+              title="Close popup"
+              type="button"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Main Details Grid ── */}
+      <div className="mt-1.5 space-y-1 text-[10.5px]">
+        {/* Collision Type */}
+        <div className="flex items-baseline justify-between gap-1">
+          <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
+            Collision
+          </span>
+          <span
+            className="font-semibold text-slate-700 text-right truncate max-w-[110px]"
+            title={safeText(selected.collision_type)}
+          >
+            {safeText(selected.collision_type)}
+          </span>
+        </div>
+
+        {/* Coordinates */}
+        <div className="flex items-baseline justify-between gap-1">
+          <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
+            Coords
+          </span>
+          <span className="font-mono text-[10px] font-medium text-slate-600 text-right">
+            {Number(selected.latitude).toFixed(4)}, {Number(selected.longitude).toFixed(4)}
+          </span>
+        </div>
+
+        {/* Road Class */}
+        <div className="flex items-baseline justify-between gap-1">
+          <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
+            Road Class
+          </span>
+          <span
+            className="font-medium text-slate-700 text-right truncate max-w-[105px]"
+            title={safeText(selected.road_classification)}
+          >
+            {safeText(selected.road_classification)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
   const [data, setData] = useState<{ total: number; data: SnappedHeatmapPoint[] } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hoveredPoint, setHoveredPoint] = useState<HoveredPoint | null>(null);
+  const [selectedPoint, setSelectedPoint] = useState<SelectedPoint | null>(null);
 
   const filterKey = toDataFilterKey(filters);
 
@@ -120,7 +266,7 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
     return () => {
       active = false;
     };
-  }, [filterKey, fetchFn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filterKey, fetchFn]);
 
   const geojson = useMemo(() => {
     if (!data || !data.data) {
@@ -174,34 +320,38 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
     const map = mapRef?.getMap();
     if (!map) return;
 
+    const layers = ["snapped-hover-targets", "snapped-points-layer", "snapped-original-points-layer"];
+
     const onMove = (e: import("react-map-gl/maplibre").MapLayerMouseEvent) => {
-      const features = map.queryRenderedFeatures(e.point, {
-        layers: ["snapped-hover-targets", "snapped-points-layer", "snapped-original-points-layer"],
-      });
+      const features = map.queryRenderedFeatures(e.point, { layers });
+      map.getCanvas().style.cursor = features.length > 0 ? "pointer" : "";
+    };
+
+    const onClick = (e: import("react-map-gl/maplibre").MapLayerMouseEvent) => {
+      const features = map.queryRenderedFeatures(e.point, { layers });
       if (features.length > 0) {
-        map.getCanvas().style.cursor = "pointer";
         const feature = features[0];
-        setHoveredPoint({
+        setSelectedPoint({
           ...feature.properties,
           longitude: e.lngLat.lng,
           latitude: e.lngLat.lat,
-        } as HoveredPoint);
+        } as SelectedPoint);
       } else {
-        map.getCanvas().style.cursor = "";
-        setHoveredPoint(null);
+        setSelectedPoint(null);
       }
     };
 
     const onLeave = () => {
       map.getCanvas().style.cursor = "";
-      setHoveredPoint(null);
     };
 
     map.on("mousemove", onMove);
+    map.on("click", onClick);
     map.on("mouseout", onLeave);
 
     return () => {
       map.off("mousemove", onMove);
+      map.off("click", onClick);
       map.off("mouseout", onLeave);
       map.getCanvas().style.cursor = "";
     };
@@ -234,7 +384,14 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
           type="line"
           paint={{
             "line-color": severityColorExpression as unknown as import("maplibre-gl").ExpressionSpecification,
-            "line-width": 2,
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              7, 0.8,
+              11, 1.2,
+              15, 1.8,
+            ],
             "line-opacity": 0.6,
             "line-dasharray": [2, 2],
           }}
@@ -250,14 +407,16 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
               "interpolate",
               ["linear"],
               ["zoom"],
-              5, 2,
-              15, 3,
-              20, 4,
+              7, 1.2,
+              9, 1.6,
+              11, 2.2,
+              13, 2.8,
+              15, 3.4,
             ],
             "circle-color": severityColorExpression as unknown as import("maplibre-gl").ExpressionSpecification,
-            "circle-stroke-width": 1,
-            "circle-stroke-color": "#ffffff",
-            "circle-opacity": 0.4, // lower opacity for original points
+            "circle-stroke-width": 0.5,
+            "circle-stroke-color": "#FFFFFF",
+            "circle-opacity": 0.45,
           }}
         />
       </Source>
@@ -271,17 +430,42 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
               "interpolate",
               ["linear"],
               ["zoom"],
-              5, 3,
-              15, 4,
-              20, 5,
+              7, 1.5,
+              9, 2.0,
+              11, 2.8,
+              13, 3.5,
+              15, 4.2,
             ],
             "circle-color": severityColorExpression as unknown as import("maplibre-gl").ExpressionSpecification,
-            "circle-stroke-width": 1,
-            "circle-stroke-color": "#ffffff",
-            "circle-opacity": 0.9,
+            "circle-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              7, 0.7,
+              11, 0.8,
+              13, 0.9,
+            ],
+            "circle-stroke-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              7, 0.4,
+              10, 0.6,
+              13, 0.8,
+              15, 1.0,
+            ],
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              7, 0.7,
+              11, 0.85,
+              13, 0.95,
+            ],
           }}
         />
-        {/* Invisible larger circle for easier hover targets */}
+        {/* Invisible larger circle for easier click targets */}
         <Layer
           id="snapped-hover-targets"
           type="circle"
@@ -292,59 +476,25 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
         />
       </Source>
 
-      {hoveredPoint && (
+      {selectedPoint && (
         <Popup
-          longitude={hoveredPoint.longitude}
-          latitude={hoveredPoint.latitude}
-          anchor="bottom"
-          offset={[0, -10]}
+          longitude={selectedPoint.longitude}
+          latitude={selectedPoint.latitude}
+          closeOnClick={true}
+          offset={12}
           closeButton={false}
-          className="z-50"
-          maxWidth="300px"
+          className="accident-popup"
+          style={{ "--popup-bg": getSeverityTheme(selectedPoint.severity).bg } as React.CSSProperties}
+          onClose={() => {
+            setSelectedPoint(null);
+          }}
         >
-          <div className="flex flex-col gap-2 p-1 max-h-[300px] overflow-y-auto custom-scrollbar">
-            <div className="flex flex-col gap-1.5 border-b border-slate-100 pb-2">
-              <div className="flex items-start justify-between gap-3">
-                <span className="font-semibold text-slate-900 leading-tight">
-                  Snapped Accident
-                </span>
-                <span
-                  className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider ${getSeverityBadgeClasses(hoveredPoint.severity)}`}
-                >
-                  {safeText(hoveredPoint.severity)}
-                </span>
-              </div>
-              <div className="text-xs text-slate-500">
-                {formatDate(hoveredPoint.accident_date_time)}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-              <div className="col-span-2">
-                <span className="text-slate-500 block mb-0.5">Location</span>
-                <span className="font-medium text-slate-800 break-words">
-                  {safeText(hoveredPoint.road_name)}
-                </span>
-              </div>
-              <div className="col-span-2">
-                <span className="text-slate-500 block mb-0.5">Snapping Distance</span>
-                <span className="font-medium text-slate-800 break-words">
-                  {Number(hoveredPoint.distance_meters).toFixed(2)} meters
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-500 block mb-0.5">Police Station</span>
-                <span className="font-medium text-slate-800 break-words">
-                  {safeText(hoveredPoint.police_station)}
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-500 block mb-0.5">Collision Type</span>
-                <span className="font-medium text-slate-800 break-words">
-                  {safeText(hoveredPoint.collision_type)}
-                </span>
-              </div>
-            </div>
-          </div>
+          <SnappedAccidentPopupBody
+            selected={selectedPoint}
+            onClose={() => {
+              setSelectedPoint(null);
+            }}
+          />
         </Popup>
       )}
     </>
