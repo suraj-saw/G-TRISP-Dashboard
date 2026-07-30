@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
-import { Loader2, AlertCircle, Download } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import {
   fetchBlackspots,
   exportBlackspotCrashes,
@@ -16,14 +16,13 @@ import {
 import type { DashboardFilters, HeatmapPoint } from "../../types/dashboard";
 import { toDataFilterKey } from "../../utils/dashboardFilters";
 import {
-  getPriorityColor,
-  getPriorityLabel,
   PRIORITY_COLOR_EXPR,
   SEARCH_RADIUS_M,
   MIN_QUALIFYING_CRASHES,
 } from "../../config/blackspotConfig";
-import CompactBlackspotPopup from "./CompactBlackspotPopup";
-import { CompactAccidentPopupBody } from "./Accidentpopup";
+import CompactBlackspotPopup, {
+  type BlackspotPopupData,
+} from "./CompactBlackspotPopup";
 
 interface Props {
   filters: DashboardFilters;
@@ -104,171 +103,11 @@ const severityColorExpression = [
   SEVERITY_COLORS.default,
 ] as const;
 
-const NULL_TEXT_SENTINEL = "nan";
-const UNKNOWN_LABEL = "Unknown";
 
-function safeText(value?: string | null): string {
-  if (!value || value === NULL_TEXT_SENTINEL) return UNKNOWN_LABEL;
-  return value;
-}
 
-function formatDate(value?: string | null): string {
-  if (!value) return UNKNOWN_LABEL;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return UNKNOWN_LABEL;
-  return date.toLocaleDateString("en-IN", {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-  });
-}
 
-const getSeverityBadgeClasses = (severity?: string | null): string => {
-  const s = (severity || "").toLowerCase();
-  if (s.includes("fatal"))
-    return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20";
-  if (s.includes("grievous"))
-    return "bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20";
-  if (s.includes("minor injury hospitalized"))
-    return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20";
-  if (s.includes("minor injury non"))
-    return "bg-yellow-50 text-yellow-700 ring-1 ring-inset ring-yellow-600/20";
-  if (s.includes("no injury") || s.includes("damage only"))
-    return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20";
-  return "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-600/20";
-};
 
-type SelectedAccident = {
-  longitude: number;
-  latitude: number;
-  accident_id?: string | null;
-  severity?: string;
-  police_station?: string | null;
-  road_name?: string | null;
-  road_classification?: string | null;
-  weather_condition?: string | null;
-  light_condition?: string | null;
-  collision_type?: string | null;
-  accident_date_time?: string | null;
-  pedestrian_killed?: number | null;
-  pedestrian_grievous_injury?: number | null;
-  pedestrian_minor_injury?: number | null;
-};
 
-function pedestrianCasualtyTotal(point: {
-  pedestrian_killed?: number | null;
-  pedestrian_grievous_injury?: number | null;
-  pedestrian_minor_injury?: number | null;
-}): number {
-  return (
-    (Number(point.pedestrian_killed) || 0) +
-    (Number(point.pedestrian_grievous_injury) || 0) +
-    (Number(point.pedestrian_minor_injury) || 0)
-  );
-}
-
-/**
- * UI Component for the body of an accident popup.
- * @param {Object} props
- * @param {SelectedAccident} props.selected - The metadata of the selected accident.
- * @param {boolean} props.showPedestrianCasualties - Flag to conditionally render the pedestrian casualty aggregate.
- */
-function AccidentPopupBody({
-  selected,
-  showPedestrianCasualties = false,
-}: {
-  selected: SelectedAccident;
-  showPedestrianCasualties?: boolean;
-}) {
-  const pedestrianTotal = pedestrianCasualtyTotal(selected);
-  const severityBadgeClass = getSeverityBadgeClasses(selected.severity);
-
-  return (
-    <div className="bg-white rounded-lg shadow-xl p-4 flex flex-col w-full min-w-[250px] max-w-[320px] font-sans">
-      {/* --- Header --- */}
-      <div className="flex flex-col mb-4">
-        <div className="mb-2.5">
-          <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider ${severityBadgeClass}`}
-          >
-            {safeText(selected.severity)}
-          </span>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-slate-500">
-          <span className="shrink-0">
-            {formatDate(selected.accident_date_time)}
-          </span>
-          {selected.accident_id && (
-            <>
-              <span className="w-1 h-1 rounded-full bg-slate-300 shrink-0"></span>
-              <span className="break-words">ID: {selected.accident_id}</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-y-4 gap-x-4">
-        <div className="flex flex-col col-span-2">
-          <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1 shrink-0">
-            Collision Type
-          </span>
-          <span className="text-[13px] font-medium text-slate-700 leading-tight break-words">
-            {safeText(selected.collision_type)}
-          </span>
-        </div>
-
-        <div className="flex flex-col">
-          <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1 shrink-0">
-            Coordinates
-          </span>
-          <span className="text-[13px] font-medium text-slate-700 break-words">
-            {selected.latitude.toFixed(4)}, {selected.longitude.toFixed(4)}
-          </span>
-        </div>
-
-        <div className="flex flex-col">
-          <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1 shrink-0">
-            Road Class
-          </span>
-          <span className="text-[13px] font-medium text-slate-700 leading-tight break-words">
-            {safeText(selected.road_classification)}
-          </span>
-        </div>
-
-        {/* --- Pedestrian Casualty Metric --- */}
-        {showPedestrianCasualties && pedestrianTotal > 0 && (
-          <div className="col-span-2 mt-1 flex items-start bg-red-50/50 rounded-lg p-2.5 ring-1 ring-inset ring-red-100">
-            <div className="h-8 w-8 bg-white rounded-full shadow-sm flex items-center justify-center mr-3 shrink-0 mt-0.5">
-              <svg
-                className="w-4 h-4 text-red-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-semibold text-red-800/80 uppercase tracking-wider mb-0.5">
-                Pedestrian Casualties
-              </span>
-              <span className="text-sm font-semibold text-red-700">
-                {pedestrianTotal} Recorded
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function buildAccidentGeojson(
   data?: HeatmapPoint[]
@@ -399,7 +238,6 @@ export default function BlackspotDetectionLayers({
       "blackspot-circles-fill",
       "blackspot-centroids-point",
     ];
-    const pointLayers = ["blackspot-accident-points"];
 
     const onMove = (e: any) => {
       if (isOverPopupRef.current) return;
@@ -486,7 +324,7 @@ export default function BlackspotDetectionLayers({
   }, [mapRef, data]);
 
   const handleExportData = async (
-    cluster: HoveredBlackspot | null = hovered
+    cluster?: BlackspotPopupData | HoveredBlackspot | null
   ) => {
     console.log("[BlackspotDetectionLayers] handleExportData called");
     console.log("[BlackspotDetectionLayers] cluster:", cluster);

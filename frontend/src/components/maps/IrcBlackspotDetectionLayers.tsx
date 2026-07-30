@@ -6,14 +6,16 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Source, Layer, useMap, Popup } from "react-map-gl/maplibre";
-import { Loader2, AlertCircle, Download } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { type BlackspotData } from "../../api/dashboardApi";
 import type { DashboardFilters, HeatmapPoint } from "../../types/dashboard";
 import { toDataFilterKey } from "../../utils/dashboardFilters";
 import {
   IRC_CATEGORY_COLOR_EXPR,
 } from "../../config/ircBlackspotConfig";
-import CompactBlackspotPopup from "./CompactBlackspotPopup";
+import CompactBlackspotPopup, {
+  type BlackspotPopupData,
+} from "./CompactBlackspotPopup";
 // import { SEARCH_RADIUS_M } from "../../config/blackspotConfig";
 
 interface Props {
@@ -159,7 +161,7 @@ export default function IrcBlackspotDetectionLayers({
     }
   }, []);
 
-  const handleExportData = async (info: HoveredIrcBlackspot) => {
+  const handleExportData = async (info: BlackspotPopupData | HoveredIrcBlackspot) => {
     if (!exportFn || !info.crash_ids) return;
     const ids = info.crash_ids.split(",").map((id) => id.trim());
     await exportFn(ids, `irc-blackspot-${info.bs_id}-crashes.csv`);

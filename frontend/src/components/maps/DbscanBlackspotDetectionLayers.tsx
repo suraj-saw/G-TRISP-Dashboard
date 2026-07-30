@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
-import { Loader2, AlertCircle, Download } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import {
   fetchDbscanBlackspots,
   exportBlackspotCrashes,
@@ -19,10 +19,10 @@ import {
   SEARCH_RADIUS_M,
   MIN_QUALIFYING_CRASHES,
   PRIORITY_COLOR_EXPR,
-  getPriorityColor,
-  getPriorityLabel,
 } from "../../config/blackspotConfig";
-import CompactBlackspotPopup from "./CompactBlackspotPopup";
+import CompactBlackspotPopup, {
+  type BlackspotPopupData,
+} from "./CompactBlackspotPopup";
 
 interface Props {
   filters: DashboardFilters;
@@ -214,7 +214,7 @@ export default function DbscanBlackspotDetectionLayers({
   }, [mapRef, data]);
 
   const handleExportData = async (
-    cluster: HoveredBlackspot | null = hovered
+    cluster?: BlackspotPopupData | HoveredBlackspot | null
   ) => {
     console.log("[DbscanBlackspotDetectionLayers] handleExportData called");
     console.log("[DbscanBlackspotDetectionLayers] cluster:", cluster);

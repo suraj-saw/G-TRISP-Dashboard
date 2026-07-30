@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
-import { Loader2, AlertCircle, Activity, Route, TrendingUp, AlertOctagon, X } from "lucide-react";
+import { Loader2, AlertCircle, Route, X } from "lucide-react";
 import type { DashboardFilters, SnappedHeatmapPoint } from "../../types/dashboard";
 import {
   CORRIDOR_COLOR_EXPR,
