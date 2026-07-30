@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
+import { X, Calendar } from "lucide-react";
 import type { HeatmapPoint } from "../../types/dashboard";
 import GeoJsonHeatmapLayers from "./GeoJsonHeatmapLayers";
 import {
@@ -114,11 +115,11 @@ const isPedestrianAccident = (point: HeatmapPoint): boolean =>
 // ---------------------------------------------------------------------------
 
 const SEVERITY_COLORS = {
-  Fatal: "#B91C1C",
+  Fatal: "#78350F", // Dark Brown to distinguish from Orange Grievous Injury
   "Grievous Injury": "#EA580C",
-  "Minor Injury Hospitalized": "#F59E0B",
-  "Minor Injury Non Hospitalized": "#FBBF24", // Lighter amber to distinguish from hospitalized
-  "No Injury": "#65A30D",
+  "Minor Injury Hospitalized": "#EAB308",
+  "Minor Injury Non Hospitalized": "#0284C7", // Distinct Sky Blue to stand out from red/orange/yellow
+  "No Injury": "#16A34A",
   default: "#64748B",
   all: "#E8603A",
 } as const;
@@ -472,13 +473,15 @@ function BlackspotLayers({
           latitude={selected.latitude}
           closeOnClick={true}
           offset={12}
-          closeButton
+          closeButton={false}
           className="accident-popup"
+          style={{ "--popup-bg": getSeverityTheme(selected.severity).bg } as React.CSSProperties}
           onClose={() => setSelected(null)}
         >
           <AccidentPopupBody
             selected={selected}
             showPedestrianCasualties={false}
+            onClose={() => setSelected(null)}
           />
         </Popup>
       )}
@@ -655,24 +658,17 @@ export function VisualizationLayers({
           <Popup
             longitude={selected.longitude}
             latitude={selected.latitude}
-            /* 1. Removed anchor="top" to enable Maplibre's smart auto-positioning.
-               It will now automatically flip above/below depending on screen space.
-          */
-
-            /* 2. Changed to true so clicking anywhere on the map closes the popup
-             */
             closeOnClick={true}
-            /* 3. Added a slight offset so the popup doesn't cover the accident marker 
-               when it auto-positions 
-          */
             offset={12}
-            closeButton
+            closeButton={false}
             className="accident-popup"
+            style={{ "--popup-bg": getSeverityTheme(selected.severity).bg } as React.CSSProperties}
             onClose={() => setSelected(null)}
           >
             <AccidentPopupBody
               selected={selected}
               showPedestrianCasualties={type === "density_heatmap"}
+              onClose={() => setSelected(null)}
             />
           </Popup>
         )}
@@ -704,37 +700,53 @@ export function VisualizationLayers({
               "interpolate",
               ["linear"],
               ["zoom"],
+              7,
+              1.5,
               9,
-              3,
+              2.0,
+              11,
+              2.8,
+              13,
+              3.5,
               15,
-              4,
+              4.2,
             ],
             "circle-color": markerColor as any,
             "circle-opacity": [
               "interpolate",
               ["linear"],
               ["zoom"],
-              9,
-              0.45,
+              7,
+              0.7,
               11,
+              0.8,
+              13,
+              0.9,
+            ],
+            "circle-stroke-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              7,
+              0.4,
+              10,
               0.6,
               13,
-              0.78,
+              0.8,
               15,
-              0.92,
+              1.0,
             ],
-            "circle-stroke-width": 1,
             "circle-stroke-color": "#FFFFFF",
             "circle-stroke-opacity": [
               "interpolate",
               ["linear"],
               ["zoom"],
-              9,
-              0.25,
-              12,
-              0.65,
-              14,
-              0.9,
+              7,
+              0.7,
+              11,
+              0.85,
+              13,
+              0.95,
             ],
           }}
         />
@@ -744,24 +756,17 @@ export function VisualizationLayers({
         <Popup
           longitude={selected.longitude}
           latitude={selected.latitude}
-          /* 1. Removed anchor="top" to enable Maplibre's smart auto-positioning.
-               It will now automatically flip above/below depending on screen space.
-          */
-
-          /* 2. Changed to true so clicking anywhere on the map closes the popup
-           */
           closeOnClick={true}
-          /* 3. Added a slight offset so the popup doesn't cover the accident marker 
-               when it auto-positions 
-          */
           offset={12}
-          closeButton
+          closeButton={false}
           className="accident-popup"
+          style={{ "--popup-bg": getSeverityTheme(selected.severity).bg } as React.CSSProperties}
           onClose={() => setSelected(null)}
         >
           <AccidentPopupBody
             selected={selected}
             showPedestrianCasualties={type === "pedestrian_accidents"}
+            onClose={() => setSelected(null)}
           />
         </Popup>
       )}
@@ -773,114 +778,162 @@ export function VisualizationLayers({
 // Shared popup body (Adaptive GIS Inspection Card)
 // ---------------------------------------------------------------------------
 
-const getSeverityBadgeClasses = (severity?: string | null): string => {
+const getSeverityTheme = (severity?: string | null) => {
   const s = (severity || "").toLowerCase();
-  if (s.includes("fatal"))
-    return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20";
-  if (s.includes("grievous"))
-    return "bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20";
-  if (s.includes("minor injury hospitalized"))
-    return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20";
-  if (s.includes("minor injury non"))
-    return "bg-yellow-50 text-yellow-700 ring-1 ring-inset ring-yellow-600/20";
-  if (s.includes("no injury") || s.includes("damage only"))
-    return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20";
-  return "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-600/20";
+  if (s.includes("fatal")) {
+    return {
+      label: "FATAL",
+      color: "#78350F", // Dark Brown
+      bg: "#FFFBEB", // Warm Amber/Cream 50
+      textColor: "text-slate-800",
+      subTextColor: "text-slate-500",
+      labelColor: "text-[#78350F] font-bold",
+      borderColor: "border-[#FDE68A]",
+      ringColor: "ring-1 ring-[#78350F]/20",
+    };
+  }
+  if (s.includes("grievous")) {
+    return {
+      label: "GRIEVOUS INJURY",
+      color: "#EA580C", // Vivid Orange
+      bg: "#FFF7ED", // Orange 50
+      textColor: "text-slate-800",
+      subTextColor: "text-slate-500",
+      labelColor: "text-orange-700 font-bold",
+      borderColor: "border-orange-200/90",
+      ringColor: "ring-1 ring-orange-500/20",
+    };
+  }
+  if (s.includes("non") || s.includes("non-hosp") || s.includes("non hosp")) {
+    return {
+      label: "MINOR (NON-HOSP)",
+      color: "#0284C7", // Sky Blue
+      bg: "#F0F9FF", // Sky Blue 50
+      textColor: "text-slate-800",
+      subTextColor: "text-slate-500",
+      labelColor: "text-sky-700 font-bold",
+      borderColor: "border-sky-200/90",
+      ringColor: "ring-1 ring-sky-500/20",
+    };
+  }
+  if (s.includes("hospitalized") || s.includes("hosp") || s.includes("minor")) {
+    return {
+      label: "MINOR (HOSPITALIZED)",
+      color: "#EAB308", // Golden Yellow
+      bg: "#FEFCE8", // Yellow 50
+      textColor: "text-slate-800",
+      subTextColor: "text-slate-500",
+      labelColor: "text-yellow-700 font-bold",
+      borderColor: "border-yellow-200/90",
+      ringColor: "ring-1 ring-yellow-500/20",
+    };
+  }
+  if (s.includes("no injury") || s.includes("damage")) {
+    return {
+      label: "NO INJURY / DAMAGE",
+      color: "#16A34A", // Emerald Green
+      bg: "#F0FDF4", // Green 50
+      textColor: "text-slate-800",
+      subTextColor: "text-slate-500",
+      labelColor: "text-emerald-700 font-bold",
+      borderColor: "border-emerald-200/90",
+      ringColor: "ring-1 ring-emerald-500/20",
+    };
+  }
+  return {
+    label: safeText(severity).toUpperCase(),
+    color: "#64748B",
+    bg: "#F8FAFC", // Slate 50
+    textColor: "text-slate-800",
+    subTextColor: "text-slate-500",
+    labelColor: "text-slate-600 font-bold",
+    borderColor: "border-slate-200/90",
+    ringColor: "ring-1 ring-slate-400/20",
+  };
 };
+
+interface AccidentPopupBodyProps {
+  selected: SelectedAccident;
+  showPedestrianCasualties?: boolean;
+  onClose?: () => void;
+}
 
 function AccidentPopupBody({
   selected,
-  // showPedestrianCasualties = false,
-}: {
-  selected: SelectedAccident;
-  showPedestrianCasualties?: boolean;
-}) {
-  // const pedestrianTotal = pedestrianCasualtyTotal(selected);
-  const severityBadgeClass = getSeverityBadgeClasses(selected.severity);
+  onClose,
+}: AccidentPopupBodyProps) {
+  const theme = getSeverityTheme(selected.severity);
 
   return (
-    /* Added pr-5 (padding-right) to ensure content NEVER touches the Maplibre absolute close button.
-      Switched to a more flexible min/max width system to allow vertical growth.
-    */
-    <div className="bg-white rounded-lg shadow-xl p-4 flex flex-col w-full min-w-[250px] max-w-[320px] font-sans">
-      {/* --- Header --- */}
-      <div className="flex flex-col mb-4">
-        {/* Badge is now isolated so it doesn't compete with the top-right close button */}
-        <div className="mb-2.5">
-          <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider ${severityBadgeClass}`}
-          >
-            {safeText(selected.severity)}
-          </span>
-        </div>
-
-        {/* Road Name: Explicit break-words so long Indian road names wrap cleanly */}
-        {/* <h3 className="text-[15px] font-semibold text-slate-800 leading-snug break-words mb-2">
-          {safeText(selected.road_name)}
-        </h3> */}
-
-        {/* Meta Info: Grouped Date and ID dynamically. Uses flex-wrap so it drops to a new line if needed */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-slate-500">
-          <span className="shrink-0">
-            {formatDate(selected.accident_date_time)}
-          </span>
+    <div
+      className={`rounded-xl shadow-lg p-2.5 w-[190px] sm:w-[200px] ${theme.textColor} ${theme.ringColor} border ${theme.borderColor} font-sans tracking-tight leading-tight select-text transition-all`}
+      style={{ backgroundColor: theme.bg }}
+    >
+      {/* ── Top Header: Date, ID & Close Button ── */}
+      <div className="flex items-center justify-between gap-1 pb-1.5 border-b border-slate-200/60">
+        <span className="flex items-center gap-1 text-[10.5px] font-semibold text-slate-700">
+          <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+          {formatDate(selected.accident_date_time)}
+        </span>
+        <div className="flex items-center gap-1 ml-auto">
           {selected.accident_id && (
-            <>
-              <span className="w-1 h-1 rounded-full bg-slate-300 shrink-0"></span>
-              <span className="break-words">ID: {selected.accident_id}</span>
-            </>
+            <span
+              className="font-mono text-[9.5px] text-slate-400 truncate max-w-[85px]"
+              title={`ID: ${selected.accident_id}`}
+            >
+              #{selected.accident_id}
+            </span>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-0.5 rounded-full hover:bg-slate-200/80 text-slate-400 hover:text-slate-700 transition-colors ml-1"
+              title="Close popup"
+              type="button"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           )}
         </div>
       </div>
 
-      {/* --- Dashboard Metric Tiles --- */}
-      <div className="grid grid-cols-2 gap-y-4 gap-x-4">
-        {/* Full width to safely hold long collision type strings */}
-        <div className="flex flex-col col-span-2">
-          <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1 shrink-0">
-            Collision Type
+      {/* ── Main Details Grid ── */}
+      <div className="mt-1.5 space-y-1 text-[10.5px]">
+        {/* Collision Type */}
+        <div className="flex items-baseline justify-between gap-1">
+          <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
+            Collision
           </span>
-          <span className="text-[13px] font-medium text-slate-700 leading-tight break-words">
+          <span
+            className="font-semibold text-slate-700 text-right truncate max-w-[110px]"
+            title={safeText(selected.collision_type)}
+          >
             {safeText(selected.collision_type)}
           </span>
         </div>
 
-        <div className="flex flex-col">
-          <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1 shrink-0">
-            Coordinates
+        {/* Coordinates */}
+        <div className="flex items-baseline justify-between gap-1">
+          <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
+            Coords
           </span>
-          <span className="text-[13px] font-medium text-slate-700 break-words">
+          <span className="font-mono text-[10px] font-medium text-slate-600 text-right">
             {selected.latitude.toFixed(4)}, {selected.longitude.toFixed(4)}
           </span>
         </div>
 
-        <div className="flex flex-col">
-          <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1 shrink-0">
+        {/* Road Class */}
+        <div className="flex items-baseline justify-between gap-1">
+          <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
             Road Class
           </span>
-          <span className="text-[13px] font-medium text-slate-700 leading-tight break-words">
+          <span
+            className="font-medium text-slate-700 text-right truncate max-w-[105px]"
+            title={safeText(selected.road_classification)}
+          >
             {safeText(selected.road_classification)}
           </span>
         </div>
-
-        {/* --- Pedestrian Casualty Metric --- */}
-        {/* {showPedestrianCasualties && pedestrianTotal > 0 && (
-          <div className="col-span-2 mt-1 flex items-start bg-red-50/50 rounded-lg p-2.5 ring-1 ring-inset ring-red-100">
-            <div className="h-8 w-8 bg-white rounded-full shadow-sm flex items-center justify-center mr-3 shrink-0 mt-0.5">
-              <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-semibold text-red-800/80 uppercase tracking-wider mb-0.5">
-                Pedestrian Casualties
-              </span>
-              <span className="text-sm font-semibold text-red-700">
-                {pedestrianTotal} Recorded
-              </span>
-            </div>
-          </div>
-        )} */}
       </div>
     </div>
   );

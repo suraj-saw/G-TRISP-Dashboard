@@ -88,11 +88,32 @@
   box-shadow: none;           /* Removes default shadow; shadow should be handled by inner component */
 }
  
-/* Keep the default directional tip/arrow at the bottom of the popup, but tint it pure white */
-.maplibregl-popup.accident-popup .maplibregl-popup-tip {
-  border-top-color: #ffffff;
+/* Dynamically tint the directional tip/arrow to match the severity card background */
+.maplibregl-popup.accident-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: var(--popup-bg, #ffffff);
 }
- 
+.maplibregl-popup.accident-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: var(--popup-bg, #ffffff);
+}
+.maplibregl-popup.accident-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--popup-bg, #ffffff);
+}
+.maplibregl-popup.accident-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--popup-bg, #ffffff);
+}
+.maplibregl-popup.accident-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip {
+  border-bottom-color: var(--popup-bg, #ffffff);
+}
+.maplibregl-popup.accident-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: var(--popup-bg, #ffffff);
+}
+.maplibregl-popup.accident-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip {
+  border-top-color: var(--popup-bg, #ffffff);
+}
+.maplibregl-popup.accident-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: var(--popup-bg, #ffffff);
+}
+
 /* Completely remove the default × button that MapLibre renders for this specific popup type, 
    assuming the injected custom React component draws its own close button */
 .maplibregl-popup.accident-popup .maplibregl-popup-close-button {

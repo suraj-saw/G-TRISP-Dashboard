@@ -35,9 +35,9 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
   filters,
   districtName,
   onComplete,
-  onError,
+  onError: _onError,
 }) => {
-  const [progress, setProgress] = useState<string>("Initializing...");
+  const [_progress, setProgress] = useState<string>("Initializing...");
   const [statLoaded, setStatLoaded] = useState(false);
   const [tempLoaded, setTempLoaded] = useState(false);
 

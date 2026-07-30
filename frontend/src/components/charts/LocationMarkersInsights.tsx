@@ -34,13 +34,13 @@ const C = {
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
-  "Fatal":                          "#ef4444",
+  "Fatal":                          "#78350f",
   "Grievous Injury":                "#f97316",
-  "Minor Injury":                   "#f59e0b",
-  "Minor Injury Hospitalized":      "#f59e0b",
-  "Minor Injury Non Hospitalized":  "#fbbf24",
-  "Damage Only":                    "#94a3b8",
-  "No Injury":                      "#10b981",
+  "Minor Injury":                   "#eab308",
+  "Minor Injury Hospitalized":      "#eab308",
+  "Minor Injury Non Hospitalized":  "#0284c7",
+  "Damage Only":                    "#16a34a",
+  "No Injury":                      "#16a34a",
 };
 
 const TREEMAP_COLORS = [

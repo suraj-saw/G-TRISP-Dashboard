@@ -7,11 +7,11 @@ import { useEffect, useState } from "react";
 import { useMap } from "react-map-gl/maplibre";
 
 const SEVERITY_LEGEND_ITEMS = [
-  { label: "Fatal", color: "#B91C1C" },
+  { label: "Fatal", color: "#78350F" },
   { label: "Grievous Injury", color: "#EA580C" },
-  { label: "Minor Injury Hospitalized", color: "#F59E0B" },
-  { label: "Minor Injury Non Hospitalized", color: "#FBBF24" },
-  { label: "No Injury / Damage Only", color: "#65A30D" },
+  { label: "Minor Injury Hospitalized", color: "#EAB308" },
+  { label: "Minor Injury Non Hospitalized", color: "#0284C7" },
+  { label: "No Injury / Damage Only", color: "#16A34A" },
 ];
 
 interface SeverityLegendProps {
@@ -44,7 +44,11 @@ export default function SeverityLegend({
   const type = visualizationLayerType || "";
   let isVisible = false;
 
-  if (type === "location_markers" || type === "clusters") {
+  if (
+    type === "location_markers" ||
+    type === "clusters" ||
+    type === "pedestrian_accidents"
+  ) {
     isVisible = true;
   } else if (type.includes("blackspot")) {
     // Show legend only when zoom is 12 or greater (when individual points start showing)
@@ -57,18 +61,18 @@ export default function SeverityLegend({
   if (!isVisible) return null;
 
   return (
-    <div className="absolute bottom-6 right-3 z-20 bg-white/95 backdrop-blur-sm border border-slate-200 shadow-lg rounded-xl px-4 py-3 pointer-events-auto">
-      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+    <div className="absolute bottom-7 right-3 z-20 bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-lg rounded-xl p-2.5 pointer-events-auto">
+      <h4 className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
         Accident Severity
       </h4>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         {SEVERITY_LEGEND_ITEMS.map((item) => (
           <div key={item.label} className="flex items-center gap-2">
-            <div
-              className="w-3 h-3 rounded-full shrink-0 shadow-sm"
+            <span
+              className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm ring-1 ring-black/10"
               style={{ backgroundColor: item.color }}
             />
-            <span className="text-[11px] font-medium text-slate-600">
+            <span className="font-medium text-slate-700 text-[10.5px] leading-tight">
               {item.label}
             </span>
           </div>

@@ -11,11 +11,11 @@ import {
 } from "../../config/riskCorridorConfig";
 
 const SEVERITY_COLORS = {
-  Fatal: "#B91C1C",
+  Fatal: "#78350F",
   "Grievous Injury": "#EA580C",
-  "Minor Injury Hospitalized": "#F59E0B",
-  "Minor Injury Non Hospitalized": "#FBBF24",
-  "No Injury": "#65A30D",
+  "Minor Injury Hospitalized": "#EAB308",
+  "Minor Injury Non Hospitalized": "#0284C7",
+  "No Injury": "#16A34A",
   default: "#64748B",
 } as const;
 

@@ -1,6 +1,3 @@
-import { useEffect, useState } from "react";
-import { useMap } from "react-map-gl/maplibre";
-
 const ROAD_NETWORK_LEGEND_ITEMS = [
   { label: "Arterial Road", color: "#DB2777" },
   { label: "Collector Road", color: "#D97706" },

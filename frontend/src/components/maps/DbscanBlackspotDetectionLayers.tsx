@@ -32,6 +32,8 @@ interface Props {
   crashLabel?: string;
 }
 
+
+
 interface HoveredBlackspot {
   longitude: number;
   latitude: number;
