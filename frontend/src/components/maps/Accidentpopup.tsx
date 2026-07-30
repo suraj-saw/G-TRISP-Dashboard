@@ -1,19 +1,24 @@
 /**
- * @file AccidentPopup.tsx
+ * @file Accidentpopup.tsx
  * @description Shared accident detail popup used across multiple map layers.
- * @responsibility Renders a map-anchored tooltip displaying detailed accident metadata (severity, date, ID, type, coords).
- * @dependencies react-map-gl/maplibre
+ * @responsibility Renders a map-anchored tooltip displaying detailed accident metadata in a sleek, compact layout.
+ * @dependencies react-map-gl/maplibre, lucide-react
  */
+
 import { Popup } from "react-map-gl/maplibre";
+import { Calendar, X } from "lucide-react";
 
 export interface AccidentPopupData {
   longitude: number;
   latitude: number;
-  severity: string; // e.g. "Fatal", "Grievous", "Simple", "Damage Only"
-  accident_date: string; // ISO or dd-mm-yyyy
-  accident_id: string | number;
-  collision_type?: string;
-  road_class?: string;
+  severity?: string; // e.g. "Fatal", "Grievous", "Simple", "Damage Only"
+  accident_date?: string; // ISO or dd-mm-yyyy
+  accident_date_time?: string | null;
+  accident_id?: string | number;
+  collision_type?: string | null;
+  road_class?: string | null;
+  road_classification?: string | null;
+  police_station?: string | null;
 }
 
 interface Props {
@@ -21,158 +26,203 @@ interface Props {
   onClose: () => void;
 }
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+const NULL_TEXT_SENTINEL = "nan";
+const UNKNOWN_LABEL = "Unknown";
 
-/**
- * Normalizes severity strings from the database into standardized uppercase labels.
- * @param {string} raw - Raw severity string from the backend.
- * @returns {string} Standardized severity label.
- */
-function severityLabel(raw: string): string {
-  const map: Record<string, string> = {
-    fatal: "FATAL",
-    grievous: "GRIEVOUS",
-    simple: "SIMPLE",
-    "damage only": "DAMAGE ONLY",
+function safeText(value?: string | null): string {
+  if (!value || value === NULL_TEXT_SENTINEL) return UNKNOWN_LABEL;
+  return value;
+}
+
+function formatDate(raw?: string | null): string {
+  if (!raw) return UNKNOWN_LABEL;
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function getSeverityTheme(severity?: string | null) {
+  const s = (severity || "").toLowerCase();
+  if (s.includes("fatal")) {
+    return {
+      label: "FATAL",
+      bg: "#FEF2F2",
+      textColor: "text-slate-800",
+      labelColor: "text-red-700 font-bold",
+      borderColor: "border-red-200/90",
+      ringColor: "ring-1 ring-red-500/20",
+    };
+  }
+  if (s.includes("grievous")) {
+    return {
+      label: "GRIEVOUS",
+      bg: "#FFF7ED",
+      textColor: "text-slate-800",
+      labelColor: "text-orange-700 font-bold",
+      borderColor: "border-orange-200/90",
+      ringColor: "ring-1 ring-orange-500/20",
+    };
+  }
+  if (s.includes("non")) {
+    return {
+      label: "MINOR (NON-HOSP)",
+      bg: "#F0F9FF",
+      textColor: "text-slate-800",
+      labelColor: "text-sky-700 font-bold",
+      borderColor: "border-sky-200/90",
+      ringColor: "ring-1 ring-sky-500/20",
+    };
+  }
+  if (s.includes("hospitalized") || s.includes("hosp") || s.includes("minor")) {
+    return {
+      label: "MINOR (HOSPITALIZED)",
+      bg: "#FEFCE8",
+      textColor: "text-slate-800",
+      labelColor: "text-yellow-700 font-bold",
+      borderColor: "border-yellow-200/90",
+      ringColor: "ring-1 ring-yellow-500/20",
+    };
+  }
+  if (s.includes("no injury") || s.includes("damage")) {
+    return {
+      label: "NO INJURY / DAMAGE",
+      bg: "#F0FDF4",
+      textColor: "text-slate-800",
+      labelColor: "text-emerald-700 font-bold",
+      borderColor: "border-emerald-200/90",
+      ringColor: "ring-1 ring-emerald-500/20",
+    };
+  }
+  return {
+    label: safeText(severity).toUpperCase(),
+    bg: "#F8FAFC",
+    textColor: "text-slate-800",
+    labelColor: "text-slate-600 font-bold",
+    borderColor: "border-slate-200/90",
+    ringColor: "ring-1 ring-slate-400/20",
   };
-  return map[raw?.toLowerCase()] ?? raw?.toUpperCase() ?? "UNKNOWN";
 }
 
 /**
- * Maps accident severity to specific Tailwind CSS color classes for the popup badge.
- * @param {string} raw - Raw severity string.
- * @returns {string} Tailwind CSS class string.
+ * Compact Popup Body Component for individual accident point inspection
  */
-function severityColor(raw: string): string {
-  switch (raw?.toLowerCase()) {
-    case "fatal":
-      return "bg-red-100 text-red-700 border border-red-300";
-    case "grievous":
-      return "bg-orange-100 text-orange-700 border border-orange-300";
-    case "simple":
-      return "bg-yellow-100 text-yellow-700 border border-yellow-300";
-    case "damage only":
-      return "bg-blue-100 text-blue-700 border border-blue-300";
-    default:
-      return "bg-gray-100 text-gray-700 border border-gray-300";
-  }
-}
-
-/**
- * Formats raw ISO date strings into a readable GB format (dd MMM yyyy).
- * @param {string} raw - Raw date string.
- * @returns {string} Formatted date string or fallback.
- */
-function formatDate(raw: string): string {
-  if (!raw) return "—";
-  // Handle ISO: "2025-08-12T..."
-  if (raw.includes("T") || raw.includes("-")) {
-    const d = new Date(raw);
-    if (!isNaN(d.getTime())) {
-      return d.toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-    }
-  }
-  return raw;
-}
-
-// ── component ─────────────────────────────────────────────────────────────────
-
-/**
- * AccidentPopup Component
- * @responsibility Renders a floating, anchored popup on the map for a specific accident.
- * @param {Object} props - Component properties.
- * @param {AccidentPopupData} props.data - The accident metadata to display.
- * @param {Function} props.onClose - Callback triggered when the popup is dismissed.
- */
-export default function AccidentPopup({ data, onClose }: Props) {
-  const {
-    longitude,
-    latitude,
-    severity,
-    accident_date,
-    accident_id,
-    collision_type,
-    road_class,
-  } = data;
+export function CompactAccidentPopupBody({
+  selected,
+  onClose,
+}: {
+  selected: AccidentPopupData;
+  onClose?: () => void;
+}) {
+  const theme = getSeverityTheme(selected.severity);
+  const dateStr = formatDate(selected.accident_date_time || selected.accident_date);
+  const roadClass = selected.road_classification || selected.road_class;
 
   return (
-    <Popup
-      longitude={longitude}
-      latitude={latitude}
-      anchor="bottom"
-      offset={[0, -10] as [number, number]}
-      closeOnClick={false}
-      onClose={onClose}
-      maxWidth="300px"
-      className="accident-popup"
+    <div
+      className={`rounded-xl shadow-lg p-2.5 w-[190px] sm:w-[200px] ${theme.textColor} ${theme.ringColor} border ${theme.borderColor} font-sans tracking-tight leading-tight select-text transition-all`}
+      style={{ backgroundColor: theme.bg }}
     >
-      {/* Override maplibre popup padding via inline style on the wrapper */}
-      <div className="bg-white rounded-lg shadow-xl p-4 min-w-[240px] font-sans">
-        {/* ── header row ── */}
-        <div className="flex items-center justify-between mb-3">
-          <span
-            className={`text-xs font-bold px-2 py-1 rounded ${severityColor(severity)}`}
-          >
-            {severityLabel(severity)}
-          </span>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-lg leading-none ml-2"
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
-
-        {/* ── date + id ── */}
-        <p className="text-sm text-gray-500 mb-3">
-          {formatDate(accident_date)}
-          {accident_id && (
-            <>
-              <span className="mx-2 text-gray-300">•</span>
-              <span>ID: {accident_id}</span>
-            </>
+      {/* Top Header */}
+      <div className="flex items-center justify-between gap-1 pb-1.5 border-b border-slate-200/60">
+        <span className="flex items-center gap-1 text-[10.5px] font-semibold text-slate-700">
+          <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+          {dateStr}
+        </span>
+        <div className="flex items-center gap-1 ml-auto">
+          {selected.accident_id && (
+            <span
+              className="font-mono text-[9.5px] text-slate-400 truncate max-w-[85px]"
+              title={`ID: ${selected.accident_id}`}
+            >
+              #{selected.accident_id}
+            </span>
           )}
-        </p>
-
-        {/* ── collision type ── */}
-        {collision_type && (
-          <div className="mb-3">
-            <p className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">
-              Collision Type
-            </p>
-            <p className="text-sm font-semibold text-gray-800">
-              {collision_type}
-            </p>
-          </div>
-        )}
-
-        {/* ── coordinates + road class ── */}
-        <div className="grid grid-cols-2 gap-3 mt-1">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">
-              Coordinates
-            </p>
-            <p className="text-sm font-semibold text-gray-800">
-              {latitude.toFixed(4)}, {longitude.toFixed(4)}
-            </p>
-          </div>
-          {road_class && (
-            <div>
-              <p className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">
-                Road Class
-              </p>
-              <p className="text-sm font-semibold text-gray-800">
-                {road_class}
-              </p>
-            </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-0.5 rounded-full hover:bg-slate-200/80 text-slate-400 hover:text-slate-700 transition-colors ml-1 cursor-pointer"
+              title="Close popup"
+              type="button"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           )}
         </div>
       </div>
+
+      {/* Main Details Grid */}
+      <div className="mt-1.5 space-y-1 text-[10.5px]">
+        {/* Severity Label */}
+        <div className="flex items-baseline justify-between gap-1">
+          <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
+            Severity
+          </span>
+          <span className="font-semibold text-slate-800 text-right truncate max-w-[110px]">
+            {theme.label}
+          </span>
+        </div>
+
+        {/* Collision Type */}
+        <div className="flex items-baseline justify-between gap-1">
+          <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
+            Collision
+          </span>
+          <span
+            className="font-semibold text-slate-700 text-right truncate max-w-[110px]"
+            title={safeText(selected.collision_type)}
+          >
+            {safeText(selected.collision_type)}
+          </span>
+        </div>
+
+        {/* Coordinates */}
+        <div className="flex items-baseline justify-between gap-1">
+          <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
+            Coords
+          </span>
+          <span className="font-mono text-[10px] font-medium text-slate-600 text-right">
+            {selected.latitude.toFixed(4)}, {selected.longitude.toFixed(4)}
+          </span>
+        </div>
+
+        {/* Road Class */}
+        {roadClass && (
+          <div className="flex items-baseline justify-between gap-1">
+            <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
+              Road Class
+            </span>
+            <span
+              className="font-medium text-slate-700 text-right truncate max-w-[105px]"
+              title={safeText(roadClass)}
+            >
+              {safeText(roadClass)}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * AccidentPopup Component
+ */
+export default function AccidentPopup({ data, onClose }: Props) {
+  return (
+    <Popup
+      longitude={data.longitude}
+      latitude={data.latitude}
+      anchor="bottom"
+      offset={[0, -10]}
+      closeOnClick={false}
+      onClose={onClose}
+      className="accident-popup"
+    >
+      <CompactAccidentPopupBody selected={data} onClose={onClose} />
     </Popup>
   );
 }

@@ -13,6 +13,7 @@ import { toDataFilterKey } from "../../utils/dashboardFilters";
 import {
   IRC_CATEGORY_COLOR_EXPR,
 } from "../../config/ircBlackspotConfig";
+import CompactBlackspotPopup from "./CompactBlackspotPopup";
 // import { SEARCH_RADIUS_M } from "../../config/blackspotConfig";
 
 interface Props {
@@ -130,6 +131,7 @@ export default function IrcBlackspotDetectionLayers({
   // References to handle the popup dismiss delay, allowing the user to move their mouse from the cluster to the popup
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isOverPopupRef = useRef(false);
+  const hoveredBsIdRef = useRef<string | number | null>(null);
 
   const filterKey = toDataFilterKey(filters);
 
@@ -141,9 +143,10 @@ export default function IrcBlackspotDetectionLayers({
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     hoverTimeoutRef.current = setTimeout(() => {
       if (!isOverPopupRef.current) {
+        hoveredBsIdRef.current = null;
         setHovered(null);
       }
-    }, 150);
+    }, 200);
   }, []);
 
   /**
@@ -167,6 +170,7 @@ export default function IrcBlackspotDetectionLayers({
     setLoading(true);
     setError(null);
     setData(null);
+    hoveredBsIdRef.current = null;
     setHovered(null);
 
     fetchFn(filters)
@@ -206,6 +210,7 @@ export default function IrcBlackspotDetectionLayers({
     ];
 
     const onMove = (e: any) => {
+      if (isOverPopupRef.current) return;
       const map_ = mapRef?.getMap();
       if (!map_) return;
 
@@ -220,14 +225,22 @@ export default function IrcBlackspotDetectionLayers({
           cancelDismiss();
           map_.getCanvas().style.cursor = "pointer";
           const f = clusterFeats[0];
-          
+          const newBsId = f.properties?.bs_id;
+
+          if (
+            hoveredBsIdRef.current !== null &&
+            String(hoveredBsIdRef.current) === String(newBsId)
+          ) {
+            return;
+          }
+
           let lon = e.lngLat.lng;
           let lat = e.lngLat.lat;
           if (f.geometry.type === "Point") {
             [lon, lat] = f.geometry.coordinates as [number, number];
           } else {
             const centroidFeat = data?.centroids?.features?.find(
-              (cf: any) => cf.properties?.bs_id === f.properties?.bs_id
+              (cf: any) => String(cf.properties?.bs_id) === String(newBsId)
             );
             if (centroidFeat && centroidFeat.geometry.type === "Point") {
               [lon, lat] = centroidFeat.geometry.coordinates as [
@@ -237,6 +250,7 @@ export default function IrcBlackspotDetectionLayers({
             }
           }
 
+          hoveredBsIdRef.current = newBsId;
           setHovered({
             longitude: lon,
             latitude: lat,
@@ -417,19 +431,25 @@ export default function IrcBlackspotDetectionLayers({
         </span>
       </StatusBadge>
 
-      {/* Render popup for hovered blackspot cluster */}
       {hovered && !hovered.isPoint && (
         <Popup
           longitude={hovered.longitude}
           latitude={hovered.latitude}
           closeButton={false}
           closeOnClick={false}
-          anchor="top"
-          offset={12}
+          offset={14}
           className="z-50 accident-popup"
         >
-          <div
-            className="w-72 overflow-hidden rounded-xl bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200"
+          <CompactBlackspotPopup
+            data={{
+              ...hovered,
+              priority_label:
+                hovered.category_label ||
+                (hovered.category !== undefined
+                  ? `Category ${hovered.category}`
+                  : undefined),
+            }}
+            onExport={handleExportData}
             onMouseEnter={() => {
               isOverPopupRef.current = true;
               cancelDismiss();
@@ -438,88 +458,7 @@ export default function IrcBlackspotDetectionLayers({
               isOverPopupRef.current = false;
               scheduleDismiss();
             }}
-          >
-            <div
-              className="px-4 py-2 text-[10px] font-bold tracking-widest text-white uppercase"
-              style={{
-                backgroundColor: hovered.category_color,
-              }}
-            >
-              {hovered.category_label || `Category ${hovered.category}`}
-            </div>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="text-sm font-extrabold text-slate-800">
-                    Cluster #{hovered.bs_id}
-                  </div>
-                  {hovered.crash_ids && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleExportData(hovered);
-                      }}
-                      className="p-1 rounded-md bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
-                      title="Export Accident Data"
-                    >
-                      <Download size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 gap-2 mb-4">
-                <div className="flex flex-col items-center p-1.5 rounded-lg bg-red-50 border border-red-100">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">
-                    Fatal
-                  </span>
-                  <span className="text-sm font-bold text-[#4C1D1D]">
-                    {hovered.fatal_count ?? "—"}
-                  </span>
-                </div>
-                <div className="flex flex-col items-center p-1.5 rounded-lg bg-orange-50 border border-orange-100">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider text-center leading-tight">
-                    Grievous
-                  </span>
-                  <span className="text-sm font-bold text-[#DC2626]">
-                    {hovered.grievous_count ?? "—"}
-                  </span>
-                </div>
-                <div className="flex flex-col items-center p-1.5 rounded-lg bg-amber-50 border border-amber-100">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider text-center leading-tight">
-                    Min Hosp
-                  </span>
-                  <span className="text-sm font-bold text-[#EA580C]">
-                    {hovered.minor_hospitalized_count ?? "—"}
-                  </span>
-                </div>
-                <div className="flex flex-col items-center p-1.5 rounded-lg bg-yellow-50 border border-yellow-100">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider text-center leading-tight">
-                    Min Non
-                  </span>
-                  <span className="text-sm font-bold text-[#F59E0B]">
-                    {hovered.minor_non_hospitalized_count ?? "—"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-xs text-slate-500 mb-3 text-center">
-                <span className="font-bold text-slate-700">
-                  {hovered.crash_count}
-                </span>{" "}
-                total crashes
-              </div>
-
-              <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100">
-                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                  AATC Score
-                </span>
-                <span className="text-sm font-bold text-slate-700">
-                  {hovered.aatc?.toFixed(2) ?? "—"}
-                </span>
-              </div>
-            </div>
-          </div>
+          />
         </Popup>
       )}
     </>

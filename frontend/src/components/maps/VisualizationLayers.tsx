@@ -11,6 +11,7 @@ import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
 import { X, Calendar } from "lucide-react";
 import type { HeatmapPoint } from "../../types/dashboard";
 import GeoJsonHeatmapLayers from "./GeoJsonHeatmapLayers";
+import CompactBlackspotPopup from "./CompactBlackspotPopup";
 import {
   NULL_TEXT_SENTINEL,
   UNKNOWN_LABEL,
@@ -497,66 +498,31 @@ function BlackspotLayers({
 function BlackspotPopup({ hovered }: { hovered: NonNullable<HoverState> }) {
   if (hovered.point_count !== undefined) {
     const count = hovered.point_count;
-    const risk = getPriorityLabel(count);
-    const color = getPriorityColor(count);
     return (
-      <div
-        className="bg-white rounded-lg shadow-xl overflow-hidden"
-        style={{ minWidth: 170, fontFamily: "inherit" }}
-      >
-        <div
-          style={{
-            background: color,
-            color: "#fff",
-            padding: "6px 10px",
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.04em",
-            textTransform: "uppercase",
-          }}
-        >
-          {risk}
-        </div>
-        <div
-          style={{ padding: "8px 10px 6px", fontSize: 12, color: "#1e293b" }}
-        >
-          <div style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>
-            {count.toLocaleString()}
-          </div>
-          <div style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>
-            Accidents in cluster
-          </div>
-        </div>
-      </div>
+      <CompactBlackspotPopup
+        data={{
+          priority_score: count,
+          crash_count: count,
+        }}
+      />
     );
   }
   return (
-    <div
-      className="bg-white rounded-lg shadow-xl"
-      style={{
-        minWidth: 170,
-        padding: "8px 10px",
-        fontSize: 12,
-        color: "#1e293b",
-        fontFamily: "inherit",
-      }}
-    >
-      <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}>
-        Accident Site
-      </div>
+    <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-slate-200 p-2.5 w-[190px] font-sans text-xs text-slate-800">
+      <div className="font-bold mb-1 text-slate-900">Accident Site</div>
       {hovered.severity && (
         <div>
-          <b>Severity:</b> {hovered.severity}
+          <span className="text-slate-500">Severity:</span> {hovered.severity}
         </div>
       )}
       {hovered.police_station && (
         <div>
-          <b>Station:</b> {safeText(hovered.police_station)}
+          <span className="text-slate-500">Station:</span> {safeText(hovered.police_station)}
         </div>
       )}
       {hovered.road_name && (
         <div>
-          <b>Road:</b> {safeText(hovered.road_name)}
+          <span className="text-slate-500">Road:</span> {safeText(hovered.road_name)}
         </div>
       )}
     </div>

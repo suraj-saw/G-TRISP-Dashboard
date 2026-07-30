@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
 import { Loader2, AlertCircle } from "lucide-react";
 import type { DashboardFilters, SnappedHeatmapPoint } from "../../types/dashboard";
+import CompactBlackspotPopup from "./CompactBlackspotPopup";
 
 const SEVERITY_COLORS = {
   Fatal: "#78350F",
@@ -111,6 +112,7 @@ export default function NetworkBlackspotLayers({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hovered, setHovered] = useState<HoveredSegment | null>(null);
+  const isOverPopupRef = useRef(false);
 
   const [snappedPointsData, setSnappedPointsData] = useState<GeoJSON.FeatureCollection | null>(null);
 
@@ -164,6 +166,7 @@ export default function NetworkBlackspotLayers({
     if (!map) return;
 
     const onMove = (e: import("react-map-gl/maplibre").MapLayerMouseEvent) => {
+      if (isOverPopupRef.current) return;
       const features = map.queryRenderedFeatures(e.point, {
         layers: ["network-blackspot-line"],
       });
@@ -355,75 +358,32 @@ export default function NetworkBlackspotLayers({
         <Popup
           longitude={hovered.longitude}
           latitude={hovered.latitude}
-          anchor="bottom"
           closeButton={false}
           closeOnClick={false}
-          offset={12}
+          offset={14}
           className="z-50 accident-popup"
         >
-          <div className="w-72 overflow-hidden rounded-xl bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-            <div
-              className="px-4 py-2 text-[10px] font-bold tracking-widest text-white uppercase"
-              style={{
-                backgroundColor: hovered.priority_color ?? "#DC2626",
-              }}
-            >
-              {hovered.priority_label?.replace(/Blackspot/gi, "Segment") ?? "Unknown Segment"}
-            </div>
-
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="text-sm font-extrabold text-slate-800">
-                    Network Segment
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 gap-2 mb-4">
-                <div className="flex flex-col items-center p-1.5 rounded-lg bg-red-50 border border-red-100">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">
-                    Fatal
-                  </span>
-                  <span className="text-sm font-bold text-[#4C1D1D]">
-                    {hovered.fatal_count ?? "—"}
-                  </span>
-                </div>
-                <div className="flex flex-col items-center p-1.5 rounded-lg bg-orange-50 border border-orange-100">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider text-center leading-tight">
-                    Grievous
-                  </span>
-                  <span className="text-sm font-bold text-[#DC2626]">
-                    {hovered.grievous_count ?? "—"}
-                  </span>
-                </div>
-                <div className="flex flex-col items-center p-1.5 rounded-lg bg-amber-50 border border-amber-100">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider text-center leading-tight">
-                    Min Hosp
-                  </span>
-                  <span className="text-sm font-bold text-[#EA580C]">
-                    {hovered.minor_hospitalized_count ?? "—"}
-                  </span>
-                </div>
-                <div className="flex flex-col items-center p-1.5 rounded-lg bg-yellow-50 border border-yellow-100">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider text-center leading-tight">
-                    Min Non
-                  </span>
-                  <span className="text-sm font-bold text-[#F59E0B]">
-                    {hovered.minor_non_hospitalized_count ?? "—"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-xs text-slate-500 text-center">
-                <span className="font-bold text-slate-700">
-                  {hovered.accident_count.toLocaleString()}
-                </span>{" "}
-                total crashes ({hovered.qualifying_count ?? 0} qualifying) within{" "}
-                {(hovered.end_m - hovered.start_m).toFixed(0)}m segment
-              </div>
-            </div>
-          </div>
+          <CompactBlackspotPopup
+            data={{
+              ...hovered,
+              bs_id: "Segment",
+              priority_label:
+                hovered.priority_label?.replace(/Blackspot/gi, "Segment") ??
+                "Unknown Segment",
+            }}
+            segmentM={
+              hovered.end_m && hovered.start_m
+                ? hovered.end_m - hovered.start_m
+                : undefined
+            }
+            onMouseEnter={() => {
+              isOverPopupRef.current = true;
+            }}
+            onMouseLeave={() => {
+              isOverPopupRef.current = false;
+              setHovered(null);
+            }}
+          />
         </Popup>
       )}
     </>
