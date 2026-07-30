@@ -12,6 +12,7 @@ Or import and call seed_gujarat_boundary() from your startup / seeder entrypoint
 import json
 import os
 from pathlib import Path
+from sqlalchemy import text
 
 from geoalchemy2.shape import from_shape
 from shapely.geometry import shape as shapely_shape
@@ -66,6 +67,9 @@ def seed_gujarat_boundary(force: bool = False) -> None:
                 f"[seed_gujarat_boundary] Table already contains {existing} "
                 "row(s). Skipping. Pass force=True to re-seed."
             )
+            # Ensure spatial index exists even if skipping insert
+            db.execute(text("CREATE INDEX IF NOT EXISTS idx_gujarat_boundary_geometry ON gujarat_boundary USING GIST (geometry);"))
+            db.commit()
             return
 
         if force and existing > 0:
@@ -120,7 +124,11 @@ def seed_gujarat_boundary(force: bool = False) -> None:
         db.add(record)
         db.commit()
 
-        print("[seed_gujarat_boundary] ✓ Gujarat boundary seeded successfully.")
+        # Create GiST spatial index for high-performance spatial checks
+        db.execute(text("CREATE INDEX IF NOT EXISTS idx_gujarat_boundary_geometry ON gujarat_boundary USING GIST (geometry);"))
+        db.commit()
+
+        print("[seed_gujarat_boundary] ✓ Gujarat boundary seeded successfully with GiST spatial index.")
 
     except Exception as exc:
         db.rollback()

@@ -37,30 +37,41 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     """
     Manages the startup and shutdown lifecycle events of the FastAPI application.
-    
-    Startup tasks:
-      1. Acquires a Postgres advisory lock to ensure that if multiple workers/pods
-         start simultaneously, only one attempts to create the tables.
-      2. Creates all database tables via SQLAlchemy's `create_all` (DDL is idempotent).
-      3. Releases the lock.
-      
-    Note: Seed data is managed manually via CLI (see app/seed/seed_geo.py), not here.
-    
-    Args:
-        app (FastAPI): The running FastAPI application instance.
     """
+    import time
+    import logging
     from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
 
-    with engine.connect() as conn:
-        # Acquire an exclusive session-level lock (arbitrary ID: 11223344) 
-        # to prevent race conditions during schema creation in multi-worker environments.
-        conn.execute(text("SELECT pg_advisory_lock(11223344)"))
+    logger = logging.getLogger("app.lifespan")
+
+    # Retry loop to handle cold-boot database initialization / network propagation
+    conn = None
+    for attempt in range(1, 6):
         try:
-            Base.metadata.create_all(bind=engine)
+            conn = engine.connect()
+            break
+        except (OperationalError, Exception) as err:
+            if attempt == 5:
+                logger.error("Failed to connect to database after 5 attempts: %s", err)
+                raise
+            logger.warning("Database connection attempt %d/5 failed (%s). Retrying in 2s…", attempt, err)
+            time.sleep(2)
+
+    if conn:
+        try:
+            conn.execute(text("SELECT pg_advisory_lock(11223344)"))
+            try:
+                Base.metadata.create_all(bind=engine)
+                
+                # Ensure spatial GiST indexes exist for high-performance spatial validation
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_gujarat_districts_geometry ON gujarat_districts USING GIST (geometry);"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_gujarat_boundary_geometry ON gujarat_boundary USING GIST (geometry);"))
+            finally:
+                conn.execute(text("SELECT pg_advisory_unlock(11223344)"))
+                conn.commit()
         finally:
-            # Always ensure the lock is released even if table creation fails
-            conn.execute(text("SELECT pg_advisory_unlock(11223344)"))
-            conn.commit()
+            conn.close()
 
     yield   # Yield control back to FastAPI; App is live
 

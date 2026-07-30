@@ -343,12 +343,14 @@ def seed_gujarat_accidents(
             total_rejected += rejected
 
             objects = []
+            duplicate_skips = 0
             for _, row in valid_df.iterrows():
                 raw_id = _clean_text(row["accident_id"])
                 district = _clean_text(row["district"]) or cfg["default_district"]
                 
                 # Check for duplicates using both accident_id and district
                 if raw_id and (raw_id, district) in seen_records:
+                    duplicate_skips += 1
                     continue
                     
                 objects.append(_build_accident(row, cfg["tag"], cfg["default_district"], seen_records))
@@ -358,7 +360,10 @@ def seed_gujarat_accidents(
                 db.bulk_save_objects(chunk)
                 db.commit()
 
-            logger.info("  inserted %d rows for %s", len(objects), key)
+            logger.info(
+                "  [%s] Summary: parsed valid=%d, duplicate skips=%d, inserted=%d",
+                key, len(valid_df), duplicate_skips, len(objects)
+            )
             total_inserted += len(objects)
 
         logger.info(

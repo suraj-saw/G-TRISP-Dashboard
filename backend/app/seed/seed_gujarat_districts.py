@@ -16,6 +16,7 @@ Or import and call:
 import json
 import os
 from pathlib import Path
+from sqlalchemy import text
 
 from geoalchemy2.shape import from_shape
 from shapely.geometry import shape as shapely_shape
@@ -70,6 +71,9 @@ def seed_gujarat_districts(force: bool = False) -> None:
                 f"[seed_gujarat_districts] Table already contains "
                 f"{existing} row(s). Skipping."
             )
+            # Ensure spatial index exists even if skipping insert
+            db.execute(text("CREATE INDEX IF NOT EXISTS idx_gujarat_districts_geometry ON gujarat_districts USING GIST (geometry);"))
+            db.commit()
             return
 
         if force and existing > 0:
@@ -110,12 +114,6 @@ def seed_gujarat_districts(force: bool = False) -> None:
             props = feature.get("properties", {})
             geom_dict = feature.get("geometry")
 
-            # --------------------------------------------------------------
-            # District Name
-            # geoBoundaries : shapeName
-            # SOI           : DISTRICT
-            # --------------------------------------------------------------
-
             shape_name = (
                 props.get("shapeName")
                 or props.get("DISTRICT")
@@ -143,10 +141,6 @@ def seed_gujarat_districts(force: bool = False) -> None:
                 shp_geom,
                 srid=POSTGIS_SRID,
             )
-
-            # --------------------------------------------------------------
-            # Common attributes supporting both datasets
-            # --------------------------------------------------------------
 
             shape_iso = (
                 props.get("shapeISO")
@@ -186,12 +180,16 @@ def seed_gujarat_districts(force: bool = False) -> None:
         db.bulk_save_objects(records)
         db.commit()
 
+        # Create GiST spatial index for high-performance spatial validation checks
+        db.execute(text("CREATE INDEX IF NOT EXISTS idx_gujarat_districts_geometry ON gujarat_districts USING GIST (geometry);"))
+        db.commit()
+
         print(
-            f"[seed_gujarat_districts] ✓ Inserted {len(records)} district(s)"
+            f"[seed_gujarat_districts] ✓ Inserted {len(records)} district(s) and created GiST spatial index."
             + (
                 f" ({skipped} skipped)."
                 if skipped
-                else "."
+                else ""
             )
         )
 
@@ -209,7 +207,6 @@ def seed_gujarat_districts(force: bool = False) -> None:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-
     import argparse
 
     parser = argparse.ArgumentParser(
