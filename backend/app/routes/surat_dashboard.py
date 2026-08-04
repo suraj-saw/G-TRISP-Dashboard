@@ -977,6 +977,7 @@ def get_blackspots(
             lat=a.latitude,
             lon=a.longitude,
             severity=a.severity or "Unknown",
+            number_of_vehicles=a.number_of_vehicles or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -1054,6 +1055,7 @@ def get_pedestrian_blackspots(
             lat=a.latitude,
             lon=a.longitude,
             severity=a.severity or "Unknown",
+            number_of_vehicles=a.number_of_vehicles or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -1132,6 +1134,7 @@ def get_dbscan_blackspots(
             lat=a.latitude,
             lon=a.longitude,
             severity=a.severity or "Unknown",
+            number_of_vehicles=a.number_of_vehicles or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -1207,6 +1210,7 @@ def get_pedestrian_dbscan_blackspots(
             lat=a.latitude,
             lon=a.longitude,
             severity=a.severity or "Unknown",
+            number_of_vehicles=a.number_of_vehicles or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -1441,6 +1445,7 @@ def export_blackspots(
                 lat=a.latitude,
                 lon=a.longitude,
                 severity=a.severity or "Unknown",
+                number_of_vehicles=a.number_of_vehicles or 0,
             ))
 
     if algorithm == "dbscan":

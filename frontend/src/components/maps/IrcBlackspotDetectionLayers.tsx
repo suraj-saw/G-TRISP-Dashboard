@@ -46,6 +46,7 @@ interface HoveredIrcBlackspot {
   minor_non_hospitalized_count?: number;
   no_injury_count?: number;
   crash_ids?: string;
+  vehicle_count?: number;
   isPoint?: boolean;
 }
 
@@ -268,6 +269,7 @@ export default function IrcBlackspotDetectionLayers({
             minor_non_hospitalized_count: f.properties?.minor_non_hospitalized_count,
             no_injury_count: f.properties?.no_injury_count,
             crash_ids: f.properties?.crash_ids != null ? String(f.properties.crash_ids) : undefined,
+            vehicle_count: f.properties?.vehicle_count,
             isPoint: false,
           });
           return;

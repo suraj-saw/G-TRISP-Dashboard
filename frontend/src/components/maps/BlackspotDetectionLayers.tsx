@@ -58,6 +58,7 @@ interface HoveredBlackspot {
   accident_date_time?: string | null;
   isPoint?: boolean;
   crash_ids?: string;
+  vehicle_count?: number;
 }
 
 // const SEVERITY_COLORS: Record<string, string> = {
@@ -302,6 +303,7 @@ export default function BlackspotDetectionLayers({
             total_blackspots: f.properties?.total_blackspots,
             priority_label: f.properties?.priority_label,
             qualifies_by: f.properties?.qualifies_by,
+            vehicle_count: f.properties?.vehicle_count,
             crash_ids:
               f.properties?.crash_ids != null
                 ? String(f.properties.crash_ids)

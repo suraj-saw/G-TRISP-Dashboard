@@ -97,6 +97,7 @@ interface HoveredSegment {
   grievous_count?: number;
   minor_hospitalized_count?: number;
   minor_non_hospitalized_count?: number;
+  vehicle_count?: number;
 }
 
 export default function NetworkBlackspotLayers({
@@ -188,6 +189,7 @@ export default function NetworkBlackspotLayers({
           grievous_count: f.properties?.grievous_count,
           minor_hospitalized_count: f.properties?.minor_hospitalized_count,
           minor_non_hospitalized_count: f.properties?.minor_non_hospitalized_count,
+          vehicle_count: f.properties?.vehicle_count,
         });
       } else {
         map.getCanvas().style.cursor = "";

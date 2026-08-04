@@ -51,7 +51,8 @@ def network_sliding_window(
             "fraction": acc["fraction"],
             "score": get_severity_score(severity),
             "is_qualifying": is_qualifying_severity(severity),
-            "severity": severity
+            "severity": severity,
+            "number_of_vehicles": acc.get("number_of_vehicles", 0)
         })
 
     candidate_segments = []
@@ -114,7 +115,8 @@ def network_sliding_window(
                     "minor_hospitalized_count": minor_hosp_count,
                     "minor_non_hospitalized_count": minor_non_count,
                     "count": len(window_acc_ids),
-                    "acc_ids": window_acc_ids
+                    "acc_ids": window_acc_ids,
+                    "vehicle_count": sum(a.get("number_of_vehicles", 0) for a in accs_in_window)
                 })
                 
             # Advance sliding window
@@ -167,6 +169,7 @@ def network_sliding_window(
                     "grievous_count": m["grievous_count"],
                     "minor_hospitalized_count": m["minor_hospitalized_count"],
                     "minor_non_hospitalized_count": m["minor_non_hospitalized_count"],
+                    "vehicle_count": m.get("vehicle_count", 0),
                     "accident_count": m["count"],
                     "accident_ids": m["acc_ids"]
                 })

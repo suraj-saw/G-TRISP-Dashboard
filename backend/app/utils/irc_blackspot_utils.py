@@ -39,6 +39,7 @@ class IrcBlackspot:
     minor_non_hospitalized_count: int = 0
     no_injury_count: int = 0
     crash_ids: List[str] = field(default_factory=list)
+    vehicle_count: int = 0
 
 def compute_M(total_crashes: int, road_network_km: float = 1900.0, years_of_data: float = 3.0) -> float:
     if road_network_km <= 0 or years_of_data <= 0:
@@ -150,7 +151,8 @@ def irc_greedy_blackspots(
             minor_hospitalized_count=min_hosp,
             minor_non_hospitalized_count=min_non,
             no_injury_count=no_inj,
-            crash_ids=[str(points[j].accident_db_id) for j in c["members"]]
+            crash_ids=[str(points[j].accident_db_id) for j in c["members"]],
+            vehicle_count=sum(points[j].number_of_vehicles for j in c["members"])
         ))
 
     return blackspots
@@ -275,7 +277,8 @@ def irc_grid_blackspots(
             minor_hospitalized_count=min_hosp,
             minor_non_hospitalized_count=min_non,
             no_injury_count=no_inj,
-            crash_ids=[str(points[j].accident_db_id) for j in c["members"]]
+            crash_ids=[str(points[j].accident_db_id) for j in c["members"]],
+            vehicle_count=sum(points[j].number_of_vehicles for j in c["members"])
         ))
 
     return blackspots
@@ -313,6 +316,7 @@ def irc_blackspots_to_geojson(blackspots: List[IrcBlackspot], radius_m: float) -
             "minor_non_hospitalized_count": bs.minor_non_hospitalized_count,
             "no_injury_count": bs.no_injury_count,
             "crash_ids": ", ".join(bs.crash_ids),
+            "vehicle_count": bs.vehicle_count,
             "label": f"IRC-BS#{bs.bs_id} | Cat {bs.category} | AATC {round(bs.aatc, 2)}",
         }
         

@@ -773,6 +773,7 @@ def get_blackspots(
             lat=a.latitude,
             lon=a.longitude,
             severity=a.severity or "Unknown",
+            number_of_vehicles=a.number_of_vehicles or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -850,6 +851,7 @@ def get_pedestrian_blackspots(
             lat=a.latitude,
             lon=a.longitude,
             severity=a.severity or "Unknown",
+            number_of_vehicles=a.number_of_vehicles or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -921,6 +923,7 @@ def get_dbscan_blackspots(
             lat=a.latitude,
             lon=a.longitude,
             severity=a.severity or "Unknown",
+            number_of_vehicles=a.number_of_vehicles or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -994,6 +997,7 @@ def get_pedestrian_dbscan_blackspots(
             lat=a.latitude,
             lon=a.longitude,
             severity=a.severity or "Unknown",
+            number_of_vehicles=a.number_of_vehicles or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -1722,6 +1726,7 @@ def export_blackspots(
                 lat=a.latitude,
                 lon=a.longitude,
                 severity=a.severity or "Unknown",
+                number_of_vehicles=a.number_of_vehicles or 0,
             ))
 
     if algorithm == "dbscan":
@@ -2429,7 +2434,7 @@ def get_district_insights(db: Session = Depends(get_db)):
         collision_type = [{"label": k, "count": v} for k, v in collision_counts.items()]
 
         points = [
-            CrashPoint(index=i, accident_id=a.accident_id, lat=a.latitude, lon=a.longitude)
+            CrashPoint(index=i, accident_db_id=a.id, accident_id=a.accident_id, lat=a.latitude, lon=a.longitude, severity=a.severity or "Unknown", number_of_vehicles=a.number_of_vehicles or 0)
             for i, a in enumerate(group)
             if a.latitude is not None and a.longitude is not None
         ]
@@ -2833,6 +2838,7 @@ def get_irc_greedy_blackspots(
             lat=a.latitude,
             lon=a.longitude,
             severity=a.severity or "Unknown",
+            number_of_vehicles=a.number_of_vehicles or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -2929,6 +2935,7 @@ def get_irc_grid_blackspots(
             lat=a.latitude,
             lon=a.longitude,
             severity=a.severity or "Unknown",
+            number_of_vehicles=a.number_of_vehicles or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -3032,6 +3039,7 @@ def get_pedestrian_irc_greedy_blackspots(
             lat=a.latitude,
             lon=a.longitude,
             severity=a.severity or "Unknown",
+            number_of_vehicles=a.number_of_vehicles or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -3136,6 +3144,7 @@ def get_pedestrian_irc_grid_blackspots(
             lat=a.latitude,
             lon=a.longitude,
             severity=a.severity or "Unknown",
+            number_of_vehicles=a.number_of_vehicles or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -3290,6 +3299,7 @@ def get_network_blackspots(
     query = db.query(
         Accident.id.label("accident_id"),
         Accident.severity,
+        Accident.number_of_vehicles,
         Accident.accident_date_time,
         SnappedAccident.road_id,
         func.ST_LineLocatePoint(GujaratRoad.geometry, SnappedAccident.snapped_location).label("fraction"),
@@ -3334,7 +3344,8 @@ def get_network_blackspots(
             "road_id": r.road_id,
             "severity": r.severity,
             "fraction": r.fraction,
-            "road_length_m": r.road_length_m
+            "road_length_m": r.road_length_m,
+            "number_of_vehicles": r.number_of_vehicles or 0,
         }
         for r in rows
     ]
@@ -3392,6 +3403,7 @@ def get_network_blackspots(
                     "grievous_count": seg.get("grievous_count", 0),
                     "minor_hospitalized_count": seg.get("minor_hospitalized_count", 0),
                     "minor_non_hospitalized_count": seg.get("minor_non_hospitalized_count", 0),
+                    "vehicle_count": seg.get("vehicle_count", 0),
                     "accident_count": seg["accident_count"]
                 }
             })
@@ -3428,6 +3440,7 @@ def get_risk_corridors(
     query = db.query(
         Accident.id.label("accident_id"),
         Accident.severity,
+        Accident.number_of_vehicles,
         Accident.accident_date_time,
         SnappedAccident.road_id,
         func.ST_LineLocatePoint(GujaratRoad.geometry, SnappedAccident.snapped_location).label("fraction"),
@@ -3472,7 +3485,8 @@ def get_risk_corridors(
             "road_id": r.road_id,
             "severity": r.severity,
             "fraction": r.fraction,
-            "road_length_m": r.road_length_m
+            "road_length_m": r.road_length_m,
+            "number_of_vehicles": r.number_of_vehicles or 0,
         }
         for r in rows
     ]

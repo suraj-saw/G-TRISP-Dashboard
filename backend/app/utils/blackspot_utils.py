@@ -132,6 +132,7 @@ class CrashPoint:
     lat: float
     lon: float
     severity: str = "Unknown"
+    number_of_vehicles: int = 0
 
 
 @dataclass
@@ -160,6 +161,7 @@ class Blackspot:
     anchor_lat: float
     anchor_lon: float
     crash_ids: list[str] = field(default_factory=list)
+    vehicle_count: int = 0
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -298,6 +300,7 @@ def _make_blackspot(
             str(points[i].accident_db_id)  # Use the primary key ID as string (always present)
             for i in member_indices
         ],
+        vehicle_count=sum(points[i].number_of_vehicles for i in member_indices),
     )
 
 
@@ -626,6 +629,7 @@ def blackspots_to_geojson(blackspots: list[Blackspot], radius_m: float) -> dict:
             "priority_color":             bs.priority_color,
             "qualifies_by":               " | ".join(bs.qualifies_by),
             "crash_ids":                  ", ".join(bs.crash_ids),
+            "vehicle_count":              bs.vehicle_count,
             "label": (
                 f"BS#{bs.bs_id} | Score {bs.priority_score} | "
                 f"{bs.crash_count} crashes"
