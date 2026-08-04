@@ -392,4 +392,8 @@ export interface TemporalAnalysisData {
   }[];
   /** Temporal insights (optional) */
   temporal_insights?: string[];
+  /** Time severity matrix (optional) */
+  time_severity_matrix?: Record<string, any>[];
+  /** Monthly fatality rate (optional) */
+  monthly_fatality_rate?: { month: string; total: number; fatalities: number; fatality_rate: number }[];
 }

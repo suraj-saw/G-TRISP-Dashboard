@@ -4,7 +4,7 @@
  * @responsibility Fetches temporal analytics via `dashboardApi`, manages local loading/error states, orchestrates the export capability, and renders a comprehensive layout of KPI cards and varied Recharts components.
  * @dependencies recharts (charting), lucide-react (icons), ExportContext (CSV/Excel downloads).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { AlertCircle, CalendarDays, Clock3, Loader2, Moon, Timer } from "lucide-react";
 import { fetchTemporalAnalysis } from "../../api/dashboardApi";
 import type { DashboardFilters, TemporalAnalysisData } from "../../types/dashboard";
@@ -14,19 +14,17 @@ import MonthlyTrend from "./MonthlyTrend";
 import { useExportContext } from "../../context/ExportContext";
 import { downloadGujaratExport } from "../../api/exportApi";
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  // PieChart,
-  // Pie,
-  // Cell,
+  BarChart,
+  Bar,
   Legend,
-  LineChart,
-  Line,
+  ComposedChart,
 } from "recharts";
 
 interface Props {
@@ -104,7 +102,12 @@ const SEVERITY_COLORS: Record<string, string> = {
   Fatal: "#ef4444",
   "Grievous Injury": "#f97316",
   "Minor Injury": "#f59e0b",
+  "Minor Injury Hospitalized": "#f59e0b",
+  "Minor Injury Non Hospitalized": "#fbbf24",
   "Damage Only": "#94a3b8",
+  "No Injury": "#64748b",
+  Grievous: "#f97316",
+  Minor: "#eab308",
 };
 
 /**
@@ -113,14 +116,25 @@ const SEVERITY_COLORS: Record<string, string> = {
  */
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
+  
+  const showTotal = payload.length > 1;
+  const total = payload.reduce((sum: number, p: any) => sum + (Number(p.value) || 0), 0);
+
   return (
     <div className="bg-white border border-slate-200 rounded-md p-2 shadow-lg text-xs">
-      {label && <div className="text-slate-500 mb-1">{label}</div>}
+      <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-slate-100">
+        {label && <div className="text-slate-500 font-semibold uppercase tracking-wider">{label}</div>}
+        {showTotal && (
+          <div className="font-bold text-slate-800 ml-4 text-[11px]">
+            Total: {total.toLocaleString()}
+          </div>
+        )}
+      </div>
       {payload.map((p: any, i: number) => (
         <div key={i} className="flex items-center gap-1.5 leading-relaxed">
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: p.color }} />
           <span className="text-slate-500">{p.name}:</span>
-          <span className="font-semibold">{p.value.toLocaleString()}</span>
+          <span className="font-semibold">{Number(p.value).toLocaleString()}</span>
         </div>
       ))}
     </div>
@@ -214,6 +228,26 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
     filters.date_from,
     filters.date_to,
   ]);
+
+  const severityByWeekendWeekday = useMemo(() => {
+    if (!data.severity_by_weekend_weekday) return [];
+    return data.severity_by_weekend_weekday.map((item: any) => {
+      const fatal = item["Fatal"] || 0;
+      const grievous = item["Grievous Injury"] || 0;
+      let other = 0;
+      Object.keys(item).forEach(key => {
+        if (key !== "label" && key !== "Fatal" && key !== "Grievous Injury") {
+          other += Number(item[key]) || 0;
+        }
+      });
+      return {
+        label: item.label,
+        "Fatal": fatal,
+        "Grievous Injury": grievous,
+        "Other": other
+      };
+    });
+  }, [data.severity_by_weekend_weekday]);
 
   if (loading) {
     return (
@@ -385,7 +419,7 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
           {data.severity_by_weekend_weekday && data.severity_by_weekend_weekday.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.severity_by_weekend_weekday} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <BarChart data={severityByWeekendWeekday} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid stroke={GRID} vertical={false} />
                   <XAxis dataKey="label" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -393,8 +427,7 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
                   <Legend wrapperStyle={{ fontSize: 10, color: MUTED, paddingTop: '10px' }} />
                   <Bar dataKey="Fatal" stackId="a" fill={SEVERITY_COLORS["Fatal"]} />
                   <Bar dataKey="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} />
-                  <Bar dataKey="Minor Injury" stackId="a" fill={SEVERITY_COLORS["Minor Injury"]} />
-                  <Bar dataKey="Damage Only" stackId="a" fill={SEVERITY_COLORS["Damage Only"]} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Other" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -417,6 +450,56 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
                   <Bar dataKey="Fatal" stackId="a" fill={SEVERITY_COLORS["Fatal"]} />
                   <Bar dataKey="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} radius={[3, 3, 0, 0]} />
                 </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">No data</div>
+          )}
+        </div>
+      </div>
+
+      {/* New Temporal Charts Row 4 */}
+      <div className="grid grid-cols-1 gap-4">
+        <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Accident Severity by Time Period</p>
+          {data.time_severity_matrix && data.time_severity_matrix.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.time_severity_matrix} layout="vertical" margin={{ top: 10, right: 10, left: 30, bottom: 0 }}>
+                  <CartesianGrid stroke={GRID} horizontal={false} vertical={true} strokeDasharray="3 3" opacity={0.4} />
+                  <XAxis type="number" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis dataKey="name" type="category" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: MUTED, paddingTop: '10px' }} iconType="circle" iconSize={8} />
+                  <Bar dataKey="Fatal" stackId="a" fill={SEVERITY_COLORS["Fatal"]} maxBarSize={24} />
+                  <Bar dataKey="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} maxBarSize={24} />
+                  <Bar dataKey="Minor Injury Hospitalized" stackId="a" fill={SEVERITY_COLORS["Minor Injury Hospitalized"]} maxBarSize={24} />
+                  <Bar dataKey="Minor Injury Non Hospitalized" stackId="a" fill={SEVERITY_COLORS["Minor Injury Non Hospitalized"]} maxBarSize={24} />
+                  <Bar dataKey="No Injury" stackId="a" fill={SEVERITY_COLORS["No Injury"]} maxBarSize={24} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">No data</div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Monthly Fatality Rate</p>
+          {data.monthly_fatality_rate && data.monthly_fatality_rate.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={data.monthly_fatality_rate} margin={{ top: 10, right: 30, left: -10, bottom: 20 }}>
+                  <CartesianGrid stroke={GRID} vertical={false} strokeDasharray="3 3" opacity={0.4} />
+                  <XAxis dataKey="month" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={20} angle={-45} textAnchor="end" height={40} />
+                  <YAxis yAxisId="left" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: MUTED, paddingTop: '10px' }} iconType="circle" iconSize={8} />
+                  <Bar yAxisId="left" dataKey="total" name="Total Accidents" fill={CHART_BLUE} maxBarSize={24} radius={[4, 4, 0, 0]} />
+                  <Bar yAxisId="left" dataKey="fatalities" name="Fatalities" fill={SEVERITY_COLORS["Fatal"]} maxBarSize={24} radius={[4, 4, 0, 0]} />
+                  <Line yAxisId="right" type="monotone" dataKey="fatality_rate" name="Fatality Rate (%)" stroke={CHART_PURPLE} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           ) : (

@@ -19,6 +19,9 @@ import {
   Cell,
   Legend,
   LabelList,
+  ComposedChart,
+  Line,
+  LineChart,
 } from "recharts";
 import { getDistrictStats } from "../../api/gujaratDashboardApi";
 import type {
@@ -35,6 +38,8 @@ const SEVERITY_COLORS: Record<string, string> = {
   Fatal: "#ef4444",
   "Grievous Injury": "#f97316",
   "Minor Injury": "#f59e0b",
+  "Minor Injury Hospitalized": "#f59e0b",
+  "Minor Injury Non Hospitalized": "#fbbf24",
   "Damage Only": "#94a3b8",
   "No Injury": "#64748b",
   Grievous: "#f97316",
@@ -157,9 +162,20 @@ const CustomTooltip: React.FC<{
   label?: string;
 }> = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
+  
+  const showTotal = payload.length > 1;
+  const total = payload.reduce((sum, p) => sum + (Number(p.value) || 0), 0);
+
   return (
     <div className="custom-tooltip">
-      {label && <div className="ct-label">{label}</div>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingBottom: showTotal ? '6px' : '0', borderBottom: showTotal ? '1px solid #e2e8f0' : 'none' }}>
+        {label && <div className="ct-label" style={{ margin: 0, padding: 0 }}>{label}</div>}
+        {showTotal && (
+          <div style={{ fontWeight: 'bold', fontSize: '12px', color: '#0f172a', marginLeft: '16px' }}>
+            Total: {total.toLocaleString()}
+          </div>
+        )}
+      </div>
       {payload.map((p, i) => (
         <div key={i} className="ct-row">
           <span className="ct-dot" style={{ background: p.fill || p.color }} />
@@ -226,11 +242,7 @@ const HorizontalCategoryChartCard: React.FC<{
             axisLine={false}
             tickLine={false}
             width={fullLabels ? 220 : yAxisWidth}
-            tickFormatter={(val) =>
-              !fullLabels && typeof val === "string" && val.length > 20
-                ? `${val.substring(0, 18)}...`
-                : val
-            }
+            interval={0}
           />
           <Tooltip content={<CustomTooltip />} />
           <Bar
@@ -253,6 +265,77 @@ const HorizontalCategoryChartCard: React.FC<{
   );
 };
 
+const StackedBarChartCard: React.FC<{
+  title: string;
+  data: Record<string, any>[];
+  keys?: string[];
+  colors: string[];
+  className?: string;
+  yAxisWidth?: number;
+  layout?: "horizontal" | "vertical";
+  fullLabels?: boolean;
+  height?: number;
+}> = ({ title, data, keys, colors, className = "", yAxisWidth = 140, layout = "vertical", fullLabels = false, height = 280 }) => {
+  if (!data || data.length === 0) {
+    return (
+      <ChartCard title={title} className={className}>
+        <EmptyState />
+      </ChartCard>
+    );
+  }
+
+  const actualKeys = keys && keys.length > 0 
+    ? keys 
+    : Array.from(new Set(data.flatMap(d => Object.keys(d).filter(k => k !== "name"))));
+
+  return (
+    <ChartCard title={title} className={className}>
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart
+          data={data}
+          layout={layout}
+          margin={{ top: 10, right: 40, left: 5, bottom: 5 }}
+          barCategoryGap="20%"
+        >
+          <CartesianGrid stroke={GRID} horizontal={layout === "vertical"} vertical={layout === "horizontal"} strokeDasharray="3 3" opacity={0.4} />
+          {layout === "vertical" ? (
+            <>
+              <XAxis type="number" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis
+                dataKey="name"
+                type="category"
+                tick={{ fill: MUTED, fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                width={fullLabels ? 220 : yAxisWidth}
+                interval={0}
+              />
+            </>
+          ) : (
+            <>
+              <XAxis
+                dataKey="name"
+                type="category"
+                tick={{ fill: MUTED, fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                interval={0}
+              />
+              <YAxis type="number" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+            </>
+          )}
+          <Tooltip content={<CustomTooltip />} />
+          <Legend wrapperStyle={{ fontSize: 11, color: MUTED, paddingTop: "10px" }} iconType="circle" iconSize={8} />
+          {actualKeys.map((k, i) => (
+            <Bar key={k} dataKey={k} stackId="a" fill={colors[i % colors.length]} maxBarSize={24} />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartCard>
+  );
+};
+
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 interface DistrictStatisticalAnalysisProps {
@@ -269,6 +352,57 @@ interface DistrictStatisticalAnalysisProps {
  * @data_flow Receives `filters` via props -> `fetchStats` calls API -> Results memoized via `getTopCategories` -> Rendered to KPI and Chart sub-components.
  * @hooks_usage Uses `useEffect` to trigger data fetches when filters change, and registers export capabilities via the global `useExportContext`.
  */
+const groupTopCategories = (data: Record<string, any>[], keepCount: number = 4) => {
+  if (!data || data.length === 0) return { groupedData: [], keys: [] };
+  
+  const totals: Record<string, number> = {};
+  data.forEach(row => {
+    Object.keys(row).forEach(k => {
+      if (k !== 'name') {
+        totals[k] = (totals[k] || 0) + (row[k] || 0);
+      }
+    });
+  });
+
+  const sortedKeys = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
+  const topKeys = sortedKeys.slice(0, keepCount);
+  const otherKeys = sortedKeys.slice(keepCount);
+
+  if (otherKeys.length === 0) {
+    return { groupedData: data, keys: sortedKeys };
+  }
+
+  const groupedData = data.map(row => {
+    const newRow: any = { name: row.name };
+    let othersSum = 0;
+    Object.keys(row).forEach(k => {
+      if (k !== 'name') {
+        if (topKeys.includes(k)) {
+          newRow[k] = row[k];
+        } else {
+          othersSum += (row[k] || 0);
+        }
+      }
+    });
+    if (othersSum > 0) newRow['Others'] = othersSum;
+    return newRow;
+  });
+
+  return { groupedData, keys: [...topKeys, 'Others'] };
+};
+
+const getTopRows = (data: Record<string, any>[], count: number = 10) => {
+  if (!data || data.length === 0) return [];
+  const withTotal = data.map(row => {
+    let total = 0;
+    Object.keys(row).forEach(k => {
+      if (k !== 'name' && typeof row[k] === 'number') total += row[k];
+    });
+    return { ...row, _total: total };
+  });
+  return withTotal.sort((a, b) => b._total - a._total).slice(0, count);
+};
+
 const DistrictStatisticalAnalysis: React.FC<
   DistrictStatisticalAnalysisProps
 > = ({ filters, onDataLoaded, disableAnimations = false, fullLabels = false }) => {
@@ -368,12 +502,37 @@ const DistrictStatisticalAnalysis: React.FC<
     [stats?.road_type_breakdown]
   );
 
+  const { groupedData: groupedRoadCollisionData, keys: roadCollisionKeys } = useMemo(
+    () => groupTopCategories(stats?.road_collision_matrix || [], 4),
+    [stats?.road_collision_matrix]
+  );
+
+  const topRoadSeverityMatrix = useMemo(
+    () => getTopRows(stats?.road_severity_matrix || [], 15),
+    [stats?.road_severity_matrix]
+  );
+
+  const topCollisionSeverityMatrix = useMemo(
+    () => getTopRows(stats?.collision_severity_matrix || [], 15),
+    [stats?.collision_severity_matrix]
+  );
+
+  const topWeatherMatrix = useMemo(
+    () => getTopRows(stats?.weather_severity_matrix || [], 10),
+    [stats?.weather_severity_matrix]
+  );
+
+  const topLightMatrix = useMemo(
+    () => getTopRows(stats?.light_severity_matrix || [], 10),
+    [stats?.light_severity_matrix]
+  );
+
   const processedCollisionType = useMemo(
-    () => getTopCategories(stats?.collision_type_breakdown, 8, "label"),
+    () => getTopCategories(stats?.collision_type_breakdown, 6, "label"),
     [stats?.collision_type_breakdown]
   );
   const processedCollisionNature = useMemo(
-    () => getTopCategories(stats?.collision_nature_breakdown, 10, "label"),
+    () => getTopCategories(stats?.collision_nature_breakdown, 7, "label"),
     [stats?.collision_nature_breakdown]
   );
   const processedWeather = useMemo(
@@ -718,6 +877,91 @@ const DistrictStatisticalAnalysis: React.FC<
               yAxisWidth={150}
             />
           </div>
+          
+          {/* Row 6: Cross-Distribution Analytics */}
+          <div className="charts-row charts-row--two">
+            <StackedBarChartCard
+              title="Severity by Road Classification"
+              data={topRoadSeverityMatrix}
+              keys={["Fatal", "Grievous Injury", "Minor Injury Hospitalized", "Minor Injury Non Hospitalized", "No Injury"]}
+              colors={[SEVERITY_COLORS["Fatal"], SEVERITY_COLORS["Grievous Injury"], SEVERITY_COLORS["Minor Injury Hospitalized"], SEVERITY_COLORS["Minor Injury Non Hospitalized"], SEVERITY_COLORS["No Injury"]]}
+              height={380}
+            />
+            <StackedBarChartCard
+              title="Collision Type vs Severity"
+              data={topCollisionSeverityMatrix}
+              keys={["Fatal", "Grievous Injury", "Minor Injury Hospitalized", "Minor Injury Non Hospitalized", "No Injury"]}
+              colors={[SEVERITY_COLORS["Fatal"], SEVERITY_COLORS["Grievous Injury"], SEVERITY_COLORS["Minor Injury Hospitalized"], SEVERITY_COLORS["Minor Injury Non Hospitalized"], SEVERITY_COLORS["No Injury"]]}
+              height={380}
+            />
+          </div>
+
+          {/* Row 7: Environment & Severity */}
+          <div className="charts-row charts-row--two">
+            <StackedBarChartCard
+              title="Weather vs Severity"
+              data={topWeatherMatrix}
+              keys={["Fatal", "Grievous Injury", "Minor Injury Hospitalized", "Minor Injury Non Hospitalized", "No Injury"]}
+              colors={[SEVERITY_COLORS["Fatal"], SEVERITY_COLORS["Grievous Injury"], SEVERITY_COLORS["Minor Injury Hospitalized"], SEVERITY_COLORS["Minor Injury Non Hospitalized"], SEVERITY_COLORS["No Injury"]]}
+              height={380}
+            />
+            <StackedBarChartCard
+              title="Light Condition vs Severity"
+              data={topLightMatrix}
+              keys={["Fatal", "Grievous Injury", "Minor Injury Hospitalized", "Minor Injury Non Hospitalized", "No Injury"]}
+              colors={[SEVERITY_COLORS["Fatal"], SEVERITY_COLORS["Grievous Injury"], SEVERITY_COLORS["Minor Injury Hospitalized"], SEVERITY_COLORS["Minor Injury Non Hospitalized"], SEVERITY_COLORS["No Injury"]]}
+              height={380}
+            />
+          </div>
+          
+          {/* Row 8: Road vs Collision */}
+          <div className="charts-row charts-row--one">
+            <StackedBarChartCard
+              title="Road Classification vs Collision Type"
+              data={groupedRoadCollisionData}
+              keys={roadCollisionKeys}
+              colors={[
+                "#2563eb", // Royal Blue
+                "#dc2626", // Red
+                "#059669", // Emerald
+                "#d97706", // Amber
+                "#7c3aed", // Violet
+                "#db2777", // Pink
+                "#0891b2", // Cyan
+                "#ea580c", // Orange
+                "#4f46e5", // Indigo
+                "#65a30d", // Lime
+                "#14b8a6", // Teal
+                "#9333ea", // Purple
+                "#be123c", // Rose
+                "#0f766e", // Dark Teal
+                "#b45309", // Dark Amber
+              ]}
+              yAxisWidth={160}
+              height={400}
+            />
+          </div>
+
+          {/* Row 9: Top Police Stations */}
+          <div className="charts-row charts-row--one">
+            <ChartCard title="Top Police Stations (By Activity)">
+              {(!stats.police_station_stats || stats.police_station_stats.length === 0) ? (
+                <EmptyState />
+              ) : (
+                <ResponsiveContainer width="100%" height={450}>
+                  <BarChart data={stats.police_station_stats.slice(0, 10)} layout="vertical" margin={{ top: 10, right: 30, left: 5, bottom: 5 }} barCategoryGap="20%">
+                    <CartesianGrid stroke={GRID} horizontal={true} vertical={true} strokeDasharray="3 3" opacity={0.4} />
+                    <XAxis type="number" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis dataKey="police_station" type="category" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={160} tickFormatter={(val) => typeof val === "string" && val.length > 25 ? `${val.substring(0, 23)}...` : val} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(0, 0, 0, 0.04)" }} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: MUTED, paddingTop: '10px' }} iconType="circle" iconSize={8} />
+                    <Bar dataKey="total" name="Total Accidents" fill={CHART_BLUE} maxBarSize={16} radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="fatal_accidents" name="Fatal Accidents" fill={SEVERITY_COLORS["Fatal"]} maxBarSize={16} radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
+          </div>
         </>
       )}
 
@@ -828,6 +1072,64 @@ const DistrictStatisticalAnalysis: React.FC<
           display: flex;
           flex-direction: column;
           justify-content: center;
+        }
+
+        .stats-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+          text-align: left;
+        }
+        .stats-table th {
+          position: sticky;
+          top: 0;
+          background: #f8fafc;
+          padding: 8px 16px;
+          color: #64748b;
+          font-weight: 700;
+          border-bottom: 1px solid #e2e8f0;
+          z-index: 1;
+        }
+        .stats-table th:not(:first-child) {
+          text-align: right;
+        }
+        .stats-table td {
+          padding: 8px 16px;
+          border-bottom: 1px solid #f1f5f9;
+          color: #334155;
+        }
+        .stats-table td:not(:first-child) {
+          text-align: right;
+        }
+        .stats-table tr:hover td {
+          background-color: #f8fafc;
+        }
+        .ps-name {
+          font-weight: 500;
+          color: #0f172a;
+          max-width: 150px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .ps-rate {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+        }
+        .rate-bar-bg {
+          width: 40px;
+          height: 6px;
+          background-color: #e2e8f0;
+          border-radius: 3px;
+          overflow: hidden;
+          flex-shrink: 0;
+        }
+        .rate-bar-fill {
+          height: 100%;
+          background-color: #ef4444;
+          border-radius: 3px;
         }
 
         /* Polished Custom Tooltip Component */

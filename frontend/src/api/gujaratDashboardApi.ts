@@ -848,6 +848,22 @@ export interface DistrictStats {
   visibility_breakdown?: { label: string; count: number }[];
   /** Statistical insights (optional) */
   statistical_insights?: string[];
+  /** Road severity matrix (optional) */
+  road_severity_matrix?: Record<string, any>[];
+  /** Collision severity matrix (optional) */
+  collision_severity_matrix?: Record<string, any>[];
+  /** Weather severity matrix (optional) */
+  weather_severity_matrix?: Record<string, any>[];
+  /** Light severity matrix (optional) */
+  light_severity_matrix?: Record<string, any>[];
+  /** Road collision matrix (optional) */
+  road_collision_matrix?: Record<string, any>[];
+  /** Time severity matrix (optional) */
+  time_severity_matrix?: Record<string, any>[];
+  /** Monthly fatality rate (optional) */
+  monthly_fatality_rate?: { month: string; total: number; fatalities: number; fatality_rate: number }[];
+  /** Police station stats (optional) */
+  police_station_stats?: { police_station: string; total: number; fatal_accidents: number; fatality_rate: number }[];
 }
 
 // ─── API call ─────────────────────────────────────────────────────────────────

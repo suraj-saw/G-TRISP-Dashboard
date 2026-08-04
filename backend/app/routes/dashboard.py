@@ -584,6 +584,8 @@ def get_temporal_analysis(
     monthly_counts: dict  = defaultdict(int)
     day_counts: dict      = defaultdict(int)
     period_counts: dict   = defaultdict(int)
+    time_severity_counts = defaultdict(lambda: defaultdict(int))
+    monthly_stats = defaultdict(lambda: {"total": 0, "fatalities": 0})
 
     month_only_counts = defaultdict(int)
     year_only_counts = defaultdict(int)
@@ -604,6 +606,10 @@ def get_temporal_analysis(
         monthly_counts[(dt.year, dt.month)] += 1
         day_counts[day_name]              += 1
         period_counts[period]             += 1
+        
+        month_key = dt.strftime("%Y-%m")
+        monthly_stats[month_key]["total"] += 1
+        monthly_stats[month_key]["fatalities"] += total_fatalities(accident)
 
         month_only_counts[dt.month] += 1
         year_only_counts[dt.year] += 1
@@ -613,17 +619,17 @@ def get_temporal_analysis(
         weekend_counts[ww_label] += 1
             
         sev = safe_text(accident.severity)
-        normalized_sev = sev
-        if sev == "Grievous":
-            normalized_sev = "Grievous Injury"
-        elif sev in ["Minor", "Minor Injury", "Minor Injury Hospitalized", "Minor Injury Non Hospitalized"]:
-            normalized_sev = "Minor Injury"
-        elif sev in ["Damage Only", "Damage only", "No Injury"]:
-            normalized_sev = "Damage Only"
+        
+        # Initialize dictionary if not present
+        if sev not in severity_by_hour[hour]:
+            severity_by_hour[hour][sev] = 0
+        if sev not in severity_by_weekend_weekday[ww_label]:
+            severity_by_weekend_weekday[ww_label][sev] = 0
             
-        if normalized_sev in severity_by_hour[hour]:
-            severity_by_hour[hour][normalized_sev] += 1
-            severity_by_weekend_weekday[ww_label][normalized_sev] += 1
+        severity_by_hour[hour][sev] += 1
+        severity_by_weekend_weekday[ww_label][sev] += 1
+            
+        time_severity_counts[period][sev] += 1
 
     peak_hour,      peak_hour_count   = _peak_item(hourly_counts, 0)
     peak_day,       peak_day_count    = _peak_item(day_counts, UNKNOWN_LABEL)
@@ -699,25 +705,19 @@ def get_temporal_analysis(
             {"label": "Weekend", "count": weekend_counts["Weekend"]}
         ],
         "severity_by_weekend_weekday": [
-            {
-                "label": "Weekday",
-                **severity_by_weekend_weekday["Weekday"]
-            },
-            {
-                "label": "Weekend",
-                **severity_by_weekend_weekday["Weekend"]
-            }
+            {"label": "Weekday", **severity_by_weekend_weekday["Weekday"]},
+            {"label": "Weekend", **severity_by_weekend_weekday["Weekend"]}
         ],
         "severity_by_hour": [
-
-            {
-                "hour": h,
-                "hour_label": _format_hour_label(h),
-                **severity_by_hour[h]
-            }
+            {"hour": h, "hour_label": _format_hour_label(h), **severity_by_hour[h]}
             for h in range(HOURS_IN_DAY)
         ],
-        "temporal_insights": insights
+        "temporal_insights": insights,
+        "time_severity_matrix": [{"name": k, **v} for k, v in time_severity_counts.items()],
+        "monthly_fatality_rate": [
+            {"month": k, "total": v["total"], "fatalities": v["fatalities"], "fatality_rate": round(v["fatalities"] / v["total"] * 100, 1) if v["total"] > 0 else 0} 
+            for k, v in sorted(monthly_stats.items())
+        ],
     }
 
 
@@ -2542,6 +2542,17 @@ def get_district_stats(
     light_counts = defaultdict(int)
     visibility_counts = defaultdict(int)
     
+    # New matrices
+    road_severity_counts = defaultdict(lambda: defaultdict(int))
+    collision_severity_counts = defaultdict(lambda: defaultdict(int))
+    weather_severity_counts = defaultdict(lambda: defaultdict(int))
+    light_severity_counts = defaultdict(lambda: defaultdict(int))
+    road_collision_counts = defaultdict(lambda: defaultdict(int))
+    time_severity_counts = defaultdict(lambda: defaultdict(int))
+    monthly_stats = defaultdict(lambda: {"total": 0, "fatalities": 0})
+    police_station_stats = defaultdict(lambda: {"total": 0, "fatal_accidents": 0})
+    
+
     vehicle_involvement_counts = {"1 Vehicle": 0, "2 Vehicles": 0, "3 Vehicles": 0, "4+ Vehicles": 0}
     victim_counts = {
         "Drivers": {"Killed": 0, "Grievous Injury": 0, "Minor Injury": 0},
@@ -2563,6 +2574,21 @@ def get_district_stats(
         weather_counts[safe_text(accident.weather_condition)] += 1
         light_counts[safe_text(accident.light_condition)] += 1
         visibility_counts[safe_text(accident.visibility)] += 1
+        
+        # Cross matrices
+        road_severity_counts[safe_text(accident.road_classification)][severity_name] += 1
+        collision_severity_counts[safe_text(accident.type_of_collision)][severity_name] += 1
+        weather_severity_counts[safe_text(accident.weather_condition)][severity_name] += 1
+        light_severity_counts[safe_text(accident.light_condition)][severity_name] += 1
+        road_collision_counts[safe_text(accident.road_classification)][safe_text(accident.type_of_collision)] += 1
+        
+        # Police station stats
+        ps = safe_text(accident.police_station)
+        if ps != "Unknown":
+            police_station_stats[ps]["total"] += 1
+            if severity_name == "Fatal":
+                police_station_stats[ps]["fatal_accidents"] += 1
+
 
         v_count = accident.number_of_vehicles or 0
         if v_count == 1:
@@ -2591,6 +2617,20 @@ def get_district_stats(
             month_key = occurred_at.strftime("%Y-%m")
             monthly[month_key] += 1
             hourly[occurred_at.hour] += 1
+            monthly_stats[month_key]["total"] += 1
+            monthly_stats[month_key]["fatalities"] += total_fatalities(accident)
+            
+            # Time period logic (from temporal analysis)
+            hour = occurred_at.hour
+            if 5 <= hour < 12:
+                time_period = "Morning"
+            elif 12 <= hour < 17:
+                time_period = "Afternoon"
+            elif 17 <= hour < 21:
+                time_period = "Evening"
+            else:
+                time_period = "Night"
+            time_severity_counts[time_period][severity_name] += 1
 
     peak_hour = max(hourly, key=hourly.get) if hourly else None
 
@@ -2642,6 +2682,20 @@ def get_district_stats(
         "victim_composition": [{"type": k, **v} for k, v in victim_counts.items()],
         "visibility_breakdown": [{"label": k, "count": v} for k, v in sorted(visibility_counts.items(), key=lambda item: item[1], reverse=True) if k != "Unknown"],
         "statistical_insights": insights,
+        "road_severity_matrix": [{"name": k, **v} for k, v in road_severity_counts.items() if k != "Unknown"],
+        "collision_severity_matrix": [{"name": k, **v} for k, v in collision_severity_counts.items() if k != "Unknown"],
+        "weather_severity_matrix": [{"name": k, **v} for k, v in weather_severity_counts.items() if k != "Unknown"],
+        "light_severity_matrix": [{"name": k, **v} for k, v in light_severity_counts.items() if k != "Unknown"],
+        "road_collision_matrix": [{"name": k, **v} for k, v in road_collision_counts.items() if k != "Unknown"],
+        "time_severity_matrix": [{"name": k, **v} for k, v in time_severity_counts.items()],
+        "monthly_fatality_rate": [
+            {"month": k, "total": v["total"], "fatalities": v["fatalities"], "fatality_rate": round(v["fatalities"] / v["total"] * 100, 1) if v["total"] > 0 else 0} 
+            for k, v in sorted(monthly_stats.items())
+        ],
+        "police_station_stats": [
+            {"police_station": k, "total": v["total"], "fatal_accidents": v["fatal_accidents"], "fatality_rate": round(v["fatal_accidents"] / v["total"] * 100, 1) if v["total"] > 0 else 0}
+            for k, v in sorted(police_station_stats.items(), key=lambda item: item[1]["total"], reverse=True)[:15]
+        ],
     }
 
 @router.get("/export")
