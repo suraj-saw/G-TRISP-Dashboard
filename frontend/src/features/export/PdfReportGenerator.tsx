@@ -85,8 +85,19 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
   const districtStr = actualDistrict ? actualDistrict : "All Gujarat";
   const dateStr = new Date().toLocaleString();
   const filterStrs: string[] = [];
+  if (filters.date_from) filterStrs.push(`Date From: ${filters.date_from}`);
+  if (filters.date_to) filterStrs.push(`Date To: ${filters.date_to}`);
   if (filters.year?.length) filterStrs.push(`Year: ${filters.year.join(", ")}`);
+  if (filters.month?.length) filterStrs.push(`Month: ${filters.month.join(", ")}`);
+  if (filters.day?.length) filterStrs.push(`Day: ${filters.day.join(", ")}`);
+  if (filters.time_period?.length) filterStrs.push(`Time: ${filters.time_period.join(", ")}`);
+  if (filters.taluka?.length) filterStrs.push(`Taluka: ${filters.taluka.join(", ")}`);
+  if (filters.police_station?.length) filterStrs.push(`Police Station: ${filters.police_station.join(", ")}`);
   if (filters.severity?.length) filterStrs.push(`Severity: ${filters.severity.join(", ")}`);
+  if (filters.road_classification?.length) filterStrs.push(`Road Type: ${filters.road_classification.join(", ")}`);
+  if (filters.weather_condition?.length) filterStrs.push(`Weather: ${filters.weather_condition.join(", ")}`);
+  if (filters.light_condition?.length) filterStrs.push(`Light Condition: ${filters.light_condition.join(", ")}`);
+  if (filters.collision_type?.length) filterStrs.push(`Collision Type: ${filters.collision_type.join(", ")}`);
 
   const statFilters = useMemo(
     () => ({
@@ -165,7 +176,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
           }
           
           @page {
-            size: A4 portrait;
+            size: A4 landscape;
             margin: 6mm;
           }
           
@@ -316,7 +327,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
       <div 
         className="print-report-container fixed top-0 left-0 bg-white text-slate-800"
         style={{
-          width: '794px',
+          width: '1123px',
           zIndex: -1,
           overflowY: 'auto',
           height: '100vh',

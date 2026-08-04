@@ -25,6 +25,7 @@ import {
   Bar,
   Legend,
   ComposedChart,
+  Area,
 } from "recharts";
 
 interface Props {
@@ -193,6 +194,10 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
     filters.light_condition,
     filters.date_from,
     filters.date_to,
+    filters.taluka,
+    filters.police_station,
+    filters.road_classification,
+    filters.collision_type,
   ]);
 
   // ── Export handler registration ──────────────────────────────────────────
@@ -487,7 +492,7 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
         <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
           <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Monthly Fatality Rate</p>
           {data.monthly_fatality_rate && data.monthly_fatality_rate.length > 0 ? (
-            <div className="h-64">
+            <div className="h-[340px]">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={data.monthly_fatality_rate} margin={{ top: 10, right: 30, left: -10, bottom: 20 }}>
                   <CartesianGrid stroke={GRID} vertical={false} strokeDasharray="3 3" opacity={0.4} />
@@ -496,8 +501,8 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
                   <YAxis yAxisId="right" orientation="right" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 11, color: MUTED, paddingTop: '10px' }} iconType="circle" iconSize={8} />
-                  <Bar yAxisId="left" dataKey="total" name="Total Accidents" fill={CHART_BLUE} maxBarSize={24} radius={[4, 4, 0, 0]} />
-                  <Bar yAxisId="left" dataKey="fatalities" name="Fatalities" fill={SEVERITY_COLORS["Fatal"]} maxBarSize={24} radius={[4, 4, 0, 0]} />
+                  <Area yAxisId="left" type="monotone" dataKey="total" name="Total Accidents" fill={CHART_BLUE} stroke={CHART_BLUE} fillOpacity={0.15} strokeWidth={2} />
+                  <Area yAxisId="left" type="monotone" dataKey="fatalities" name="Fatal Accidents" fill={SEVERITY_COLORS["Fatal"]} stroke={SEVERITY_COLORS["Fatal"]} fillOpacity={0.8} strokeWidth={2} />
                   <Line yAxisId="right" type="monotone" dataKey="fatality_rate" name="Fatality Rate (%)" stroke={CHART_PURPLE} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                 </ComposedChart>
               </ResponsiveContainer>

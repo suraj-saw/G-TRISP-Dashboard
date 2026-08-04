@@ -123,8 +123,10 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "time_period", label: "Time Period" },
   { id: "district", label: GEO_FILTER_LABEL },
   { id: "severity", label: "Severity" },
+  { id: "road_classification", label: "Road type" },
   { id: "weather_condition", label: "Weather Condition" },
   { id: "light_condition", label: "Light Condition" },
+  { id: "collision_type", label: "Collision type" },
 ];
 
 /** Removes the severity filter from a filter configuration array */

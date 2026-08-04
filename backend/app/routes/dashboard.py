@@ -220,9 +220,10 @@ def get_summary(
     collision_type: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-        taluka: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    severity: Optional[List[str]] = Query(None),
 ):
     query     = apply_filters(
         db.query(Accident),
@@ -232,6 +233,9 @@ def get_summary(
         taluka=taluka, db=db,
         police_station=police_station
     )
+    if severity:
+        query = query.filter(Accident.severity.in_(severity))
+
     res = query.with_entities(
         func.count(Accident.id).label("total_accidents"),
         func.sum(
@@ -542,40 +546,35 @@ def get_temporal_analysis(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
+    road_classification: Optional[List[str]] = Query(None),
+    collision_type: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
 ):
-    query = db.query(Accident)
-    start_date = _parse_iso_date(date_from)
-    end_date = _parse_iso_date(date_to)
-
-    if district:
-        query = query.filter(Accident.district.in_(district))
+    query = apply_filters(
+        db.query(Accident),
+        district, year, road_classification,
+        weather_condition, light_condition, collision_type,
+        date_from, date_to,
+        taluka=taluka, db=db,
+        police_station=police_station
+    )
     if severity:
-        query = query.filter(Accident.severity.in_(severity))
-    if weather_condition:
-        query = query.filter(Accident.weather_condition.in_(weather_condition))
-    if light_condition:
-        query = query.filter(Accident.light_condition.in_(light_condition))
-    if police_station:
-        query = query.filter(Accident.police_station.in_(police_station))
+        if isinstance(severity, list):
+            query = query.filter(Accident.severity.in_(severity))
+        else:
+            query = query.filter(Accident.severity == severity)
 
     accidents_with_dt = []
     for accident in query.all():
         dt = accident.accident_date_time
         if not dt:
             continue
-        if year and dt.year not in [int(y) for y in year]:
-            continue
         if month and dt.month not in [int(m) for m in month]:
             continue
         if day and dt.strftime("%A") not in day:
             continue
         if time_period and _time_period_for_hour(dt.hour) not in time_period:
-            continue
-        if start_date and dt.date() < start_date:
-            continue
-        if end_date and dt.date() > end_date:
             continue
         accidents_with_dt.append((accident, dt))
 
@@ -609,7 +608,8 @@ def get_temporal_analysis(
         
         month_key = dt.strftime("%Y-%m")
         monthly_stats[month_key]["total"] += 1
-        monthly_stats[month_key]["fatalities"] += total_fatalities(accident)
+        if safe_text(accident.severity) == "Fatal":
+            monthly_stats[month_key]["fatalities"] += 1
 
         month_only_counts[dt.month] += 1
         year_only_counts[dt.year] += 1
@@ -2567,7 +2567,8 @@ def get_district_stats(
 
     for accident in accidents:
         severity_name = safe_text(accident.severity)
-        severity_counts[severity_name] += 1
+        mapped_severity = "Fatal" if severity_name == "Fatal" else ("Grievous Injury" if severity_name == "Grievous Injury" else "Other")
+        severity_counts[mapped_severity] += 1
         road_counts[safe_text(accident.road_classification)] += 1
         collision_type_counts[safe_text(accident.type_of_collision)] += 1
         collision_nature_counts[safe_text(accident.collision_feature)] += 1

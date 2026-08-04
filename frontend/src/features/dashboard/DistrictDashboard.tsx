@@ -262,8 +262,10 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "taluka", label: "Taluka" }, // NEW
   { id: "police_station", label: "Police Station" },
   { id: "severity", label: "Severity" },
+  { id: "road_classification", label: "Road type" },
   { id: "weather_condition", label: "Weather Condition" },
   { id: "light_condition", label: "Light Condition" },
+  { id: "collision_type", label: "Collision type" },
 ];
 
 const DISTRICT_VISUALIZATION_OPTIONS = VISUALIZATION_OPTIONS.filter(

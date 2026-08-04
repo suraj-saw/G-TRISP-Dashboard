@@ -822,28 +822,37 @@ const DistrictStatisticalAnalysis: React.FC<
                       iconType="circle"
                       iconSize={10}
                     />
-                    <Bar
-                      dataKey="Killed"
-                      name="Fatal (Killed)"
-                      stackId="a"
-                      fill={SEVERITY_COLORS["Fatal"]}
-                      barSize={35}
-                    />
-                    <Bar
-                      dataKey="Grievous Injury"
-                      name="Grievous Injury"
-                      stackId="a"
-                      fill={SEVERITY_COLORS["Grievous Injury"]}
-                      barSize={35}
-                    />
-                    <Bar
-                      dataKey="Minor Injury"
-                      name="Minor Injury"
-                      stackId="a"
-                      fill={SEVERITY_COLORS["Minor Injury"]}
-                      radius={[0, 4, 4, 0]}
-                      barSize={35}
-                    />
+                    {(!filters.severity?.length || filters.severity.includes("Fatal")) && (
+                      <Bar
+                        dataKey="Killed"
+                        name="Fatal (Killed)"
+                        stackId="a"
+                        fill={SEVERITY_COLORS["Fatal"]}
+                        barSize={35}
+                      />
+                    )}
+                    {(!filters.severity?.length || filters.severity.includes("Grievous Injury")) && (
+                      <Bar
+                        dataKey="Grievous Injury"
+                        name="Grievous Injury"
+                        stackId="a"
+                        fill={SEVERITY_COLORS["Grievous Injury"]}
+                        barSize={35}
+                      />
+                    )}
+                    {(!filters.severity?.length || 
+                      filters.severity.includes("Minor Injury Non Hospitalized") || 
+                      filters.severity.includes("Minor Injury Hospitalized") ||
+                      filters.severity.includes("Minor Injury")) && (
+                      <Bar
+                        dataKey="Minor Injury"
+                        name="Minor Injury"
+                        stackId="a"
+                        fill={SEVERITY_COLORS["Minor Injury"]}
+                        radius={[0, 4, 4, 0]}
+                        barSize={35}
+                      />
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -879,7 +888,7 @@ const DistrictStatisticalAnalysis: React.FC<
           </div>
           
           {/* Row 6: Cross-Distribution Analytics */}
-          <div className="charts-row charts-row--two">
+          <div className="charts-row charts-row--one">
             <StackedBarChartCard
               title="Severity by Road Classification"
               data={topRoadSeverityMatrix}
@@ -897,7 +906,7 @@ const DistrictStatisticalAnalysis: React.FC<
           </div>
 
           {/* Row 7: Environment & Severity */}
-          <div className="charts-row charts-row--two">
+          <div className="charts-row charts-row--one">
             <StackedBarChartCard
               title="Weather vs Severity"
               data={topWeatherMatrix}
@@ -949,14 +958,28 @@ const DistrictStatisticalAnalysis: React.FC<
                 <EmptyState />
               ) : (
                 <ResponsiveContainer width="100%" height={450}>
-                  <BarChart data={stats.police_station_stats.slice(0, 10)} layout="vertical" margin={{ top: 10, right: 30, left: 5, bottom: 5 }} barCategoryGap="20%">
+                  <BarChart 
+                    data={stats.police_station_stats.slice(0, 10).map(s => ({
+                      ...s,
+                      non_fatal_accidents: s.total - s.fatal_accidents
+                    }))} 
+                    layout="vertical" 
+                    margin={{ top: 10, right: 30, left: 5, bottom: 5 }} 
+                    barCategoryGap="20%"
+                  >
                     <CartesianGrid stroke={GRID} horizontal={true} vertical={true} strokeDasharray="3 3" opacity={0.4} />
                     <XAxis type="number" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis dataKey="police_station" type="category" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={160} tickFormatter={(val) => typeof val === "string" && val.length > 25 ? `${val.substring(0, 23)}...` : val} />
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(0, 0, 0, 0.04)" }} />
                     <Legend wrapperStyle={{ fontSize: 11, color: MUTED, paddingTop: '10px' }} iconType="circle" iconSize={8} />
-                    <Bar dataKey="total" name="Total Accidents" fill={CHART_BLUE} maxBarSize={16} radius={[0, 4, 4, 0]} />
-                    <Bar dataKey="fatal_accidents" name="Fatal Accidents" fill={SEVERITY_COLORS["Fatal"]} maxBarSize={16} radius={[0, 4, 4, 0]} />
+                    {(!filters.severity?.length || filters.severity.includes("Fatal")) ? (
+                      <>
+                        <Bar dataKey="fatal_accidents" name="Fatal Accidents" stackId="a" fill={SEVERITY_COLORS["Fatal"]} maxBarSize={16} />
+                        <Bar dataKey="non_fatal_accidents" name="Non-Fatal Accidents" stackId="a" fill={CHART_BLUE} maxBarSize={16} radius={[0, 4, 4, 0]} />
+                      </>
+                    ) : (
+                      <Bar dataKey="total" name="Total Accidents" fill={CHART_BLUE} maxBarSize={16} radius={[0, 4, 4, 0]} />
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               )}
