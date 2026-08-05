@@ -2,7 +2,9 @@
 Model for preprocessed snapped accident locations.
 """
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Integer, Float, ForeignKey, Index
+# pyrefly: ignore [missing-import]
 from geoalchemy2 import Geometry
 
 from app.database import Base

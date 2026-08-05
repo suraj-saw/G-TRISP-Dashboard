@@ -1,6 +1,9 @@
 # backend/app/routes/admin.py
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, HTTPException
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from typing import Literal, List
 
@@ -67,96 +70,11 @@ def list_all_users(
     return db.query(User).order_by(User.created_at.desc()).all()
 
 
-def _set_user_status(
-    user_id: int,
-    new_status: str,
-    db: Session,
-    decided_by: User,
-) -> User:
-    """Used for first-time decisions on pending users."""
-    target = db.query(User).filter(User.id == user_id).first()
+from app.services.admin_service import set_user_status, force_set_user_status
 
-    if not target:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if target.role == "superadmin" or (target.role == "admin" and decided_by.role != "superadmin"):
-        raise HTTPException(status_code=400, detail="Not enough privileges to change status of this account")
-
-    if target.status != "pending":
-        raise HTTPException(
-            status_code=400,
-            detail=f"This user has already been {target.status} (by another admin).",
-        )
-
-    target.status = new_status
-
-    related_notifications = (
-        db.query(Notification)
-        .filter(
-            Notification.related_user_id == user_id,
-            Notification.type == "user_registration",
-        )
-        .all()
-    )
-
-    verb = "approved" if new_status == "approved" else "rejected"
-    for notif in related_notifications:
-        notif.is_read = True
-        notif.message = (
-            f"User '{target.username}' ({target.email}) was {verb} by {decided_by.username}."
-        )
-
-    db.commit()
-    db.refresh(target)
-    return target
-
-
-def _force_set_user_status(
-    user_id: int,
-    new_status: str,
-    db: Session,
-    decided_by: User,
-) -> User:
-    """Used for re-decisions on already approved/rejected users."""
-    target = db.query(User).filter(User.id == user_id).first()
-
-    if not target:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if target.role == "superadmin" or (target.role == "admin" and decided_by.role != "superadmin"):
-        raise HTTPException(status_code=400, detail="Not enough privileges to change status of this account")
-
-    if target.status == "pending":
-        raise HTTPException(
-            status_code=400,
-            detail="Use the standard approve/reject endpoints for pending users.",
-        )
-
-    if target.status == new_status:
-        raise HTTPException(
-            status_code=400,
-            detail=f"User is already {new_status}.",
-        )
-
-    old_status = target.status
-    target.status = new_status
-
-    db.add(Notification(
-        type="status_change",
-        message=(
-            f"User '{target.username}' ({target.email}) status changed "
-            f"from {old_status} to {new_status} by {decided_by.username}."
-        ),
-        related_user_id=target.id,
-        # Track which admin performed this action so the notifications
-        # endpoint can mark it as already-read for them specifically.
-        acted_by_admin_id=decided_by.id,
-        is_read=False,
-    ))
-
-    db.commit()
-    db.refresh(target)
-    return target
+# Keep helper aliases for internal router delegates
+_set_user_status = set_user_status
+_force_set_user_status = force_set_user_status
 
 
 @router.post("/users/{user_id}/approve", response_model=UserResponse)
@@ -165,7 +83,7 @@ def approve_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
-    return _set_user_status(user_id, "approved", db, decided_by=current_user)
+    return set_user_status(user_id, "approved", db, decided_by=current_user)
 
 
 @router.post("/users/{user_id}/reject", response_model=UserResponse)
@@ -174,7 +92,7 @@ def reject_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
-    return _set_user_status(user_id, "rejected", db, decided_by=current_user)
+    return set_user_status(user_id, "rejected", db, decided_by=current_user)
 
 
 @router.post("/users/{user_id}/set-status", response_model=UserResponse)
@@ -185,7 +103,8 @@ def change_user_status(
     current_user: User = Depends(get_current_admin_user),
 ):
     """Re-decide the status of an already approved or rejected user."""
-    return _force_set_user_status(user_id, payload.status, db, decided_by=current_user)
+    return force_set_user_status(user_id, payload.status, db, decided_by=current_user)
+
 
 
 @router.post("/users/{user_id}/set-role", response_model=UserResponse)

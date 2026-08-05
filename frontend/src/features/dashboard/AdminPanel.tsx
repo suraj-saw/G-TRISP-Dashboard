@@ -5,8 +5,8 @@
  * @dependencies framer-motion, lucide-react, react-router-dom
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
@@ -61,34 +61,8 @@ const itemVariants: Variants = {
   },
 };
 
-/**
- * Renders a visual badge indicating the user's current status.
- * @param {Object} props - Component props.
- * @param {User["status"]} props.status - The status to render (approved, rejected, pending).
- * @returns {JSX.Element} The styled badge.
- */
-function StatusBadge({ status }: { status: User["status"] }) {
-  const styles: Record<User["status"], string> = {
-    approved: "bg-emerald-100/80 text-emerald-700 border-emerald-200/50",
-    rejected: "bg-rose-100/80 text-rose-700 border-rose-200/50",
-    pending: "bg-amber-100/80 text-amber-700 border-amber-200/50",
-  };
+import { StatusBadge } from "./admin/StatusBadge";
 
-  const icons: Record<User["status"], ReactNode> = {
-    approved: <CheckCircle className="w-3 h-3 mr-1" />,
-    rejected: <XCircle className="w-3 h-3 mr-1" />,
-    pending: <Clock className="w-3 h-3 mr-1" />,
-  };
-
-  return (
-    <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize border ${styles[status]}`}
-    >
-      {icons[status]}
-      {status}
-    </span>
-  );
-}
 
 /**
  * AdminPanel Component

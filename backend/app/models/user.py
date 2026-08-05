@@ -1,5 +1,7 @@
 # backend/app/models/user.py
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Integer, String, DateTime
+# pyrefly: ignore [missing-import]
 from sqlalchemy.sql import func
 
 from app.database import Base

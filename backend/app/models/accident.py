@@ -18,7 +18,9 @@ Key renames from previous version:
   collision_type             → type_of_collision
 """
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Integer, String, Float, DateTime, Index, UniqueConstraint
+# pyrefly: ignore [missing-import]
 from geoalchemy2 import Geometry
 
 from app.database import Base

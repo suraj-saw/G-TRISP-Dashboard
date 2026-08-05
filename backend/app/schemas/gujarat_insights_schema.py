@@ -1,6 +1,7 @@
 # backend/app/schemas/gujarat_insights_schema.py
 
 from typing import List, Dict, Optional
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 
 

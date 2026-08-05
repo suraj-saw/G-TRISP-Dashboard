@@ -15,6 +15,7 @@ from __future__ import annotations
 import math
 from typing import Optional
 
+# pyrefly: ignore [missing-import]
 import numpy as np
 
 

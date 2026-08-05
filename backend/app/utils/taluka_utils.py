@@ -16,7 +16,9 @@ from __future__ import annotations
 
 from typing import Optional, Sequence, Union
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import func
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 from app.models.gujarat_taluka import GujaratTaluka

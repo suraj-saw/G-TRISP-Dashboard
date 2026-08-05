@@ -37,9 +37,10 @@ import DistrictAnalysisTabs, {
   type AnalysisView,
 } from "../../components/maps/Districtanalysistabs";
 import DistrictStatisticalAnalysis from "../../components/dashboard/DistrictStatisticalAnalysis";
-import { ExportProvider, useExportContext } from "../../context/ExportContext";
+import { ExportProvider } from "../../context/ExportContext";
+
 import { useIdleTimer } from "../../hooks/useIdleTimer";
-import { downloadGujaratExport } from "../../api/exportApi";
+
 
 import {
   Filter,
@@ -99,6 +100,11 @@ import {
 } from "./filterConfig";
 import { isBlackspotVisualization, toDataFilterKey } from "../../utils/dashboardFilters";
 import { MAP_STYLES } from "../../components/maps/mapStyles";
+import { DateFilterInput } from "./district/DateFilterInput";
+import { SpatialExportRegistrar } from "./district/SpatialExportRegistrar";
+
+
+
 
 const pedestrianCasualtyTotal = (point: HeatmapPoint): number =>
   (Number(point.pedestrian_killed) || 0) +
@@ -108,106 +114,14 @@ const pedestrianCasualtyTotal = (point: HeatmapPoint): number =>
 const isPedestrianAccident = (point: HeatmapPoint): boolean =>
   pedestrianCasualtyTotal(point) > 0;
 
-type DateBounds = {
-  min?: string;
-  max?: string;
-};
-
-// const toDateInputValue = (value?: string | null): string | null => {
-//   if (!value) return null;
-//   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-//   if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return value.slice(0, 10);
-
-//   const date = new Date(value);
-//   if (Number.isNaN(date.getTime())) return null;
-//   return date.toISOString().slice(0, 10);
-// };
-
-// const getDatasetDateBounds = (points?: HeatmapPoint[]): DateBounds => {
-//   const dates =
-//     points
-//       ?.map((point) => toDateInputValue(point.accident_date_time))
-//       .filter((value): value is string => Boolean(value))
-//       .sort() || [];
-
-//   return {
-//     min: dates[0],
-//     max: dates[dates.length - 1],
-//   };
-// };
-
-const clampDateValue = (value: string, bounds: DateBounds): string => {
+const clampDateValue = (value: string, bounds: { min?: string; max?: string }): string => {
   if (!value) return "";
   if (bounds.min && value < bounds.min) return bounds.min;
   if (bounds.max && value > bounds.max) return bounds.max;
   return value;
 };
 
-/**
- * A controlled date input component that handles local draft state and commits on blur/enter.
- * @param {Object} props - Component props.
- * @param {string} props.value - The current committed date value.
- * @param {string} [props.min] - The minimum allowed date.
- * @param {string} [props.max] - The maximum allowed date.
- * @param {(value: string) => void} props.onCommit - Callback fired when the user commits a date.
- * @param {string} props.className - CSS classes for styling.
- * @returns {JSX.Element} The date input element.
- */
-function DateFilterInput({
-  value,
-  min,
-  max,
-  onCommit,
-  className,
-}: {
-  value: string;
-  min?: string;
-  max?: string;
-  onCommit: (value: string) => void;
-  className: string;
-}) {
-  const [draft, setDraft] = useState(value);
 
-  useEffect(() => {
-    setDraft(value);
-  }, [value]);
-
-  const commit = () => {
-    const next = clampDateValue(draft, { min, max });
-    setDraft(next);
-    if (next !== value) onCommit(next);
-  };
-
-  return (
-    <input
-      type="date"
-      value={draft}
-      min={min}
-      max={max}
-      onChange={(event) => {
-        const next = clampDateValue(event.target.value, { min, max });
-        setDraft(next);
-        if (next !== value) onCommit(next);
-      }}
-      onBlur={commit}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          event.currentTarget.blur();
-        }
-        if (event.key === "Escape") {
-          setDraft(value);
-          event.currentTarget.blur();
-        }
-      }}
-      className={className}
-    />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// District-scoped filter config — no police-station/district filter, since
-// the district is fixed by the route itself.
-// ---------------------------------------------------------------------------
 
 type FilterId =
   | "baseMap"
@@ -222,7 +136,7 @@ type FilterId =
   | "weather_condition"
   | "light_condition"
   | "collision_type"
-  | "police_station" // NEW
+  | "police_station"
   | "taluka"
   | "date_from"
   | "date_to";
@@ -240,8 +154,8 @@ const MAP_FILTERS: FilterConfigItem[] = [
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
-  { id: "taluka", label: "Taluka" }, // NEW
-  { id: "police_station", label: "Police Station" }, // NEW
+  { id: "taluka", label: "Taluka" },
+  { id: "police_station", label: "Police Station" },
   { id: "severity", label: "Severity" },
   { id: "road_classification", label: "Road type" },
   { id: "weather_condition", label: "Weather" },
@@ -259,7 +173,7 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "month", label: "Month" },
   { id: "day", label: "Day" },
   { id: "time_period", label: "Time Period" },
-  { id: "taluka", label: "Taluka" }, // NEW
+  { id: "taluka", label: "Taluka" },
   { id: "police_station", label: "Police Station" },
   { id: "severity", label: "Severity" },
   { id: "road_classification", label: "Road type" },
@@ -283,7 +197,7 @@ const defaultDistrictFilters: DashboardFilters = {
   weather_condition: [],
   light_condition: [],
   collision_type: [],
-  police_station: [], // NEW
+  police_station: [],
   taluka: [],
   date_from: "",
   date_to: "",
@@ -314,67 +228,6 @@ const emptyDashboardData: DashboardData = {
   roads: [],
   violations: [],
 };
-
-/**
- * Utility component that registers spatial-specific export handlers into the global ExportContext.
- * @business_rule Allows CSV/Excel exports only when the view is spatial (map).
- * @param {Object} props - Configuration for the export registrar.
- * @returns {null} Renders nothing visually.
- */
-function SpatialExportRegistrar({
-  analysisView,
-  isBlackspotDetection,
-  isDbscanBlackspot,
-  filters,
-  districtName,
-  // mapRef,
-}: any) {
-  const { registerExportHandler } = useExportContext();
-
-  useEffect(() => {
-    if (analysisView === "spatial") {
-      if (isBlackspotDetection || isDbscanBlackspot) {
-        registerExportHandler({
-          supportedFormats: ["csv", "excel"],
-          allowClusterSelection: true,
-          onExport: async (format, options) => {
-            if (format === "csv" || format === "excel") {
-              const isBlackspot = isBlackspotDetection || isDbscanBlackspot;
-              await downloadGujaratExport(
-                filters,
-                format,
-                districtName,
-                isBlackspot,
-                options?.clusterId
-              );
-            }
-          },
-        });
-      } else {
-        registerExportHandler({
-          supportedFormats: ["csv", "excel"],
-          onExport: async (format) => {
-            if (format === "csv" || format === "excel") {
-              await downloadGujaratExport(filters, format, districtName);
-            }
-          },
-        });
-      }
-    } else {
-      registerExportHandler(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    analysisView,
-    isBlackspotDetection,
-    isDbscanBlackspot,
-    filters,
-    districtName,
-    registerExportHandler,
-  ]);
-
-  return null;
-}
 
 /**
  * DistrictDashboard Component

@@ -16,6 +16,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+# pyrefly: ignore
 import pandas as pd
 
 from app.core.constants import ACCIDENT_DATETIME_FORMATS
@@ -60,8 +61,10 @@ def parse_accident_datetime(value) -> Optional[datetime]:
     # Excel calculates dates as the number of days since Dec 30, 1899.
     if isinstance(value, (int, float)):
         parsed = pd.to_datetime(value, unit="D", origin="1899-12-30", errors="coerce")
-        # pd.isna checks for pandas NaT (Not a Time) which results from coerced errors
-        return None if pd.isna(parsed) else parsed.to_pydatetime()
+        if pd.isna(parsed):
+            return None
+        res = parsed.to_pydatetime()
+        return res if isinstance(res, datetime) else None
 
     # Fallback to string processing for everything else
     text = str(value).strip()
@@ -79,7 +82,9 @@ def parse_accident_datetime(value) -> Optional[datetime]:
     for fmt in ACCIDENT_DATETIME_FORMATS:
         parsed = pd.to_datetime(text, format=fmt, errors="coerce")
         if not pd.isna(parsed):
-            return parsed.to_pydatetime()
+            res = parsed.to_pydatetime()
+            if isinstance(res, datetime):
+                return res
 
     # Generic fallback: allow pandas to try and infer the date format heuristically.
     # dayfirst=True ensures ambiguous dates like '10/11/2023' are read as Nov 10, not Oct 11.
@@ -87,7 +92,8 @@ def parse_accident_datetime(value) -> Optional[datetime]:
     if pd.isna(parsed):
         return None
 
-    return parsed.to_pydatetime()
+    res = parsed.to_pydatetime()
+    return res if isinstance(res, datetime) else None
 
 
 def parse_accident_datetime_from_str(value) -> Optional[datetime]:

@@ -26,9 +26,13 @@ import sys
 import uuid
 from pathlib import Path
 
+# pyrefly: ignore
 import pandas as pd
+# pyrefly: ignore [missing-import]
 from geoalchemy2.shape import from_shape
+# pyrefly: ignore
 from shapely.geometry import Point
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 _BACKEND = Path(__file__).resolve().parents[2]
@@ -185,7 +189,7 @@ def _load_dataset(path: Path) -> pd.DataFrame:
     df = df.rename(columns=COLUMN_MAP)
     df["accident_date_time"] = df["accident_date_time"].apply(parse_accident_datetime)
 
-    parsed_count = int(df["accident_date_time"].notna().sum())
+    parsed_count = df["accident_date_time"].notna().sum()
     logger.info("  parsed accident_date_time for %d / %d rows", parsed_count, len(df))
     return df
 
@@ -276,7 +280,7 @@ def _validate_coordinates(df: pd.DataFrame, db: Session, default_district: str) 
                 # We use the exact PostGIS matched district string for database consistency
                 df.at[df.index[idx], "district"] = result.matched_district
 
-    valid_df = df[valid_mask].copy()
+    valid_df = pd.DataFrame(df[valid_mask].copy())
 
     if mismatches > 0:
         logger.warning("  dropped %d rows where claimed district differs from physical PostGIS boundary.", mismatches)

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Integer, String, Index
+# pyrefly: ignore [missing-import]
 from sqlalchemy.dialects.postgresql import JSONB
+# pyrefly: ignore [missing-import]
 from geoalchemy2 import Geometry
 
 from app.database import Base

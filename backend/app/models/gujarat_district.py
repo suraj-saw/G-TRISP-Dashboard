@@ -8,7 +8,9 @@ Used for:
   - Validation pipeline (point must lie inside one of these districts)
 """
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Integer, String, Index
+# pyrefly: ignore [missing-import]
 from geoalchemy2 import Geometry
 
 from app.database import Base

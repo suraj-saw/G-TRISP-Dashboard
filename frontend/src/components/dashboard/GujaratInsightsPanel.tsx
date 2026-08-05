@@ -14,7 +14,7 @@ import {
   Loader2, AlertCircle, Skull, Car, ShieldCheck, MapPinOff, Activity
 } from "lucide-react";
 import { useDistrictInsights } from "../../context/DistrictInsightsContext";
-import { useCountUp } from "../../hooks/useCountUp";
+
 
 const C = {
   primary: "#1e3a8a",
@@ -66,35 +66,8 @@ const tooltipStyle = {
 };
 const FADE = { duration: 0.22, ease: "easeInOut" as const };
 
-/**
- * Renders an individual KPI tile with an animated counting number effect.
- * @param {Object} props - KPI properties.
- * @param {React.ReactNode} props.icon - Lucide icon.
- * @param {string} props.label - KPI title.
- * @param {number} props.value - The raw number to animate up to.
- * @param {string} props.tone - Base color string applied to the icon background and text.
- */
-function KpiTile({ icon, label, value, tone }: {
-  icon: React.ReactNode; label: string; value: number; tone: string;
-}) {
-  const animated = useCountUp(value, 300);
-  return (
-    <div className="rounded-xl border border-slate-100 bg-white p-3 flex items-center gap-2.5 shadow-sm">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-        style={{ background: `${tone}18`, color: tone }}>
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-[15px] font-extrabold text-slate-800 tabular-nums leading-none">
-          {animated.toLocaleString("en-IN")}
-        </p>
-        <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mt-1 truncate">
-          {label}
-        </p>
-      </div>
-    </div>
-  );
-}
+import { KpiTile } from "./insights/KpiTile";
+
 
 /**
  * Small informational cell used within the District Snapshot block.

@@ -24,7 +24,9 @@ import logging
 import os
 from pathlib import Path
 
+# pyrefly: ignore [missing-import]
 from geoalchemy2.shape import from_shape
+# pyrefly: ignore
 from shapely.geometry import shape as shapely_shape
 
 from app.database import Base, engine, SessionLocal

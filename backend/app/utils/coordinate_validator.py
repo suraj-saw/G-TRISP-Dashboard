@@ -33,7 +33,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, Sequence
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import text
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 from app.models.gujarat_boundary import GujaratBoundary
@@ -385,6 +387,8 @@ def validate_dataframe(
     Validate all rows in a pandas DataFrame and return:
         (valid_df, rejected_df, report)
     """
+   
+    # pyrefly: ignore
     import pandas as pd
 
     coords = list(zip(df[lat_col].tolist(), df[lon_col].tolist()))

@@ -31,7 +31,6 @@ from app.seed.seed_gujarat_districts import seed_gujarat_districts
 from app.seed.seed_accidents         import seed_accidents
 from app.utils.coordinate_validator  import check_validation_tables_ready
 from app.database import SessionLocal
-from app.seed.seed_surat_boundary import seed_surat_boundary
 from app.seed.seed_gujarat_talukas import seed_gujarat_talukas
 
 # Roads seeding is optional: the roads file may not exist in all deployments.
@@ -74,10 +73,6 @@ def run_geo_seeds(
         # 2. District polygons
         logger.info("Step 2/3 — seeding Gujarat district polygons …")
         seed_gujarat_districts(force=force)
-
-        # 2.5 Surat district boundary
-        logger.info("Step 2.5/3 — seeding Surat district boundary …")
-        seed_surat_boundary(force=force)
 
         logger.info("Step 2.6/3 — seeding Gujarat taluka (subdistrict) boundaries …")
         seed_gujarat_talukas(force=force)

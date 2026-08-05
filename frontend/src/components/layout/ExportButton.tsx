@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { Download } from "lucide-react";
 import type { DashboardFilters } from "../../types/dashboard";
-import { PdfReportGenerator } from "../../features/export";
+import { PdfReportGenerator } from "../../features/export/PdfReportGenerator";
 
 interface Props {
   filters: DashboardFilters;
@@ -41,7 +41,7 @@ export default function ExportButton({ filters, districtName }: Props) {
           filters={filters} 
           districtName={districtName}
           onComplete={() => setGenerating(false)}
-          onError={(msg) => {
+          onError={(msg: string) => {
             alert(msg);
             setGenerating(false);
           }}

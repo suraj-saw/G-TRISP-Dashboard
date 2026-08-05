@@ -1,6 +1,8 @@
 # backend/app/models/notification.py
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+# pyrefly: ignore [missing-import]
 from sqlalchemy.sql import func
 
 from app.database import Base

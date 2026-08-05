@@ -91,123 +91,122 @@ function TopBar({
     <>
       <header
         style={{ height: `${TOPBAR_HEIGHT_PX}px` }}
-      className={`
-        ${TOPBAR_Z_INDEX}
-        w-full
-        flex items-center justify-between
-        px-6
-        bg-white/80 backdrop-blur-md
-        border-b border-slate-100
-      `}
-    >
-      {/* LEFT SIDE: Branding */}
-      <div className="flex items-center gap-4">
-        {/* App Title */}
-        <h1 className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 to-indigo-950 bg-clip-text text-transparent">
-          {appName}
-        </h1>
-      </div>
+        className={`
+          relative ${TOPBAR_Z_INDEX}
+          w-full
+          flex items-center justify-between
+          px-6
+          bg-white/80 backdrop-blur-md
+          border-b border-slate-100
+        `}
+      >
+        {/* LEFT SIDE: Branding */}
+        <div className="flex items-center gap-4">
+          {/* App Title */}
+          <h1 className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 to-indigo-950 bg-clip-text text-transparent">
+            {appName}
+          </h1>
+        </div>
 
-      {/* RIGHT SIDE: Navigation & Profile Dropdown */}
-      <div className="flex items-center gap-3">
-        {/* About Button */}
-        <button
-          onClick={() => navigate(ROUTES.ABOUT)}
-          className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium text-slate-600 transition-all hover:bg-slate-50 hover:text-indigo-600"
-          aria-label="About G-TRISP"
-        >
-          <Info
-            size={16}
-            className="text-slate-400 group-hover:text-indigo-600"
-          />
-          <span className="hidden lg:inline">About</span>
-        </button>
-
-        {/* Admin Panel Button */}
-        {adminPanelPath && (
+        {/* RIGHT SIDE: Navigation & Profile Dropdown */}
+        <div className="flex items-center gap-3">
+          {/* About Button */}
           <button
-            onClick={() => navigate(adminPanelPath)}
-            className="
-              flex items-center gap-2 px-4 py-1.5 
-              rounded-xl border border-slate-200 bg-white 
-              text-sm font-semibold text-slate-700 shadow-sm
-              hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900
-              transition-all active:scale-[0.98]
-            "
+            onClick={() => navigate(ROUTES.ABOUT)}
+            className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium text-slate-600 transition-all hover:bg-slate-50 hover:text-indigo-600"
+            aria-label="About G-TRISP"
           >
-            <span className="hidden sm:inline">Admin Panel</span>
-          </button>
-        )}
-
-        {/* Notification Bell */}
-        {showNotificationBell && (
-          <div className="p-0.5 rounded-xl hover:bg-slate-50 transition-colors">
-            <NotificationBell count={notificationCount} />
-          </div>
-        )}
-
-        {/* Divider */}
-        <span className="hidden sm:block h-5 w-px bg-slate-200" aria-hidden />
-
-        {/* User Profile Dropdown */}
-        <div ref={dropdownRef} className="relative">
-          <button
-            onClick={() => setOpen((prev) => !prev)}
-            aria-haspopup="menu"
-            aria-expanded={open}
-            className="
-              flex items-center gap-2.5
-              p-1.5 pr-3
-              rounded-full
-              border border-transparent
-              hover:bg-slate-50 hover:border-slate-100
-              transition-all duration-200
-            "
-          >
-            <div
-              className="
-                h-8 w-8
-                rounded-full bg-gradient-to-tr from-indigo-600 to-violet-500
-                flex items-center justify-center
-                text-white text-sm font-bold
-                shadow-sm shadow-indigo-200
-              "
-            >
-              {user.username.charAt(0).toUpperCase()}
-            </div>
-
-            <span className="hidden md:block text-sm font-semibold text-slate-700">
-              {user.username}
-            </span>
-
-            <ChevronDown
-              size={14}
-              className={`text-slate-400 transition-transform duration-200 ${
-                open ? "rotate-180" : ""
-              }`}
+            <Info
+              size={16}
+              className="text-slate-400 group-hover:text-indigo-600"
             />
+            <span className="hidden lg:inline">About</span>
           </button>
 
-          {/* DROPDOWN MENU */}
-          {open && (
-            <div
-              role="menu"
-              style={{
-                top: `${TOPBAR_HEIGHT_PX - 4}px`,
-                fontFamily: '"Public Sans", system-ui, sans-serif',
-              }}
+          {/* Admin Panel Button */}
+          {adminPanelPath && (
+            <button
+              onClick={() => navigate(adminPanelPath)}
               className="
-                absolute right-0
-                w-80 mt-2
-                rounded-2xl
-                bg-white
-                border border-slate-100
-                shadow-[0_20px_50px_rgba(79,70,229,0.12)]
-                overflow-hidden
-                z-50
-                animate-in fade-in slide-in-from-top-2 duration-200
+                flex items-center gap-2 px-4 py-1.5 
+                rounded-xl border border-slate-200 bg-white 
+                text-sm font-semibold text-slate-700 shadow-sm
+                hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900
+                transition-all active:scale-[0.98]
               "
             >
+              <span className="hidden sm:inline">Admin Panel</span>
+            </button>
+          )}
+
+          {/* Notification Bell */}
+          {showNotificationBell && (
+            <div className="p-0.5 rounded-xl hover:bg-slate-50 transition-colors">
+              <NotificationBell count={notificationCount} />
+            </div>
+          )}
+
+          {/* Divider */}
+          <span className="hidden sm:block h-5 w-px bg-slate-200" aria-hidden />
+
+          {/* User Profile Dropdown */}
+          <div ref={dropdownRef} className="relative">
+            <button
+              onClick={() => setOpen((prev) => !prev)}
+              aria-haspopup="menu"
+              aria-expanded={open}
+              className="
+                flex items-center gap-2.5
+                p-1.5 pr-3
+                rounded-full
+                border border-transparent
+                hover:bg-slate-50 hover:border-slate-100
+                transition-all duration-200
+              "
+            >
+              <div
+                className="
+                  h-8 w-8
+                  rounded-full bg-gradient-to-tr from-indigo-600 to-violet-500
+                  flex items-center justify-center
+                  text-white text-sm font-bold
+                  shadow-sm shadow-indigo-200
+                "
+              >
+                {user.username.charAt(0).toUpperCase()}
+              </div>
+
+              <span className="hidden md:block text-sm font-semibold text-slate-700">
+                {user.username}
+              </span>
+
+              <ChevronDown
+                size={14}
+                className={`text-slate-400 transition-transform duration-200 ${
+                  open ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {/* DROPDOWN MENU */}
+            {open && (
+              <div
+                role="menu"
+                style={{
+                  fontFamily: '"Public Sans", system-ui, sans-serif',
+                }}
+                className="
+                  absolute right-0 top-full
+                  w-80 mt-2
+                  rounded-2xl
+                  bg-white
+                  border border-slate-100
+                  shadow-[0_20px_50px_rgba(79,70,229,0.12)]
+                  overflow-hidden
+                  z-50
+                  animate-in fade-in slide-in-from-top-2 duration-200
+                "
+              >
               {/* DROPDOWN HEADER */}
               <div className="px-5 pt-6 pb-5 bg-gradient-to-br from-indigo-900 to-slate-900">
                 <div className="flex items-center gap-3.5">

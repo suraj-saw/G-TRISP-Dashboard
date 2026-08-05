@@ -1,7 +1,9 @@
 # backend/app/schemas/user_schema.py
 
 import re
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, EmailStr, field_validator
+# pyrefly: ignore [missing-import]
 from pydantic import ConfigDict
 from datetime import datetime
 

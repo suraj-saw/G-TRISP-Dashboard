@@ -11,9 +11,13 @@ lifecycle (e.g., database table initialization on startup).
 import os
 from contextlib import asynccontextmanager
 
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.gzip import GZipMiddleware
+# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 
 from app.database import engine, Base
@@ -21,10 +25,8 @@ from app import models                          # registers all ORM models
 from app.routes import auth
 from app.routes import admin
 from app.routes import dashboard              
-from app.routes import surat_dashboard         
 from app.routes import geo
-from app.routes import surat_accidents_admin 
-from app.routes import surat_export  
+from app.routes import accident_admin_routes
 
 load_dotenv()
 
@@ -40,7 +42,9 @@ async def lifespan(app: FastAPI):
     """
     import time
     import logging
+    # pyrefly: ignore [missing-import]
     from sqlalchemy import text
+    # pyrefly: ignore [missing-import]
     from sqlalchemy.exc import OperationalError
 
     logger = logging.getLogger("app.lifespan")
@@ -94,10 +98,10 @@ app = FastAPI(
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(dashboard.router)         # ← /api/dashboard/*
-app.include_router(surat_dashboard.router)   # ← /api/surat/dashboard/*
-app.include_router(geo.router)               # ← /api/geo/*
-app.include_router(surat_accidents_admin.router)
-app.include_router(surat_export.router) 
+app.include_router(geo.router)               # ← /api/geo/* 
+app.include_router(accident_admin_routes.router) # ← /api/admin/surat/accidents/*
+
+
 
 # ── CORS Configuration ──────────────────────────────────────────────────────
 # Parse allowed origins from environment variables, removing empty strings/spaces

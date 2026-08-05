@@ -6,14 +6,6 @@ const GEO_REQUEST_CONFIG = {
   params: { boundary_version: GEO_DATA_VERSION },
 } as const;
 
-export async function fetchSuratBoundary(): Promise<GeoJSON.FeatureCollection> {
-  const res = await API.get<GeoJSON.FeatureCollection>(
-    `${GEO_API_BASE}/surat-boundary`,
-    GEO_REQUEST_CONFIG
-  );
-  return res.data;
-}
-
 export async function fetchAllGujaratDistricts(): Promise<GeoJSON.FeatureCollection> {
   const res = await API.get<GeoJSON.FeatureCollection>(
     `${GEO_API_BASE}/all-districts`,

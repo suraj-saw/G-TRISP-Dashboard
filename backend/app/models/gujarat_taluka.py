@@ -10,7 +10,9 @@ Mirrors GujaratDistrict's structure so the same spatial-query, seeding and
 API patterns extend cleanly to this (and any future) admin level.
 """
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Integer, String, Index
+# pyrefly: ignore [missing-import]
 from geoalchemy2 import Geometry
 
 from app.database import Base

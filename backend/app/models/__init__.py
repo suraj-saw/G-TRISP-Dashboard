@@ -22,10 +22,6 @@ from app.models.gujarat_district  import GujaratDistrict
 from app.models.gujarat_taluka    import GujaratTaluka
 from app.models.gujarat_road      import GujaratRoad
 
-# ── City / Local-Level Geographic Models ──────────────────────────────────────
-# from app.models.surat_boundary    import SuratBoundary
-
 # ── Incident & Accident Event Datasets ────────────────────────────────────────
 from app.models.accident          import Accident
-# from app.models.surat_accident    import SuratAccident
 from app.models.snapped_accident  import SnappedAccident

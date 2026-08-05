@@ -76,6 +76,7 @@ def clean_text(value) -> str | None:
     # We use a localized try-except block to gracefully handle environments 
     # where pandas might not be installed, avoiding a hard dependency crash.
     try:
+        # pyrefly: ignore
         import pandas as pd  # local import — not always available
         if pd.isna(value):
             return None
@@ -89,3 +90,13 @@ def clean_text(value) -> str | None:
     
     # Return None for empty strings or our specific null sentinel keyword
     return None if s == "" or s.lower() == NULL_TEXT_SENTINEL else s
+
+
+def slugify(name: str) -> str:
+    """Convert a string to a URL-friendly slug.
+    e.g. "The Dangs" -> "the-dangs", "Ahmadabad" -> "ahmadabad"
+    """
+    import re
+    s = name.strip().lower()
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    return s.strip("-")

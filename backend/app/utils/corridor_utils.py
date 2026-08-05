@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import hashlib
 from app.core.constants import CORRIDOR_PRIORITY_THRESHOLDS
 
@@ -7,8 +7,8 @@ def _generate_corridor_id(road_id: int, start_m: float, end_m: float) -> str:
     Generates a stable, deterministic corridor ID based on the road and normalized bounds.
     Bounds are rounded to the nearest integer meter to avoid floating-point drift.
     """
-    normalized_start = int(round(start_m))
-    normalized_end = int(round(end_m))
+    normalized_start = round(start_m)
+    normalized_end = round(end_m)
     raw_str = f"corridor_{road_id}_{normalized_start}_{normalized_end}"
     return hashlib.md5(raw_str.encode('utf-8')).hexdigest()[:12]
 
@@ -107,10 +107,9 @@ def generate_risk_corridors(
         c["corridor_id"] = _generate_corridor_id(c["road_id"], c["start_m"], c["end_m"])
         c["corridor_length_m"] = max(0.0, c["end_m"] - c["start_m"])
         c["accident_ids"] = list(c["accident_ids"])
-
     return corridors
 
-def rank_corridors(corridors: List[Dict[str, Any]], road_lengths_map: Dict[int, float] = None) -> List[Dict[str, Any]]:
+def rank_corridors(corridors: List[Dict[str, Any]], road_lengths_map: Optional[Dict[int, float]] = None) -> List[Dict[str, Any]]:
     """
     Ranks corridors by calculating priority scores, densities, and assigning priority levels.
     road_lengths_map provides total road length for context (road_id -> length).

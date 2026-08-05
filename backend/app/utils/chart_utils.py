@@ -9,7 +9,9 @@ writing to disk.
 """
 
 import io
+# pyrefly: ignore [missing-import]
 import matplotlib.pyplot as plt
+# pyrefly: ignore [missing-import]
 import matplotlib
 # Use 'Agg' backend to avoid requiring GUI/X11 libraries on the server.
 # This is crucial for headless environments (like Docker containers).

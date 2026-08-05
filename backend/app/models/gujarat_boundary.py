@@ -4,7 +4,9 @@ Stores the official Gujarat state boundary (SOI) as a single row.
 Used for point-in-state validation before accepting accident records.
 """
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Integer, String, Index
+# pyrefly: ignore [missing-import]
 from geoalchemy2 import Geometry
 
 from app.database import Base

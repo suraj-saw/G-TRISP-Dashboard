@@ -16,7 +16,7 @@ import Map, { Source, Layer, NavigationControl, Popup } from "react-map-gl/mapli
 import type { MapRef, LngLatBoundsLike, MapLayerMouseEvent } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2, AlertCircle } from "lucide-react";
-import { fetchSuratBoundary } from "../../api/geoApi";
+import { fetchDistrictBoundaryBySlug } from "../../api/geoApi";
 import { getMapStyleUrl } from "./mapStyles";
 import {
   SURAT_MAP_CENTER,
@@ -167,7 +167,7 @@ const SuratBaseMap = forwardRef<SuratBaseMapHandle, Props>(
     }));
 
     useEffect(() => {
-      fetchSuratBoundary()
+      fetchDistrictBoundaryBySlug("surat")
         .then((fc) => {
           setBoundary(fc);
           setMask(buildMask(fc) as GeoJSON.Feature);

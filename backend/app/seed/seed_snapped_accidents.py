@@ -6,6 +6,7 @@ to snap every accident point to its nearest road network segment.
 
 import sys
 import logging
+# pyrefly: ignore [missing-import]
 from sqlalchemy import text
 from app.database import engine
 from app.models.snapped_accident import SnappedAccident

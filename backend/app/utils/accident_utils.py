@@ -9,9 +9,8 @@ the main project's SQLAlchemy `Accident` model.
 
 from datetime import datetime
 from typing import Optional, List
-from dateutil.relativedelta import relativedelta
 
-# pyrefly: ignore [missing-import]
+# pyrefly: ignore
 from sqlalchemy import extract
 from app.models.accident import Accident
 from app.utils.taluka_utils import apply_taluka_spatial_filter

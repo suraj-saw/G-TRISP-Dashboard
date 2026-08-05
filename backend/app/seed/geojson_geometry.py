@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+# pyrefly: ignore [missing-import]
 from pyproj import Transformer
+# pyrefly: ignore
 from shapely.geometry.base import BaseGeometry
+# pyrefly: ignore
 from shapely.ops import transform
 
 
@@ -81,7 +84,9 @@ def normalize_gujarat_geometry(
     return normalized
 
 
+# pyrefly: ignore
 from shapely.geometry import MultiPolygon, Polygon
+# pyrefly: ignore
 from shapely.validation import make_valid
 
 

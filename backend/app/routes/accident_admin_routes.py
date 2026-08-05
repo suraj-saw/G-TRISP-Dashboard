@@ -1,5 +1,5 @@
 """
-Admin-only endpoints for managing Surat accident records.
+Admin-only endpoints for managing accident records.
 
 Routes live under /api/admin/surat/accidents and support manual CRUD,
 advanced filtering, and the two-step bulk import workflow:
@@ -12,17 +12,22 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+# pyrefly: ignore [missing-import]
 from geoalchemy2.shape import from_shape
+# pyrefly: ignore [missing-import]
 from shapely.geometry import Point
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 from app.core.config import POSTGIS_SRID
 from app.core.constants import ADMIN_SURAT_PREFIX
-from app.database import get_db
+from app.core.dependencies import get_db, get_current_admin_user
+# pyrefly: ignore [missing-import]
 from app.models.accident import Accident
 from app.models.user import User
-from app.routes.auth import get_current_admin_user
+
 
 router = APIRouter(
     prefix=ADMIN_SURAT_PREFIX,

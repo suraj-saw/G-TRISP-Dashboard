@@ -37,6 +37,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
+# pyrefly: ignore
 from jose import JWTError
 
 from app.database import get_db
@@ -98,124 +99,13 @@ def _set_auth_cookies(
     )
 
 
-# ---------------------------------------------------------------------------
-# Dependency: resolve the current authenticated user
-# ---------------------------------------------------------------------------
+# Re-export core auth dependencies for backwards compatibility
+from app.core.dependencies import (  # noqa: F401
+    get_current_user,
+    get_current_admin_user,
+    get_current_superadmin_user,
+)
 
-def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
-    """
-    Dependency to resolve and authenticate the current user from their access token.
-
-    Authorization Checks:
-    1. Extracts access token from HttpOnly cookies.
-    2. Decodes JWT to verify signature and expiration.
-    3. Validates the token type is 'access'.
-    4. Checks Redis to ensure the session hasn't been invalidated or timed out.
-    5. Retrieves user from the database and ensures they are 'approved'.
-
-    Args:
-        request (Request): The incoming FastAPI request.
-        db (Session): Database session.
-
-    Returns:
-        User: The fully authenticated SQLAlchemy user object.
-
-    Raises:
-        HTTPException: If authentication fails at any step (401) or if the account
-                       is not approved (403).
-    """
-    token = request.cookies.get(ACCESS_TOKEN_COOKIE)
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    try:
-        payload = decode_token(token)
-
-        if payload.get("type") != "access":
-            raise HTTPException(status_code=401, detail="Invalid token type")
-
-        user_id_str = payload.get("sub")
-        if not user_id_str:
-            raise HTTPException(status_code=401, detail="Invalid token")
-
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired access token")
-
-    # Check if request is a passive background status poll (e.g. 5-sec poll)
-    is_background_poll = request.headers.get("x-background-poll", "").lower() == "true"
-    touch_session = not is_background_poll
-
-    if not is_session_valid(token, touch=touch_session):
-        raise HTTPException(
-            status_code=401,
-            detail="Session invalidated. Please log in again.",
-        )
-
-    user = db.query(User).filter(User.id == int(user_id_str)).first()
-
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    if user.status != "approved":
-        raise HTTPException(
-            status_code=403,
-            detail="Your account is not currently approved for access.",
-        )
-
-    return user
-
-
-# ---------------------------------------------------------------------------
-# Dependency: resolve the current admin user
-# ---------------------------------------------------------------------------
-
-def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
-    """
-    Dependency to ensure the authenticated user has administrative privileges.
-
-    Authorization Checks:
-    - Inherits all checks from `get_current_user`.
-    - Strictly verifies that the `role` column is either 'admin' or 'superadmin'.
-
-    Args:
-        current_user (User): The authenticated user resolved by `get_current_user`.
-
-    Returns:
-        User: The authenticated admin user.
-
-    Raises:
-        HTTPException: If the user does not have the admin or superadmin role (403).
-    """
-    if current_user.role not in ["admin", "superadmin"]:
-        raise HTTPException(
-            status_code=403,
-            detail="Not enough privileges. Admin access required.",
-        )
-    return current_user
-
-def get_current_superadmin_user(current_user: User = Depends(get_current_user)) -> User:
-    """
-    Dependency to ensure the authenticated user has superadmin privileges.
-
-    Authorization Checks:
-    - Inherits all checks from `get_current_user`.
-    - Strictly verifies that the `role` column equals 'superadmin'.
-
-    Args:
-        current_user (User): The authenticated user resolved by `get_current_user`.
-
-    Returns:
-        User: The authenticated superadmin user.
-
-    Raises:
-        HTTPException: If the user does not have the superadmin role (403).
-    """
-    if current_user.role != "superadmin":
-        raise HTTPException(
-            status_code=403,
-            detail="Not enough privileges. Superadmin access required.",
-        )
-    return current_user
 
 
 # ---------------------------------------------------------------------------

@@ -31,73 +31,14 @@ from sqlalchemy.orm import Session
 # pyrefly: ignore [missing-import]
 from geoalchemy2.functions import ST_AsGeoJSON
 
-from app.database import get_db
-from app.models.surat_boundary import SuratBoundary
+from app.core.dependencies import get_db
+from app.utils.text_utils import slugify as _slugify
 from app.models.gujarat_district import GujaratDistrict
 from app.models.gujarat_taluka import GujaratTaluka
 from app.core.constants import GEO_PREFIX, GEO_CACHE_MAX_AGE_SECONDS
 
 router = APIRouter(prefix=GEO_PREFIX, tags=["Geo"])
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _slugify(name: str) -> str:
-    """Convert a district name to a URL-friendly slug.
-    e.g. "The Dangs" → "the-dangs", "Ahmadabad" → "ahmadabad"
-    """
-    s = name.strip().lower()
-    s = re.sub(r"[^a-z0-9]+", "-", s)   # replace non-alphanumeric with hyphen
-    return s.strip("-")
-
-
-# ---------------------------------------------------------------------------
-# Surat boundary
-# ---------------------------------------------------------------------------
-
-@router.get("/surat-boundary")
-def get_surat_boundary(db: Session = Depends(get_db)):
-    """
-    Returns the Surat district boundary as a GeoJSON FeatureCollection.
-
-    GIS Operations:
-    - Geometry is selected from the SuratBoundary table.
-    - Reprojected natively in the database to EPSG:4326 (WGS-84) using ST_AsGeoJSON.
-
-    Returns:
-        JSONResponse: FeatureCollection ready for MapLibre ingestion.
-    """
-    rows = db.query(
-        SuratBoundary.id,
-        SuratBoundary.shape_name,
-        ST_AsGeoJSON(SuratBoundary.geometry).label("geojson"),
-    ).all()
-
-    if not rows:
-        raise HTTPException(status_code=404, detail="Surat boundary not found in database")
-
-    features = []
-    for row in rows:
-        features.append({
-            "type": "Feature",
-            "id": row.id,
-            "geometry": json.loads(row.geojson),
-            "properties": {
-                "name": row.shape_name,
-            },
-        })
-
-    return JSONResponse(
-        content={
-            "type": "FeatureCollection",
-            "features": features,
-        },
-        headers={
-            "Cache-Control": f"public, max-age={GEO_CACHE_MAX_AGE_SECONDS}",
-        },
-    )
 
 
 # ---------------------------------------------------------------------------

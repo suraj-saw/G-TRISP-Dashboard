@@ -8,6 +8,7 @@ rendering analytics, charts, tables, and geospatial maps based on road accident 
 """
 
 from typing import List, Optional
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
@@ -362,3 +363,49 @@ class SnappedAccidentResponse(ResponseModel):
     """Schema for a collection of snapped accident points."""
     total: int
     data: List[SnappedPoint]
+
+
+# ---------------------------------------------------------------------------
+# Temporal Analysis
+# ---------------------------------------------------------------------------
+
+class HourDayCount(ResponseModel):
+    """Schema representing a single data point in an hour-of-day vs day-of-week heatmap."""
+    hour: int
+    day: str
+    count: int
+
+
+class HourlyAccidentCount(ResponseModel):
+    """Schema representing the number of accidents per hour of the day."""
+    hour: int
+    count: int
+
+
+class MonthlyAccidentCount(ResponseModel):
+    """Schema representing the number of accidents per month, with year and human-readable label."""
+    year: int
+    month: int
+    month_label: str
+    count: int
+
+
+class PeakSummary(ResponseModel):
+    """Schema summarizing the peak accident time periods (hour, day, month, time-of-day bucket)."""
+    peak_hour: str
+    peak_hour_count: int
+    peak_day: str
+    peak_day_count: int
+    peak_month: str
+    peak_month_count: int
+    peak_time_period: str
+    peak_time_period_count: int
+    total_accidents: int
+
+
+class TemporalAnalysisResponse(ResponseModel):
+    """Top-level schema for the complete temporal analysis payload."""
+    hour_day: List[HourDayCount]
+    hourly: List[HourlyAccidentCount]
+    monthly: List[MonthlyAccidentCount]
+    summary: PeakSummary
