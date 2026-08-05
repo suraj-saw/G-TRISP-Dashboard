@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  LabelList,
 } from "recharts";
 import { ChartCard, CustomTooltip, EmptyState, GRID, MUTED } from "./common";
 
@@ -55,7 +56,7 @@ export const StackedBarChartCard: React.FC<StackedBarChartCardProps> = ({
         <BarChart
           data={data}
           layout={layout}
-          margin={{ top: 10, right: 40, left: 5, bottom: 5 }}
+          margin={{ top: 10, right: 10, left: 5, bottom: 5 }}
           barCategoryGap="20%"
         >
           <CartesianGrid
@@ -74,7 +75,7 @@ export const StackedBarChartCard: React.FC<StackedBarChartCardProps> = ({
                 tick={{ fill: MUTED, fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                width={fullLabels ? 220 : yAxisWidth}
+                width={fullLabels ? 140 : yAxisWidth}
                 interval={0}
               />
             </>
@@ -98,7 +99,31 @@ export const StackedBarChartCard: React.FC<StackedBarChartCardProps> = ({
             iconSize={8}
           />
           {actualKeys.map((k, i) => (
-            <Bar key={k} dataKey={k} stackId="a" fill={colors[i % colors.length]} maxBarSize={24} />
+            <Bar key={k} dataKey={k} stackId="a" fill={colors[i % colors.length]} maxBarSize={24} isAnimationActive={!fullLabels}>
+              {fullLabels && (
+                <LabelList
+                  dataKey={k}
+                  position="inside"
+                  content={(props: any) => {
+                    const { x, y, width, height, value } = props;
+                    if (!value || value <= 0) return null;
+                    const minDim = layout === "vertical" ? width : height;
+                    if (minDim < 30) return null;
+                    return (
+                      <text
+                        x={x + width / 2}
+                        y={y + height / 2}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        style={{ fill: "#FFFFFF", fontSize: 9, fontWeight: 700 }}
+                      >
+                        {Number(value).toLocaleString()}
+                      </text>
+                    );
+                  }}
+                />
+              )}
+            </Bar>
           ))}
         </BarChart>
       </ResponsiveContainer>

@@ -46,6 +46,18 @@ import {
 import { StatisticalOverviewKPIs } from "./statistical_analysis/StatisticalOverviewKPIs";
 import { StackedBarChartCard } from "./statistical_analysis/StackedBarChartCard";
 
+// ─── Smart label renderer for stacked bars (only shows if segment is wide enough) ──
+const smartInsideLabel = (props: any) => {
+  const { x, y, width, height, value } = props;
+  if (!value || value <= 0) return null;
+  if (width < 30) return null;
+  return (
+    <text x={x + width / 2} y={y + height / 2} textAnchor="middle" dominantBaseline="central" style={{ fill: "#fff", fontSize: 9, fontWeight: 700 }}>
+      {Number(value).toLocaleString()}
+    </text>
+  );
+};
+
 // ─── Helper Matrix Transformations ─────────────────────────────────────────
 
 const groupTopCategories = (data: Record<string, any>[], keepCount: number = 4) => {
@@ -361,7 +373,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart
                     data={stats.vehicle_involvement_breakdown}
-                    margin={{ top: 20, right: 15, left: -15, bottom: 5 }}
+                    margin={{ top: fullLabels ? 35 : 20, right: 15, left: -15, bottom: 5 }}
                     barCategoryGap="30%"
                   >
                     <CartesianGrid
@@ -387,6 +399,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                       name="Accidents"
                       radius={[4, 4, 0, 0]}
                       barSize={36}
+                      isAnimationActive={!fullLabels}
                     >
                       {stats.vehicle_involvement_breakdown.map((_, index) => (
                         <Cell
@@ -394,16 +407,18 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                           fill={INVOLVED_GRADIENT[index % INVOLVED_GRADIENT.length]}
                         />
                       ))}
-                      <LabelList
-                        dataKey="count"
-                        position="top"
-                        style={{
-                          fill: "#475569",
-                          fontSize: 10,
-                          fontWeight: 600,
-                        }}
-                        formatter={(val: any) => Number(val).toLocaleString()}
-                      />
+                      {fullLabels && (
+                        <LabelList
+                          dataKey="count"
+                          position="top"
+                          style={{
+                            fill: "#475569",
+                            fontSize: 10,
+                            fontWeight: 600,
+                          }}
+                          formatter={(val: any) => Number(val).toLocaleString()}
+                        />
+                      )}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -423,7 +438,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart
                     data={stats.victim_composition}
-                    margin={{ top: 20, right: 40, left: 10, bottom: 5 }}
+                    margin={{ top: 20, right: 10, left: 10, bottom: 5 }}
                     layout="vertical"
                     barGap={8}
                   >
@@ -464,7 +479,12 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                         stackId="a"
                         fill={SEVERITY_COLORS["Fatal"]}
                         barSize={35}
-                      />
+                        isAnimationActive={!fullLabels}
+                      >
+                        {fullLabels && (
+                          <LabelList dataKey="Killed" position="inside" content={smartInsideLabel} />
+                        )}
+                      </Bar>
                     )}
                     {(!filters.severity?.length || filters.severity.includes("Grievous Injury")) && (
                       <Bar
@@ -473,7 +493,12 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                         stackId="a"
                         fill={SEVERITY_COLORS["Grievous Injury"]}
                         barSize={35}
-                      />
+                        isAnimationActive={!fullLabels}
+                      >
+                        {fullLabels && (
+                          <LabelList dataKey="Grievous Injury" position="inside" content={smartInsideLabel} />
+                        )}
+                      </Bar>
                     )}
                     {(!filters.severity?.length ||
                       filters.severity.includes("Minor Injury Non Hospitalized") ||
@@ -486,7 +511,12 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                         fill={SEVERITY_COLORS["Minor Injury"]}
                         radius={[0, 4, 4, 0]}
                         barSize={35}
-                      />
+                        isAnimationActive={!fullLabels}
+                      >
+                        {fullLabels && (
+                          <LabelList dataKey="Minor Injury" position="inside" content={smartInsideLabel} />
+                        )}
+                      </Bar>
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -519,6 +549,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
               data={processedCollisionNature}
               fillColor={CHART_INDIGO}
               yAxisWidth={150}
+              fullLabels={fullLabels}
             />
           </div>
 
@@ -542,6 +573,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                 SEVERITY_COLORS["No Injury"],
               ]}
               height={380}
+              fullLabels={fullLabels}
             />
             <StackedBarChartCard
               title="Collision Type vs Severity"
@@ -561,6 +593,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                 SEVERITY_COLORS["No Injury"],
               ]}
               height={380}
+              fullLabels={fullLabels}
             />
           </div>
 
@@ -584,6 +617,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                 SEVERITY_COLORS["No Injury"],
               ]}
               height={380}
+              fullLabels={fullLabels}
             />
             <StackedBarChartCard
               title="Light Condition vs Severity"
@@ -603,6 +637,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                 SEVERITY_COLORS["No Injury"],
               ]}
               height={380}
+              fullLabels={fullLabels}
             />
           </div>
 
@@ -631,6 +666,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
               ]}
               yAxisWidth={160}
               height={400}
+              fullLabels={fullLabels}
             />
           </div>
 
@@ -690,7 +726,12 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                           stackId="a"
                           fill={SEVERITY_COLORS["Fatal"]}
                           maxBarSize={16}
-                        />
+                          isAnimationActive={!fullLabels}
+                        >
+                          {fullLabels && (
+                            <LabelList dataKey="fatal_accidents" position="inside" content={smartInsideLabel} />
+                          )}
+                        </Bar>
                         <Bar
                           dataKey="non_fatal_accidents"
                           name="Non-Fatal Accidents"
@@ -698,7 +739,12 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                           fill={CHART_BLUE}
                           maxBarSize={16}
                           radius={[0, 4, 4, 0]}
-                        />
+                          isAnimationActive={!fullLabels}
+                        >
+                          {fullLabels && (
+                            <LabelList dataKey="non_fatal_accidents" position="inside" content={smartInsideLabel} />
+                          )}
+                        </Bar>
                       </>
                     ) : (
                       <Bar
@@ -707,7 +753,12 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
                         fill={CHART_BLUE}
                         maxBarSize={16}
                         radius={[0, 4, 4, 0]}
-                      />
+                        isAnimationActive={!fullLabels}
+                      >
+                        {fullLabels && (
+                          <LabelList dataKey="total" position="inside" content={smartInsideLabel} />
+                        )}
+                      </Bar>
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -796,27 +847,24 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
 
         .chart-card {
           background: #ffffff;
-          border: 1px solid #e2e8f0;
+          border: 1px solid #E4E8F4;
           border-radius: 12px;
-          overflow: hidden;
+          padding: 16px;
           display: flex;
           flex-direction: column;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+          box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
         }
 
         .chart-card-header {
           font-size: 12px;
           font-weight: 700;
-          color: #1e3a8a;
+          color: #1e293b;
           text-transform: uppercase;
-          letter-spacing: 0.06em;
-          padding: 14px 20px;
-          border-bottom: 1px solid #f1f5f9;
-          background-color: #f8fafc;
+          letter-spacing: 0.025em;
+          margin-bottom: 12px;
         }
 
         .chart-card-body {
-          padding: 16px 12px;
           flex: 1;
           display: flex;
           flex-direction: column;

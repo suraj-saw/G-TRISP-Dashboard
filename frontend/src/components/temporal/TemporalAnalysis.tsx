@@ -26,13 +26,40 @@ import {
   Legend,
   ComposedChart,
   Area,
+  LabelList,
 } from "recharts";
 
 interface Props {
   filters: DashboardFilters;
   fetchFn?: (filters: DashboardFilters) => Promise<TemporalAnalysisData>;
   onDataLoaded?: () => void;
+  isExport?: boolean;
 }
+
+// ─── Smart label renderers for stacked bars ──
+const smartInsideLabel = (props: any) => {
+  const { x, y, width, height, value } = props;
+  if (!value || value <= 0) return null;
+  const minDim = width < height ? width : height;
+  if (minDim < 25) return null; // Only show if there's enough space
+  return (
+    <text x={x + width / 2} y={y + height / 2} textAnchor="middle" dominantBaseline="central" style={{ fill: "#fff", fontSize: 9, fontWeight: 700 }}>
+      {Number(value).toLocaleString()}
+    </text>
+  );
+};
+
+const smartInsideLabelDark = (props: any) => {
+  const { x, y, width, height, value } = props;
+  if (!value || value <= 0) return null;
+  const minDim = width < height ? width : height;
+  if (minDim < 25) return null;
+  return (
+    <text x={x + width / 2} y={y + height / 2} textAnchor="middle" dominantBaseline="central" style={{ fill: "#475569", fontSize: 9, fontWeight: 700 }}>
+      {Number(value).toLocaleString()}
+    </text>
+  );
+};
 
 const emptyTemporalData: TemporalAnalysisData = {
   hour_day: [],
@@ -151,7 +178,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
  * @param {DashboardFilters} props.filters - Global dashboard filters to apply to the data request.
  * @param {Function} [props.fetchFn] - Optional override for the data fetching function (useful for testing or specialized views).
  */
-export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Props) {
+export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded, isExport = false }: Props) {
   const [data, setData] = useState<TemporalAnalysisData>(emptyTemporalData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -306,8 +333,8 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
       </div> */}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {cards(data).map((card) => {
+      <div className="temporal-kpi-row grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {cards(data).filter(card => isExport ? (card.label !== "Total accidents" && card.label !== "Peak hour") : true).map((card) => {
           const Icon = card.icon;
           return (
             <div key={card.label} className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
@@ -317,9 +344,11 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
                   <p className="mt-2 text-[20px] font-bold text-slate-900">{card.value}</p>
                   <p className="mt-1 text-[11px] font-medium text-slate-500">{card.sub}</p>
                 </div>
-                <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${toneClass[card.tone as keyof typeof toneClass]}`}>
-                  <Icon size={18} className="text-white" />
-                </div>
+                {!isExport && (
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${toneClass[card.tone as keyof typeof toneClass]}`}>
+                    <Icon size={18} className="text-white" />
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -330,24 +359,26 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
       <HourDayHeatmap data={data.hour_day} />
 
       {/* Hourly & Monthly (Existing) */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <HourlyChart data={data.hourly} />
-        <MonthlyTrend data={data.monthly} />
+      <div className="grid grid-cols-1 gap-4">
+        <HourlyChart data={data.hourly} isExport={isExport} />
+        <MonthlyTrend data={data.monthly} isExport={isExport} />
       </div>
 
       {/* New Temporal Charts Row 1 */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="temporal-chart-row-two grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
           <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Day of Week Distribution</p>
           {data.day_of_week_distribution && data.day_of_week_distribution.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.day_of_week_distribution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <LineChart data={data.day_of_week_distribution} margin={{ top: isExport ? 25 : 10, right: 20, left: -20, bottom: 0 }}>
                   <CartesianGrid stroke={GRID} vertical={false} />
                   <XAxis dataKey="day" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="count" name="Accidents" stroke={CHART_BLUE} strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="count" name="Accidents" stroke={CHART_BLUE} strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} isAnimationActive={!isExport}>
+                    {isExport && <LabelList dataKey="count" position="top" style={{ fontSize: 10, fill: "#475569", fontWeight: 600 }} formatter={(val: any) => Number(val).toLocaleString()} />}
+                  </Line>
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -361,12 +392,14 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
           {data.time_period_distribution && data.time_period_distribution.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.time_period_distribution} layout="vertical" margin={{ top: 10, right: 10, left: 30, bottom: 0 }}>
+                <BarChart data={data.time_period_distribution} layout="vertical" margin={{ top: 10, right: 40, left: 30, bottom: 0 }}>
                   <CartesianGrid stroke={GRID} horizontal={false} />
                   <XAxis type="number" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis dataKey="period" type="category" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="count" name="Accidents" fill={CHART_INDIGO} radius={[0, 3, 3, 0]} />
+                  <Bar dataKey="count" name="Accidents" fill={CHART_INDIGO} radius={[0, 3, 3, 0]} isAnimationActive={!isExport}>
+                    <LabelList dataKey="count" position="right" style={{ fontSize: 10, fill: "#475569", fontWeight: 600 }} formatter={(val: any) => Number(val).toLocaleString()} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -377,18 +410,20 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
       </div>
 
       {/* New Temporal Charts Row 2 */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="temporal-chart-row-two grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
           <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Monthly Seasonality</p>
           {data.monthly_seasonality && data.monthly_seasonality.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.monthly_seasonality} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <LineChart data={data.monthly_seasonality} margin={{ top: isExport ? 25 : 10, right: 20, left: -20, bottom: 0 }}>
                   <CartesianGrid stroke={GRID} vertical={false} />
                   <XAxis dataKey="month" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} interval={0} angle={-45} textAnchor="end" height={50} />
                   <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="count" name="Accidents" stroke={CHART_TEAL} strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="count" name="Accidents" stroke={CHART_TEAL} strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} isAnimationActive={!isExport}>
+                    {isExport && <LabelList dataKey="count" position="top" style={{ fontSize: 10, fill: "#475569", fontWeight: 600 }} formatter={(val: any) => Number(val).toLocaleString()} />}
+                  </Line>
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -402,12 +437,14 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
           {data.annual_trend && data.annual_trend.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.annual_trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <LineChart data={data.annual_trend} margin={{ top: isExport ? 25 : 10, right: 20, left: -20, bottom: 0 }}>
                   <CartesianGrid stroke={GRID} vertical={false} />
                   <XAxis dataKey="year" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="count" name="Accidents" stroke={CHART_PURPLE} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="count" name="Accidents" stroke={CHART_PURPLE} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} isAnimationActive={!isExport}>
+                    {isExport && <LabelList dataKey="count" position="top" style={{ fontSize: 10, fill: "#475569", fontWeight: 600 }} formatter={(val: any) => Number(val).toLocaleString()} />}
+                  </Line>
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -418,7 +455,7 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
       </div>
 
       {/* New Temporal Charts Row 3 */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="temporal-chart-row-two grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
           <p className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Severity on Weekend vs Weekday</p>
           {data.severity_by_weekend_weekday && data.severity_by_weekend_weekday.length > 0 ? (
@@ -430,9 +467,15 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
                   <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(0, 0, 0, 0.04)" }} />
                   <Legend wrapperStyle={{ fontSize: 10, color: MUTED, paddingTop: '10px' }} />
-                  <Bar dataKey="Fatal" stackId="a" fill={SEVERITY_COLORS["Fatal"]} />
-                  <Bar dataKey="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} />
-                  <Bar dataKey="Other" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Fatal" stackId="a" fill={SEVERITY_COLORS["Fatal"]} isAnimationActive={!isExport}>
+                    {isExport && <LabelList dataKey="Fatal" position="inside" content={smartInsideLabel} />}
+                  </Bar>
+                  <Bar dataKey="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} isAnimationActive={!isExport}>
+                    {isExport && <LabelList dataKey="Grievous Injury" position="inside" content={smartInsideLabel} />}
+                  </Bar>
+                  <Bar dataKey="Other" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} isAnimationActive={!isExport}>
+                    {isExport && <LabelList dataKey="Other" position="inside" content={smartInsideLabelDark} />}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -446,14 +489,18 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
           {data.severity_by_hour && data.severity_by_hour.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.severity_by_hour} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <BarChart data={data.severity_by_hour} margin={{ top: 10, right: 10, left: -20, bottom: 15 }}>
                   <CartesianGrid stroke={GRID} vertical={false} />
-                  <XAxis dataKey="hour_label" tick={{ fill: MUTED, fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={20} />
+                  <XAxis dataKey="hour_label" tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} interval={2} />
                   <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(0, 0, 0, 0.04)" }} />
-                  <Legend wrapperStyle={{ fontSize: 10, color: MUTED, paddingTop: '10px' }} />
-                  <Bar dataKey="Fatal" stackId="a" fill={SEVERITY_COLORS["Fatal"]} />
-                  <Bar dataKey="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} radius={[3, 3, 0, 0]} />
+                  <Legend wrapperStyle={{ fontSize: 10, color: MUTED, paddingTop: '6px' }} />
+                  <Bar dataKey="Fatal" stackId="a" fill={SEVERITY_COLORS["Fatal"]} isAnimationActive={!isExport}>
+                    {isExport && <LabelList dataKey="Fatal" position="inside" content={smartInsideLabel} />}
+                  </Bar>
+                  <Bar dataKey="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} radius={[3, 3, 0, 0]} isAnimationActive={!isExport}>
+                    {isExport && <LabelList dataKey="Grievous Injury" position="inside" content={smartInsideLabel} />}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -476,11 +523,21 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
                   <YAxis dataKey="name" type="category" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 11, color: MUTED, paddingTop: '10px' }} iconType="circle" iconSize={8} />
-                  <Bar dataKey="Fatal" stackId="a" fill={SEVERITY_COLORS["Fatal"]} maxBarSize={24} />
-                  <Bar dataKey="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} maxBarSize={24} />
-                  <Bar dataKey="Minor Injury Hospitalized" stackId="a" fill={SEVERITY_COLORS["Minor Injury Hospitalized"]} maxBarSize={24} />
-                  <Bar dataKey="Minor Injury Non Hospitalized" stackId="a" fill={SEVERITY_COLORS["Minor Injury Non Hospitalized"]} maxBarSize={24} />
-                  <Bar dataKey="No Injury" stackId="a" fill={SEVERITY_COLORS["No Injury"]} maxBarSize={24} />
+                  <Bar dataKey="Fatal" stackId="a" fill={SEVERITY_COLORS["Fatal"]} maxBarSize={24} isAnimationActive={!isExport}>
+                    {isExport && <LabelList dataKey="Fatal" position="inside" content={smartInsideLabel} />}
+                  </Bar>
+                  <Bar dataKey="Grievous Injury" stackId="a" fill={SEVERITY_COLORS["Grievous Injury"]} maxBarSize={24} isAnimationActive={!isExport}>
+                    {isExport && <LabelList dataKey="Grievous Injury" position="inside" content={smartInsideLabel} />}
+                  </Bar>
+                  <Bar dataKey="Minor Injury Hospitalized" stackId="a" fill={SEVERITY_COLORS["Minor Injury Hospitalized"]} maxBarSize={24} isAnimationActive={!isExport}>
+                    {isExport && <LabelList dataKey="Minor Injury Hospitalized" position="inside" content={smartInsideLabel} />}
+                  </Bar>
+                  <Bar dataKey="Minor Injury Non Hospitalized" stackId="a" fill={SEVERITY_COLORS["Minor Injury Non Hospitalized"]} maxBarSize={24} isAnimationActive={!isExport}>
+                    {isExport && <LabelList dataKey="Minor Injury Non Hospitalized" position="inside" content={smartInsideLabel} />}
+                  </Bar>
+                  <Bar dataKey="No Injury" stackId="a" fill={SEVERITY_COLORS["No Injury"]} maxBarSize={24} isAnimationActive={!isExport}>
+                    {isExport && <LabelList dataKey="No Injury" position="inside" content={smartInsideLabel} />}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -494,16 +551,16 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded }: Pro
           {data.monthly_fatality_rate && data.monthly_fatality_rate.length > 0 ? (
             <div className="h-[340px]">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={data.monthly_fatality_rate} margin={{ top: 10, right: 30, left: -10, bottom: 20 }}>
+                <ComposedChart data={data.monthly_fatality_rate} margin={{ top: 10, right: 30, left: -10, bottom: 45 }}>
                   <CartesianGrid stroke={GRID} vertical={false} strokeDasharray="3 3" opacity={0.4} />
-                  <XAxis dataKey="month" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={20} angle={-45} textAnchor="end" height={40} />
+                  <XAxis dataKey="month" tick={{ fill: MUTED, fontSize: 10 }} axisLine={false} tickLine={false} minTickGap={15} angle={-45} textAnchor="end" height={55} />
                   <YAxis yAxisId="left" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis yAxisId="right" orientation="right" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 11, color: MUTED, paddingTop: '10px' }} iconType="circle" iconSize={8} />
-                  <Area yAxisId="left" type="monotone" dataKey="total" name="Total Accidents" fill={CHART_BLUE} stroke={CHART_BLUE} fillOpacity={0.15} strokeWidth={2} />
-                  <Area yAxisId="left" type="monotone" dataKey="fatalities" name="Fatal Accidents" fill={SEVERITY_COLORS["Fatal"]} stroke={SEVERITY_COLORS["Fatal"]} fillOpacity={0.8} strokeWidth={2} />
-                  <Line yAxisId="right" type="monotone" dataKey="fatality_rate" name="Fatality Rate (%)" stroke={CHART_PURPLE} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: MUTED, paddingTop: '15px' }} iconType="circle" iconSize={8} />
+                  <Area yAxisId="left" type="monotone" dataKey="total" name="Total Accidents" fill={CHART_BLUE} stroke={CHART_BLUE} fillOpacity={0.15} strokeWidth={2} isAnimationActive={!isExport} />
+                  <Area yAxisId="left" type="monotone" dataKey="fatalities" name="Fatal Accidents" fill={SEVERITY_COLORS["Fatal"]} stroke={SEVERITY_COLORS["Fatal"]} fillOpacity={0.8} strokeWidth={2} isAnimationActive={!isExport} />
+                  <Line yAxisId="right" type="monotone" dataKey="fatality_rate" name="Fatality Rate (%)" stroke={CHART_PURPLE} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} isAnimationActive={!isExport} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>

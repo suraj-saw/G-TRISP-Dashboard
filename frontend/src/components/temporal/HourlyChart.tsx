@@ -11,11 +11,13 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  LabelList,
 } from "recharts";
 import type { HourlyAccidentCount } from "../../types/dashboard";
 
 interface Props {
   data: HourlyAccidentCount[];
+  isExport?: boolean;
 }
 
 /**
@@ -33,7 +35,7 @@ const formatHour = (hour: number) => {
  * @param {Object} props - Component properties.
  * @param {HourlyAccidentCount[]} props.data - Array of hourly accident counts.
  */
-export default function HourlyChart({ data }: Props) {
+export default function HourlyChart({ data, isExport = false }: Props) {
   /** Injects formatted 12-hour labels into the data array for the XAxis. */
   const chartData = data.map((item) => ({
     ...item,
@@ -48,7 +50,7 @@ export default function HourlyChart({ data }: Props) {
       </div>
       <div className="h-[260px]">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 8, right: 10, left: -20, bottom: 8 }}>
+          <LineChart data={chartData} margin={{ top: isExport ? 35 : 8, right: 15, left: -20, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EDF0F8" />
             <XAxis
               dataKey="label"
@@ -65,7 +67,9 @@ export default function HourlyChart({ data }: Props) {
                 boxShadow: "0 12px 30px rgba(15,23,42,0.12)",
               }}
             />
-            <Line type="monotone" dataKey="count" name="Accidents" stroke="#2C6EF2" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+            <Line type="monotone" dataKey="count" name="Accidents" stroke="#2C6EF2" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} isAnimationActive={!isExport}>
+              {isExport && <LabelList dataKey="count" position="top" style={{ fontSize: 10, fill: "#475569", fontWeight: 600 }} formatter={(val: any) => Number(val).toLocaleString()} />}
+            </Line>
           </LineChart>
         </ResponsiveContainer>
       </div>

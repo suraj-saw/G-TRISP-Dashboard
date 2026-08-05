@@ -9,6 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  LabelList,
 } from "recharts";
 import { AlertCircle } from "lucide-react";
 
@@ -182,7 +183,7 @@ export const HorizontalCategoryChartCard: React.FC<{
         <BarChart
           data={data}
           layout="vertical"
-          margin={{ top: 10, right: 40, left: 5, bottom: 5 }}
+          margin={{ top: 10, right: fullLabels ? 45 : 10, left: 5, bottom: 5 }}
           barCategoryGap="20%"
         >
           <CartesianGrid
@@ -203,7 +204,7 @@ export const HorizontalCategoryChartCard: React.FC<{
             tick={{ fill: MUTED, fontSize: 11 }}
             axisLine={false}
             tickLine={false}
-            width={fullLabels ? 220 : yAxisWidth}
+            width={fullLabels ? 140 : yAxisWidth}
             interval={0}
           />
           <Tooltip content={<CustomTooltip />} />
@@ -213,7 +214,21 @@ export const HorizontalCategoryChartCard: React.FC<{
             fill={fillColor}
             radius={[0, 4, 4, 0]}
             barSize={16}
-          />
+            isAnimationActive={!fullLabels}
+          >
+            {fullLabels && (
+              <LabelList
+                dataKey="count"
+                position="right"
+                style={{
+                  fill: "#475569",
+                  fontSize: 10,
+                  fontWeight: 600,
+                }}
+                formatter={(val: any) => Number(val).toLocaleString()}
+              />
+            )}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </ChartCard>

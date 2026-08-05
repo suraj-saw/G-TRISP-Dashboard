@@ -11,11 +11,13 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  LabelList,
 } from "recharts";
 import type { MonthlyAccidentCount } from "../../types/dashboard";
 
 interface Props {
   data: MonthlyAccidentCount[];
+  isExport?: boolean;
 }
 
 /**
@@ -23,7 +25,7 @@ interface Props {
  * @param {Object} props - Component properties.
  * @param {MonthlyAccidentCount[]} props.data - Pre-aggregated monthly accident counts.
  */
-export default function MonthlyTrend({ data }: Props) {
+export default function MonthlyTrend({ data, isExport = false }: Props) {
   return (
     <div className="rounded-xl border border-[#E4E8F4] bg-white p-4 shadow-sm">
       <div className="mb-3">
@@ -32,7 +34,7 @@ export default function MonthlyTrend({ data }: Props) {
       </div>
       <div className="h-[260px]">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 8, right: 12, left: -20, bottom: 8 }}>
+          <AreaChart data={data} margin={{ top: isExport ? 35 : 8, right: 12, left: -20, bottom: 8 }}>
             <defs>
               <linearGradient id="monthlyTrendFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#14B8A6" stopOpacity={0.32} />
@@ -43,7 +45,7 @@ export default function MonthlyTrend({ data }: Props) {
             <XAxis
               dataKey="month_label"
               tick={{ fontSize: 10, fill: "#94A3B8" }}
-              interval="preserveStartEnd"
+              minTickGap={20}
               axisLine={false}
               tickLine={false}
             />
@@ -62,8 +64,11 @@ export default function MonthlyTrend({ data }: Props) {
               stroke="#0F766E"
               strokeWidth={2.5}
               fill="url(#monthlyTrendFill)"
-              activeDot={{ r: 5, fill: "#0F766E", stroke: "#FFFFFF", strokeWidth: 2 }}
-            />
+              activeDot={{ r: 5, fill: "#0F766E", stroke: "#FFFFFF", strokeWidth: 3 }}
+              isAnimationActive={!isExport}
+            >
+              {isExport && <LabelList dataKey="count" position="top" style={{ fontSize: 10, fill: "#475569", fontWeight: 600 }} formatter={(val: any) => Number(val).toLocaleString()} />}
+            </Area>
           </AreaChart>
         </ResponsiveContainer>
       </div>

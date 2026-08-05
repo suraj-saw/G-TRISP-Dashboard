@@ -143,14 +143,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
           color-adjust: exact !important;
         }
 
-        /* ── Force 1-column layout BEFORE print (so Recharts renders full-width SVGs) ── */
-        .print-report-container .charts-row--two,
-        .print-report-container .xl\\:grid-cols-2 {
-          grid-template-columns: 1fr !important;
-          display: grid !important;
-        }
-        
-        /* ── Disable Recharts animations in print container (pie chart fix) ── */
+        /* ── Disable Recharts animations in print container ── */
         .print-report-container .recharts-pie-sector,
         .print-report-container .recharts-bar-rectangle,
         .print-report-container .recharts-line,
@@ -168,97 +161,158 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
             position: static !important;
             overflow: visible !important;
             width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 2mm !important;
             z-index: auto !important;
+            box-shadow: none !important;
+            background: white !important;
           }
           
           body {
             background-color: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
           
           @page {
-            size: A4 landscape;
-            margin: 6mm;
+            size: A4 portrait;
+            margin: 3mm 4mm;
+          }
+
+          /* Ensure Recharts containers use full component heights in print */
+          .print-report-container .recharts-responsive-container {
+            width: 100% !important;
+            height: 100% !important;
+          }
+
+          /* Keep full-width charts single column */
+          .print-report-container .grid-cols-1:not(.xl\\:grid-cols-2):not(.xl\\:grid-cols-4):not(.temporal-kpi-row):not(.temporal-chart-row-two),
+          .print-report-container .charts-row--one {
+            display: grid !important;
+            grid-template-columns: 1fr !important;
+            width: 100% !important;
+          }
+
+          /* Force 2-column grid for paired chart rows */
+          .print-report-container .xl\\:grid-cols-2,
+          .print-report-container .charts-row--two,
+          .print-report-container .temporal-chart-row-two {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 12px !important;
+            width: 100% !important;
+          }
+
+          /* Force KPI row for Statistical Analysis (5 cols) */
+          .print-report-container .kpi-row,
+          .print-report-container .grid-cols-2,
+          .print-report-container .md\\:grid-cols-4 {
+            display: grid !important;
+            grid-template-columns: repeat(5, 1fr) !important;
+            gap: 6px !important;
+          }
+
+          /* Force KPI row for Temporal Analysis (4 cols) */
+          .print-report-container .temporal-kpi-row,
+          .print-report-container .xl\\:grid-cols-4,
+          .print-report-container .sm\\:grid-cols-2 {
+            display: grid !important;
+            grid-template-columns: repeat(4, 1fr) !important;
+            gap: 6px !important;
+            width: 100% !important;
           }
           
-          /* Remove borders, shadows from containers */
-          .chart-card, .kpi-card {
-            border: none !important;
-            box-shadow: none !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
-          
-          .print-report-container .rounded-xl {
+          /* Remove borders and shadows from outer card containers */
+          .print-report-container .chart-card,
+          .print-report-container .kpi-card,
+          .print-report-container .rounded-xl:not(.h-7),
+          .print-report-container .rounded-2xl {
             border: none !important;
             box-shadow: none !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
 
-          /* Move chart titles below the chart */
-          .chart-card {
-            display: flex !important;
-            flex-direction: column-reverse !important;
+          .print-report-container .chart-card,
+          .print-report-container .kpi-card {
+            margin-bottom: 4px !important;
           }
-          
-          .chart-card-header {
-            text-align: center !important;
-            font-size: 10px !important;
-            font-weight: 700 !important;
-            color: #64748b !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.05em !important;
-            margin-top: 8px !important;
-            margin-bottom: 0 !important;
-            border-bottom: none !important;
-            background: transparent !important;
+
+          /* Eliminate excessive empty whitespace below charts */
+          .print-report-container .chart-card-body {
             padding: 2px 0 !important;
+            height: auto !important;
+            display: flex !important;
+            flex-direction: column !important;
+          }
+
+          .print-report-container .district-statistical-analysis,
+          .print-report-container [class*="min-h-"] {
+            background: white !important;
+            padding: 0 !important;
+            gap: 8px !important;
+            min-height: 0 !important;
+          }
+
+          /* Tighten spacing between stacked rows */
+          .print-report-container .space-y-4 > * + * {
+            margin-top: 8px !important;
+          }
+
+          /* Readable sizing for charts in print mode */
+          .print-report-container .h-64 {
+            height: 240px !important;
+            min-height: 220px !important;
+          }
+
+          .print-report-container .h-\\[340px\\] {
+            height: 280px !important;
+            min-height: 250px !important;
           }
 
           .page-break {
-            page-break-before: always;
+            page-break-before: always !important;
+            break-before: page !important;
           }
           
-          .break-inside-avoid {
-            break-inside: avoid;
-            page-break-inside: avoid;
+          .break-inside-avoid,
+          .print-report-container .grid > div {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
           }
           
-          .stat-loading, .stat-empty {
+          .stat-loading, .stat-empty, .pdf-loading-overlay {
             display: none !important;
           }
           
-          .pdf-loading-overlay {
-            display: none !important;
-          }
-          
-          /* Compact KPIs for print */
-          .district-statistical-analysis {
-            background: white !important;
-            padding: 0 !important;
-            gap: 12px !important;
-          }
-          
+          /* Typography & Sizing */
           .kpi-card {
-            padding: 8px 12px !important;
+            padding: 6px 8px !important;
           }
           
           .kpi-label {
-            font-size: 9px !important;
+            font-size: 10px !important;
+            font-weight: 700 !important;
           }
           
           .kpi-value {
-            font-size: 18px !important;
-            margin-top: 2px !important;
+            font-size: 20px !important;
+            margin-top: 1px !important;
           }
           
           .kpi-sub {
             font-size: 9px !important;
           }
           
-          .kpi-row {
-            gap: 8px !important;
+          .chart-card-header {
+            font-size: 12px !important;
+            font-weight: 700 !important;
+            color: #1e293b !important;
+            letter-spacing: 0.025em !important;
+            margin-bottom: 8px !important;
           }
+        }
           
           .charts-row {
             gap: 8px !important;
@@ -271,7 +325,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
           
           /* Compact chart card body */
           .chart-card-body {
-            padding: 8px 4px !important;
+            padding: 6px 4px !important;
           }
         }
       `}</style>
@@ -323,11 +377,12 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
           </div>
         </div>
 
-      {/* The print content — wider container for better chart rendering */}
+      {/* The print content container formatted for standard A4 Portrait */}
       <div 
         className="print-report-container fixed top-0 left-0 bg-white text-slate-800"
         style={{
-          width: '1123px',
+          width: '100%',
+          maxWidth: '1000px',
           zIndex: -1,
           overflowY: 'auto',
           height: '100vh',
@@ -378,6 +433,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
             filters={filters as any} 
             fetchFn={temporalFetchFn}
             onDataLoaded={() => setTempLoaded(true)} 
+            isExport={true}
           />
         </div>
       </div>
