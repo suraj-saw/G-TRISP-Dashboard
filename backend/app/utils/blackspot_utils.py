@@ -43,27 +43,18 @@ from typing import Optional
 
 EARTH_RADIUS_M: float = 6_371_000.0
 
-# ── Spatial search ──────────────────────────────────────────────────────────
-# Default search radius in metres.  A 500 m linear IRC section is approximated
-# with a 250 m haversine radius (centre-to-crash) consistent with GIS practice.
-SEARCH_RADIUS_M: float = 250.0
+from app.core.gis_config import (
+    BLACKSPOT_RADIUS_METERS as SEARCH_RADIUS_M,
+    BLACKSPOT_MIN_CRASHES as MIN_QUALIFYING_CRASHES,
+    SEVERITY_PRIORITY_WEIGHTS as PRIORITY_WEIGHTS,
+)
 
 # ── Qualification threshold ─────────────────────────────────────────────────
-# Minimum number of *qualifying* crashes (i.e. those whose severity appears as
-# True below) required before a candidate cluster is accepted as a blackspot.
-MIN_QUALIFYING_CRASHES: int = 5
+# Minimum number of *qualifying* crashes required before a candidate cluster is accepted.
 
 # ── Qualification severity mapping ──────────────────────────────────────────
 # Maps each severity value (exactly as stored in the database) to a boolean
-# indicating whether that crash should be counted toward the qualification
-# threshold above.
-#
-# To make an additional severity category contribute to qualification in the
-# future, simply change its value from False to True — no algorithm changes
-# are needed.
-#
-# NOTE: These strings must match the severity values in the accident database
-# exactly.  Do not introduce new strings without updating the database first.
+# indicating whether that crash should be counted toward the qualification threshold.
 QUALIFYING_SEVERITIES: dict[str, bool] = {
     "Fatal": True,
     "Grievous Injury": True,
@@ -71,25 +62,6 @@ QUALIFYING_SEVERITIES: dict[str, bool] = {
     "Minor Injury Non Hospitalized": False,
     "No Injury": False,
     "Damage Only": False,
-}
-
-# ── Priority score weights ───────────────────────────────────────────────────
-# Weight applied to each crash when computing the priority score for a cluster.
-# A higher score means the blackspot is ranked higher (treated with more urgency).
-#
-# These weights apply to ALL crashes inside the cluster radius, including those
-# that do not individually contribute to the qualifying count above.
-#
-# NOTE: The thresholds in PRIORITY_LEVELS below were inherited from the previous
-# ASI-based scoring.  They should be calibrated against the Gujarat accident
-# dataset once initial results have been reviewed by the supervisor.
-PRIORITY_WEIGHTS: dict[str, int] = {
-    "Fatal": 10,
-    "Grievous Injury": 5,
-    "Minor Injury Hospitalized": 3,
-    "Minor Injury Non Hospitalized": 2,
-    "No Injury": 1,
-    "Damage Only": 0,
 }
 
 # ── Priority level thresholds ────────────────────────────────────────────────

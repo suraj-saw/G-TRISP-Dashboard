@@ -46,16 +46,23 @@ def compute_M(total_crashes: int, road_network_km: float = 1900.0, years_of_data
         return 0.0
     return total_crashes / road_network_km / 2.0 / years_of_data
 
+from app.core.gis_config import (
+    IRC_CAT_1_MULTIPLIER,
+    IRC_CAT_2_MULTIPLIER,
+    IRC_CAT_3_MULTIPLIER,
+    IRC_CAT_4_MULTIPLIER,
+)
+
 def assign_category(aatc: float, M: float) -> Optional[int]:
     if M <= 0:
         return None
-    if aatc >= 15.0 * M:
+    if aatc >= IRC_CAT_1_MULTIPLIER * M:
         return 1
-    if aatc >= 10.0 * M:
+    if aatc >= IRC_CAT_2_MULTIPLIER * M:
         return 2
-    if aatc >= 5.0 * M:
+    if aatc >= IRC_CAT_3_MULTIPLIER * M:
         return 3
-    if aatc >= 3.0 * M:
+    if aatc >= IRC_CAT_4_MULTIPLIER * M:
         return 4
     return None
 

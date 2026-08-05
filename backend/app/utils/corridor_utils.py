@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional
 import hashlib
-from app.core.constants import CORRIDOR_PRIORITY_THRESHOLDS
+from app.core.constants import CORRIDOR_PRIORITY_THRESHOLDS, CORRIDOR_MERGE_THRESHOLD_M
 
 def _generate_corridor_id(road_id: int, start_m: float, end_m: float) -> str:
     """
@@ -21,7 +21,7 @@ def get_corridor_priority_level(score: float) -> str:
 
 def generate_risk_corridors(
     blackspot_segments: List[Dict[str, Any]],
-    merge_distance_threshold_m: float = 100.0
+    merge_distance_threshold_m: float = CORRIDOR_MERGE_THRESHOLD_M
 ) -> List[Dict[str, Any]]:
     """
     Consumes raw blackspot segments and merges adjacent/overlapping segments on the same road

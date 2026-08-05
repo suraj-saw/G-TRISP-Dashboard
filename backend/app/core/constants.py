@@ -148,8 +148,33 @@ NIGHT_MORNING_CUTOFF = 5
 # ---------------------------------------------------------------------------
 # API / pagination defaults
 # ---------------------------------------------------------------------------
+# Database & Lifespan Initialization
+# ---------------------------------------------------------------------------
 
-# Default and maximum values for the top-N dangerous locations endpoint.
+DB_RETRY_ATTEMPTS: int = 5
+DB_RETRY_DELAY_SECONDS: int = 2
+DB_ADVISORY_LOCK_ID: int = 11223344
+
+# ---------------------------------------------------------------------------
+# Middleware & HTTP Response Compression
+# ---------------------------------------------------------------------------
+
+GZIP_MINIMUM_SIZE_BYTES: int = 1000
+
+# ---------------------------------------------------------------------------
+# File Upload Validation
+# ---------------------------------------------------------------------------
+
+ALLOWED_FILE_UPLOAD_EXTENSIONS = ("xlsx", "csv")
+MAX_FILE_UPLOAD_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB
+
+# ---------------------------------------------------------------------------
+# API / pagination defaults
+# ---------------------------------------------------------------------------
+
+# Default and maximum values for pagination and data limits.
+DEFAULT_PAGE_SIZE: int = 50
+MAX_PAGE_SIZE: int     = 1000
 TOP_DANGEROUS_DEFAULT_N = 10
 TOP_DANGEROUS_MAX_N     = 50
 
@@ -181,33 +206,17 @@ NO_DISTRICT_LABEL = "Unknown"
 HOURS_IN_DAY = 24
 
 # ---------------------------------------------------------------------------
-# Blackspot detection (greedy algorithm)
-# ---------------------------------------------------------------------------
-BLACKSPOT_RADIUS_METERS: float = 250.0
-BLACKSPOT_MIN_CRASHES: int = 5
-PEDESTRIAN_BLACKSPOT_MIN_CRASHES: int = 5
-MIN_ANALYSIS_YEARS: int = 3
-
-# ---------------------------------------------------------------------------
-# KDE density heatmap (quartic kernel — matches QGIS Heatmap tool)
-# ---------------------------------------------------------------------------
-KDE_RADIUS_METERS: float = 500.0
-KDE_PIXEL_METERS: float = 25.0
-
-# ---------------------------------------------------------------------------
-# Risk Corridor Analysis
+# Re-export GIS / Spatial Configuration for Backward Compatibility
 # ---------------------------------------------------------------------------
 
-# Default maximum gap distance (meters) between adjacent blackspot segments
-# to merge them into a single continuous risk corridor.
-CORRIDOR_MERGE_THRESHOLD_M: float = 100.0
+from app.core.gis_config import (
+    BLACKSPOT_RADIUS_METERS,
+    BLACKSPOT_MIN_CRASHES,
+    PEDESTRIAN_BLACKSPOT_MIN_CRASHES,
+    MIN_ANALYSIS_YEARS,
+    KDE_RADIUS_METERS,
+    KDE_PIXEL_METERS,
+    CORRIDOR_MERGE_THRESHOLD_M,
+    CORRIDOR_PRIORITY_THRESHOLDS,
+)
 
-# Priority thresholds based on the calculated priority score
-# (which is usually a combination of weighted severity, density, etc.)
-CORRIDOR_PRIORITY_THRESHOLDS = {
-    "Critical": 250,
-    "Very High": 150,
-    "High": 100,
-    "Medium": 50,
-    "Low": 0,
-}

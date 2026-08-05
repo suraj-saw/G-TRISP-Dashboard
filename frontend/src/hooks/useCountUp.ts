@@ -4,6 +4,7 @@
  * @responsibility Enhances UI transitions (e.g., in KPI cards) by preventing sudden numerical jumps when data refreshes.
  */
 import { useEffect, useRef, useState } from "react";
+import { DEFAULT_COUNTUP_DURATION_MS } from "../config/appConfig";
 
 /**
  * Animates a number from its previous value to a `target` value over `duration` milliseconds using a cubic easing function.
@@ -13,7 +14,10 @@ import { useEffect, useRef, useState } from "react";
  * @param {number} [duration=250] - The duration of the animation in milliseconds.
  * @returns {number} The current interpolated value during the animation, or the target value when complete.
  */
-export function useCountUp(target: number, duration = 250): number {
+export function useCountUp(
+  target: number,
+  duration = DEFAULT_COUNTUP_DURATION_MS
+): number {
   const [value, setValue] = useState(target);
   const fromRef = useRef(target);
   const rafRef = useRef<number | null>(null);

@@ -5,14 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import { useMap } from "react-map-gl/maplibre";
-
-const SEVERITY_LEGEND_ITEMS = [
-  { label: "Fatal", color: "#78350F" },
-  { label: "Grievous Injury", color: "#EA580C" },
-  { label: "Minor Injury Hospitalized", color: "#EAB308" },
-  { label: "Minor Injury Non Hospitalized", color: "#0284C7" },
-  { label: "No Injury / Damage Only", color: "#16A34A" },
-];
+import { SEVERITY_LEGEND_PALETTE as SEVERITY_LEGEND_ITEMS } from "../../config/themeConfig";
 
 interface SeverityLegendProps {
   visualizationLayerType?: string;

@@ -27,6 +27,12 @@ from app.routes import admin
 from app.routes import dashboard              
 from app.routes import geo
 from app.routes import accident_admin_routes
+from app.core.constants import (
+    DB_RETRY_ATTEMPTS,
+    DB_RETRY_DELAY_SECONDS,
+    DB_ADVISORY_LOCK_ID,
+    GZIP_MINIMUM_SIZE_BYTES,
+)
 
 load_dotenv()
 
@@ -51,20 +57,20 @@ async def lifespan(app: FastAPI):
 
     # Retry loop to handle cold-boot database initialization / network propagation
     conn = None
-    for attempt in range(1, 6):
+    for attempt in range(1, DB_RETRY_ATTEMPTS + 1):
         try:
             conn = engine.connect()
             break
         except (OperationalError, Exception) as err:
-            if attempt == 5:
-                logger.error("Failed to connect to database after 5 attempts: %s", err)
+            if attempt == DB_RETRY_ATTEMPTS:
+                logger.error("Failed to connect to database after %d attempts: %s", DB_RETRY_ATTEMPTS, err)
                 raise
-            logger.warning("Database connection attempt %d/5 failed (%s). Retrying in 2s…", attempt, err)
-            time.sleep(2)
+            logger.warning("Database connection attempt %d/%d failed (%s). Retrying in %ds…", attempt, DB_RETRY_ATTEMPTS, err, DB_RETRY_DELAY_SECONDS)
+            time.sleep(DB_RETRY_DELAY_SECONDS)
 
     if conn:
         try:
-            conn.execute(text("SELECT pg_advisory_lock(11223344)"))
+            conn.execute(text(f"SELECT pg_advisory_lock({DB_ADVISORY_LOCK_ID})"))
             try:
                 Base.metadata.create_all(bind=engine)
                 
@@ -72,7 +78,7 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("CREATE INDEX IF NOT EXISTS idx_gujarat_districts_geometry ON gujarat_districts USING GIST (geometry);"))
                 conn.execute(text("CREATE INDEX IF NOT EXISTS idx_gujarat_boundary_geometry ON gujarat_boundary USING GIST (geometry);"))
             finally:
-                conn.execute(text("SELECT pg_advisory_unlock(11223344)"))
+                conn.execute(text(f"SELECT pg_advisory_unlock({DB_ADVISORY_LOCK_ID})"))
                 conn.commit()
         finally:
             conn.close()
@@ -127,9 +133,9 @@ app.add_middleware(
 )
 
 # ── Response Compression ────────────────────────────────────────────────────
-# Compress HTTP responses larger than 1000 bytes to reduce bandwidth, 
+# Compress HTTP responses larger than GZIP_MINIMUM_SIZE_BYTES to reduce bandwidth, 
 # especially useful for large JSON payloads from the dashboard/geo endpoints.
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(GZipMiddleware, minimum_size=GZIP_MINIMUM_SIZE_BYTES)
 
 
 # ---------------------------------------------------------------------------

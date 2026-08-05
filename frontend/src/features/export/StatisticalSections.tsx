@@ -30,26 +30,20 @@ import {
 } from "recharts";
 import { ReportRegistry } from "./ReportRegistry";
 import type { DistrictStats } from "../../api/gujaratDashboardApi";
+import {
+  SEVERITY_COLORS,
+  CHART_COLORS,
+  INVOLVED_VEHICLE_GRADIENT as INVOLVED_GRADIENT,
+} from "../../config/themeConfig";
 
-// Colors
-const SEVERITY_COLORS: Record<string, string> = {
-  Fatal: "#ef4444",
-  "Grievous Injury": "#f97316",
-  "Minor Injury": "#f59e0b",
-  "Damage Only": "#94a3b8",
-  "No Injury": "#64748b",
-  Grievous: "#f97316",
-  Minor: "#eab308",
-};
-
-const INVOLVED_GRADIENT = ["#60a5fa", "#3b82f6", "#2563eb", "#1d4ed8"];
-
-const CHART_BLUE = "#3b82f6";
-const CHART_TEAL = "#14b8a6";
-const CHART_INDIGO = "#6366f1";
-const CHART_PURPLE = "#a855f7";
-const MUTED = "#64748b";
-const GRID = "#cbd5e1";
+const {
+  BLUE: CHART_BLUE,
+  TEAL: CHART_TEAL,
+  INDIGO: CHART_INDIGO,
+  PURPLE: CHART_PURPLE,
+  MUTED,
+  GRID,
+} = CHART_COLORS;
 
 // Helpers
 

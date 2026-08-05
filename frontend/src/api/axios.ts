@@ -16,6 +16,7 @@ import axios, {
     type AxiosResponse,
     type InternalAxiosRequestConfig
 } from "axios";
+import { AUTH_ENDPOINTS } from "../config/apiConfig";
 
 declare module "axios" {
     export interface AxiosRequestConfig {
@@ -72,11 +73,11 @@ function processQueue(error?: unknown) {
  */
 function isAuthEndpoint(url?: string) {
     return (
-        url?.includes("/auth/login") ||
-        url?.includes("/auth/register") ||
-        url?.includes("/auth/refresh") ||
-        url?.includes("/auth/logout") ||
-        url?.includes("/auth/me")
+        url?.includes(AUTH_ENDPOINTS.LOGIN) ||
+        url?.includes(AUTH_ENDPOINTS.REGISTER) ||
+        url?.includes(AUTH_ENDPOINTS.REFRESH) ||
+        url?.includes(AUTH_ENDPOINTS.LOGOUT) ||
+        url?.includes(AUTH_ENDPOINTS.ME)
     );
 }
 
@@ -125,7 +126,7 @@ API.interceptors.response.use(
         try {
             // Attempt to obtain a new access token via the refresh endpoint.
             // Assumes the browser will automatically send the HttpOnly refresh token cookie.
-            await axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+            await axios.post(`${BASE_URL}${AUTH_ENDPOINTS.REFRESH}`, {}, { withCredentials: true });
 
             processQueue();
             return API(originalRequest);

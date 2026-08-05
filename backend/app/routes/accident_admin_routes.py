@@ -22,7 +22,7 @@ from shapely.geometry import Point
 from sqlalchemy.orm import Session
 
 from app.core.config import POSTGIS_SRID
-from app.core.constants import ADMIN_SURAT_PREFIX
+from app.core.constants import ADMIN_SURAT_PREFIX, ALLOWED_FILE_UPLOAD_EXTENSIONS
 from app.core.dependencies import get_db, get_current_admin_user
 # pyrefly: ignore [missing-import]
 from app.models.accident import Accident
@@ -452,7 +452,7 @@ async def upload_accidents_file(
 ):
     filename = file.filename or ""
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    if ext not in ("xlsx", "csv"):
+    if ext not in ALLOWED_FILE_UPLOAD_EXTENSIONS:
         raise HTTPException(
             status_code=400,
             detail="Unsupported file format. Please upload an Excel (.xlsx) or CSV (.csv) file.",
