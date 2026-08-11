@@ -20,6 +20,9 @@ from pydantic import BaseModel
 from sqlalchemy import func
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
+# pyrefly: ignore [missing-import]
+from shapely.geometry import shape, LineString
+import shapely
 
 from app.core.dependencies import get_db
 from app.models.accident import Accident
@@ -708,7 +711,8 @@ def get_network_blackspots(
     police_station: Optional[List[str]] = Query(None),
     is_pedestrian: bool = Query(False),
     window_size_m: float = Query(500.0, description="Sliding window size in meters"),
-    min_qualifying_crashes: int = Query(3, description="Minimum qualifying crashes")
+    min_qualifying_crashes: int = Query(3, description="Minimum qualifying crashes"),
+    merge_lanes: bool = Query(False, description="Merge parallel lane segments using spatial clustering")
 ):
     """
     Computes network-constrained blackspot road segments based on snapped accidents.
@@ -806,10 +810,105 @@ def get_network_blackspots(
                     "minor_hospitalized_count": seg.get("minor_hospitalized_count", 0),
                     "minor_non_hospitalized_count": seg.get("minor_non_hospitalized_count", 0),
                     "vehicle_count": seg.get("vehicle_count", 0),
-                    "accident_count": seg["accident_count"]
+                    "accident_count": seg["accident_count"],
+                    "accident_ids": seg.get("accident_ids", [])
                 }
             })
             
+    if merge_lanes and features:
+        from app.utils.blackspot_utils import priority_label_and_color
+        # Convert to shapely geometries and cluster them
+        import math
+        def get_bearing(g):
+            coords = list(g.coords)
+            if len(coords) < 2: return 0
+            dx = coords[-1][0] - coords[0][0]
+            dy = coords[-1][1] - coords[0][1]
+            return math.degrees(math.atan2(dy, dx)) % 360
+
+        def are_parallel(b1, b2, tol=30):
+            diff = abs(b1 - b2) % 360
+            return (diff <= tol) or (diff >= 360 - tol) or (abs(diff - 180) <= tol)
+
+        shapely_features = []
+        for f in features:
+            geom = shape(f["geometry"])
+            shapely_features.append({
+                "feature": f,
+                "geom": geom,
+                "buffer": geom.buffer(0.0003), # roughly 30m in degrees for EPSG:4326
+                "bearing": get_bearing(geom)
+            })
+            
+        merged_features = []
+        used = set()
+        
+        for i, s1 in enumerate(shapely_features):
+            if i in used:
+                continue
+            
+            cluster = [s1]
+            used.add(i)
+            
+            # Find intersecting buffers (parallel lanes)
+            for j, s2 in enumerate(shapely_features):
+                if j not in used and s1["buffer"].intersects(s2["buffer"]):
+                    if are_parallel(s1["bearing"], s2["bearing"]):
+                        cluster.append(s2)
+                        used.add(j)
+                    
+            if len(cluster) == 1:
+                merged_features.append(s1["feature"])
+            else:
+                # Aggregate properties
+                acc_ids = set()
+                total_fatal = 0
+                total_grievous = 0
+                total_minor_hosp = 0
+                total_minor_non = 0
+                total_vehicles = 0
+                total_qualifying = 0
+                new_score = 0
+                
+                for item in cluster:
+                    p = item["feature"]["properties"]
+                    acc_ids.update(p.get("accident_ids", []))
+                    total_fatal += p.get("fatal_count", 0)
+                    total_grievous += p.get("grievous_count", 0)
+                    total_minor_hosp += p.get("minor_hospitalized_count", 0)
+                    total_minor_non += p.get("minor_non_hospitalized_count", 0)
+                    total_vehicles += p.get("vehicle_count", 0)
+                    total_qualifying += p.get("qualifying_count", 0)
+                    new_score += p.get("score", 0)
+                    
+                new_label, new_color = priority_label_and_color(new_score, total_qualifying)
+                
+                # Pick the longest geometry as representative
+                longest_item = max(cluster, key=lambda x: x["geom"].length)
+                new_feature = {
+                    "type": "Feature",
+                    "geometry": longest_item["feature"]["geometry"],
+                    "properties": {
+                        "road_id": longest_item["feature"]["properties"]["road_id"],
+                        "start_m": longest_item["feature"]["properties"]["start_m"],
+                        "end_m": longest_item["feature"]["properties"]["end_m"],
+                        "score": new_score,
+                        "priority_label": new_label,
+                        "priority_color": new_color,
+                        "qualifying_count": total_qualifying,
+                        "fatal_count": total_fatal,
+                        "grievous_count": total_grievous,
+                        "minor_hospitalized_count": total_minor_hosp,
+                        "minor_non_hospitalized_count": total_minor_non,
+                        "vehicle_count": total_vehicles,
+                        "accident_count": len(acc_ids),
+                        "accident_ids": list(acc_ids)
+                    }
+                }
+                merged_features.append(new_feature)
+                
+        features = merged_features
+
     return {
         "type": "FeatureCollection",
         "features": features

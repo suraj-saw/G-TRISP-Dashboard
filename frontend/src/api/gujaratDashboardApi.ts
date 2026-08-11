@@ -425,9 +425,13 @@ export const fetchGujaratPedestrianIrcGridBlackspots = async (
  */
 export const fetchGujaratNetworkBlackspots = async (
   filters: DashboardFilters,
-  district: string
+  district: string,
+  mergeLanes: boolean = false
 ): Promise<any> => {
   const params = getParams(filters, district);
+  if (mergeLanes) {
+    params.set("merge_lanes", "true");
+  }
   const cacheKey = `gujarat_network_${params.toString()}`;
   return withCache(cacheKey, async () => {
     const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, {
@@ -445,10 +449,14 @@ export const fetchGujaratNetworkBlackspots = async (
  */
 export const fetchGujaratPedestrianNetworkBlackspots = async (
   filters: DashboardFilters,
-  district: string
+  district: string,
+  mergeLanes: boolean = false
 ): Promise<any> => {
   const params = getParams(filters, district);
   params.set("is_pedestrian", "true");
+  if (mergeLanes) {
+    params.set("merge_lanes", "true");
+  }
   const cacheKey = `gujarat_pedestrian_network_${params.toString()}`;
   return withCache(cacheKey, async () => {
     const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, {

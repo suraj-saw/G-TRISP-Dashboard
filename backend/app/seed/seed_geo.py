@@ -28,7 +28,7 @@ if str(_BACKEND) not in sys.path:
 
 from app.seed.seed_gujarat_boundary  import seed_gujarat_boundary
 from app.seed.seed_gujarat_districts import seed_gujarat_districts
-from app.seed.seed_accidents         import seed_accidents
+from app.seed.seed_gujarat_accidents import seed_gujarat_accidents
 from app.utils.coordinate_validator  import check_validation_tables_ready
 from app.database import SessionLocal
 from app.seed.seed_gujarat_talukas import seed_gujarat_talukas
@@ -104,7 +104,7 @@ def run_geo_seeds(
 
     # 3. Accident records
     logger.info("Step %s — seeding accident records …", "3/3" if not accidents_only else "1/1")
-    seed_accidents(force=force, skip_validation=skip_validation)
+    seed_gujarat_accidents(force=force, skip_validation=skip_validation)
 
     # 4. Roads (optional)
     if seed_gujarat_roads is not None:

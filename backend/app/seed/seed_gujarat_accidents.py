@@ -70,14 +70,43 @@ CHUNK_SIZE = int(os.getenv("SEED_BATCH_SIZE", str(DEFAULT_SEED_BATCH_SIZE)))
 # key -> (filename, fallback district name used only when a row's own
 # "District" cell is blank, and short tag used for accident_id de-duplication)
 DISTRICT_FILES: dict[str, dict] = {
-    "ahmedabad":    {"file": "Ahmedabad City 2023-2026 overall data.xlsx", "default_district": "Ahmedabad", "tag": "AHM"},
-    "dang":         {"file": "Ahwa Dang 2023-2026 overall data.xlsx",       "default_district": "The Dangs",  "tag": "DNG"},
-    "bhavnagar":    {"file": "Bhavnagar 2023-2026 overall data.xlsx",       "default_district": "Bhavnagar",  "tag": "BHV"},
-    "jamnagar":     {"file": "Jamnagar 2023-2026 overall data.xlsx",        "default_district": "Jamnagar",   "tag": "JAM"},
-    "rajkot":       {"file": "Rajkot 2023-2026 overall data.xlsx",          "default_district": "Rajkot",     "tag": "RAJ"},
-    "surat_city":   {"file": "Surat City 2023-2026 overall data.xlsx",      "default_district": "Surat",      "tag": "SURC"},
-    "surat_rural":  {"file": "Surat Rural 2023-2026 overall data.xlsx",     "default_district": "Surat",      "tag": "SURR"},
-    "vadodara":     {"file": "Vadodara 2023-2026 overall data.xlsx",        "default_district": "Vadodara",   "tag": "VAD"},
+    # ── Original Seeded Districts ──
+    "ahmedabad":     {"file": "Ahmedabad City 2023-2026 overall data.xlsx", "default_district": "Ahmadabad",    "tag": "AHM"},
+    "bhavnagar":     {"file": "Bhavnagar 2023-2026 overall data.xlsx",      "default_district": "Bhavnagar",    "tag": "BHV"},
+    "dang":          {"file": "Ahwa Dang 2023-2026 overall data.xlsx",      "default_district": "Dangs",        "tag": "DNG"},
+    "jamnagar":      {"file": "Jamnagar 2023-2026 overall data.xlsx",       "default_district": "Jamnagar",     "tag": "JAM"},
+    "rajkot":        {"file": "Rajkot 2023-2026 overall data.xlsx",         "default_district": "Rajkot",       "tag": "RAJ"},
+    "surat_city":    {"file": "Surat City 2023-2026 overall data.xlsx",     "default_district": "Surat",        "tag": "SURC"},
+    "surat_rural":   {"file": "Surat Rural 2023-2026 overall data.xlsx",    "default_district": "Surat",        "tag": "SURR"},
+    "vadodara":      {"file": "Vadodara 2023-2026 overall data.xlsx",       "default_district": "Vadodara",     "tag": "VAD"},
+    
+    # ── Newly Added Districts ──
+    "amreli":        {"file": "Amreli 2023-2026 overall data.xlsx",         "default_district": "Amreli",       "tag": "AMR"},
+    "anand":         {"file": "Anand 2023-2026 overall data.xlsx",          "default_district": "Anand",        "tag": "AND"},
+    "arvalli":       {"file": "Arvalli 2023-2026 overall data.xlsx",        "default_district": "Arvalli",      "tag": "ARV"},
+    "banas_kantha":  {"file": "Banas Kantha 2023-2026 overall data.xlsx",   "default_district": "Banas Kantha", "tag": "BNK"},
+    "bharuch":       {"file": "Bharuch 2023-2026 overall data.xlsx",        "default_district": "Bharuch",      "tag": "BHR"},
+    "botad":         {"file": "Botad 2023-2026 overall data.xlsx",          "default_district": "Botad",        "tag": "BOT"},
+    "chhotaudepur":  {"file": "Chhotaudepur 2023-2026 overall data.xlsx",   "default_district": "Chhotaudepur", "tag": "CHU"},
+    "dahod":         {"file": "Dahod 2023-2026 overall data.xlsx",          "default_district": "Dahod",        "tag": "DHD"},
+    "devbhumi_dwarka":{"file": "Devbhumi Dwarka 2023-2026 overall data.xlsx","default_district": "Devbhumi Dwarka","tag": "DVK"},
+    "gandhinagar":   {"file": "Gandhinagar 2023-2026 overall data.xlsx",    "default_district": "Gandhinagar",  "tag": "GAN"},
+    "gir_somnath":   {"file": "Gir Somnath 2023-2026 overall data.xlsx",    "default_district": "Gir Somnath",  "tag": "GIR"},
+    "junagadh":      {"file": "Junagadh 2023-2026 overall data.xlsx",       "default_district": "Junagadh",     "tag": "JUN"},
+    "kachchh":       {"file": "Kachchh 2023-2026 overall data.xlsx",        "default_district": "Kachchh",      "tag": "KCH"},
+    "kheda":         {"file": "Kheda 2023-2026 overall data.xlsx",          "default_district": "Kheda",        "tag": "KHD"},
+    "mahesana":      {"file": "Mahesana 2023-2026 overall data.xlsx",       "default_district": "Mahesana",     "tag": "MHS"},
+    "mahisagar":     {"file": "Mahisagar 2023-2026 overall data.xlsx",      "default_district": "Mahisagar",    "tag": "MHG"},
+    "morbi":         {"file": "Morbi 2023-2026 overall data.xlsx",          "default_district": "Morbi",        "tag": "MRB"},
+    "narmada":       {"file": "Narmada 2023-2026 overall data.xlsx",        "default_district": "Narmada",      "tag": "NRM"},
+    "navsari":       {"file": "Navsari 2023-2026 overall data.xlsx",        "default_district": "Navsari",      "tag": "NVS"},
+    "panch_mahals":  {"file": "Panch Mahals 2023-2026 overall data.xlsx",   "default_district": "Panch Mahals", "tag": "PNM"},
+    "patan":         {"file": "Patan 2023-2026 overall data.xlsx",          "default_district": "Patan",        "tag": "PTN"},
+    "porbandar":     {"file": "Porbandar 2023-2026 overall data.xlsx",      "default_district": "Porbandar",    "tag": "POR"},
+    "sabar_kantha":  {"file": "Sabar Kantha 2023-2026 overall data.xlsx",   "default_district": "Sabar Kantha", "tag": "SBK"},
+    "surendranagar": {"file": "Surendranagar 2023-2026 overall data.xlsx",  "default_district": "Surendranagar","tag": "SRN"},
+    "tapi":          {"file": "Tapi 2023-2026 overall data.xlsx",           "default_district": "Tapi",         "tag": "TPI"},
+    "valsad":        {"file": "Valsad 2023-2026 overall data.xlsx",         "default_district": "Valsad",       "tag": "VLS"},
 }
 
 # ---------------------------------------------------------------------------

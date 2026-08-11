@@ -411,9 +411,13 @@ export const fetchPedestrianIrcGridBlackspots = async (
  * Fetch Network-constrained Blackspots
  */
 export const fetchNetworkBlackspots = async (
-  filters: DashboardFilters
+  filters: DashboardFilters,
+  mergeLanes: boolean = false
 ): Promise<any> => {
   const params = getParams(filters);
+  if (mergeLanes) {
+    params.set("merge_lanes", "true");
+  }
   const cacheKey = `network_${params.toString()}`;
   return withCache(cacheKey, async () => {
     const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, { params });
@@ -425,10 +429,14 @@ export const fetchNetworkBlackspots = async (
  * Fetch Pedestrian Network-constrained Blackspots
  */
 export const fetchPedestrianNetworkBlackspots = async (
-  filters: DashboardFilters
+  filters: DashboardFilters,
+  mergeLanes: boolean = false
 ): Promise<any> => {
   const params = getParams(filters);
   params.set("is_pedestrian", "true");
+  if (mergeLanes) {
+    params.set("merge_lanes", "true");
+  }
   const cacheKey = `pedestrian_network_${params.toString()}`;
   return withCache(cacheKey, async () => {
     const { data } = await API.get(`${GUJARAT_API_BASE}/network-blackspots`, { params });

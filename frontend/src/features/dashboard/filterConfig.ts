@@ -19,6 +19,7 @@ export type VisualizationType =
   | "irc_grid_blackspot"
   | "temporal_analysis"
   | "network_blackspot"
+  | "network_blackspot_merged"
   | "risk_corridors"
   | "road_network";
 
@@ -59,6 +60,7 @@ export const VISUALIZATION_OPTIONS = [
   { value: "irc_grid_blackspot", label: "IRC 131 Blackspot (Grid)" },
   { value: "snapped_accidents", label: "Network Snapped" },
   { value: "network_blackspot", label: "Network Blackspots (Segments)" },
+  { value: "network_blackspot_merged", label: "Network Blackspots (Merged Lanes)" },
   { value: "risk_corridors", label: "Risk Corridors" },
   { value: "road_network", label: "Road Network" },
   { value: "temporal_analysis", label: "Temporal Analysis" },
@@ -82,6 +84,7 @@ export const VISUALIZATION_VARIANT_LABELS: Record<string, string> = {
   irc_grid_blackspot: "Crash Type",
   snapped_accidents: "Crash Type",
   network_blackspot: "Crash Type",
+  network_blackspot_merged: "Crash Type",
   risk_corridors: "Crash Type",
   road_network: "Crash Type",
 };

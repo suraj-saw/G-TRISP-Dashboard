@@ -552,6 +552,8 @@ export default function DistrictDashboard() {
     filters.visualization_type === "snapped_accidents";
   const isNetworkBlackspot =
     filters.visualization_type === "network_blackspot";
+  const isNetworkBlackspotMerged =
+    filters.visualization_type === "network_blackspot_merged";
   const isRiskCorridors =
     filters.visualization_type === "risk_corridors";
   const isRoadNetwork =
@@ -987,6 +989,22 @@ export default function DistrictDashboard() {
                           fetchFn={(f) => fetchGujaratNetworkBlackspots(f, districtName)}
                           fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
                           analysisLabel="Network Blackspots (Segments)"
+                        />
+                      ) : isNetworkBlackspotMerged && isPedestrianVariant ? (
+                        <NetworkBlackspotLayers
+                          key="pedestrian-network-blackspot-merged"
+                          filters={filters}
+                          fetchFn={(f) => fetchGujaratPedestrianNetworkBlackspots(f, districtName, true)}
+                          fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
+                          analysisLabel="Pedestrian Network Blackspots (Merged Lanes)"
+                        />
+                      ) : isNetworkBlackspotMerged ? (
+                        <NetworkBlackspotLayers
+                          key="network-blackspot-merged"
+                          filters={filters}
+                          fetchFn={(f) => fetchGujaratNetworkBlackspots(f, districtName, true)}
+                          fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
+                          analysisLabel="Network Blackspots (Merged Lanes)"
                         />
                       ) : isRiskCorridors && isPedestrianVariant ? (
                         <RiskCorridorLayers
