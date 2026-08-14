@@ -22,18 +22,22 @@ from app.core.constants import (
     UNKNOWN_LABEL,
 )
 
-router = APIRouter()
+from app.utils.taluka_utils import apply_taluka_spatial_filter
 
+router = APIRouter()
 
 @router.get("/filter-options", response_model=FilterOptions)
 def get_filter_options(
     district: Optional[List[str]] = Query(None),
+    taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     def distinct(col):
         q = db.query(col).filter(col.isnot(None), col != "", col != "nan")
         if district:
             q = q.filter(Accident.district.in_(district))
+        if taluka:
+            q = apply_taluka_spatial_filter(q, Accident, Accident.location, taluka, db)
         return [r[0] for r in q.distinct().order_by(col).all()]
 
     date_q = db.query(
@@ -42,6 +46,8 @@ def get_filter_options(
     )
     if district:
         date_q = date_q.filter(Accident.district.in_(district))
+    if taluka:
+        date_q = apply_taluka_spatial_filter(date_q, Accident, Accident.location, taluka, db)
     min_dt, max_dt = date_q.first()
     
     # Get distinct years
@@ -50,6 +56,8 @@ def get_filter_options(
     )
     if district:
         year_q = year_q.filter(Accident.district.in_(district))
+    if taluka:
+        year_q = apply_taluka_spatial_filter(year_q, Accident, Accident.location, taluka, db)
     years = sorted([int(r[0]) for r in year_q.distinct().all()])
 
     return FilterOptions(

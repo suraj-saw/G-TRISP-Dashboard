@@ -96,10 +96,14 @@ function getParams(
  * @returns Filter options object
  */
 export const fetchGujaratFilterOptions = async (
-  district?: string
+  district?: string,
+  talukas?: string[]
 ): Promise<FilterOptions> => {
   const params = new URLSearchParams();
   if (district) params.append("district", district);
+  if (talukas && talukas.length) {
+    talukas.forEach((t) => params.append("taluka", t));
+  }
   const { data } = await API.get(`${GUJARAT_API_BASE}/filter-options`, {
     params,
   });

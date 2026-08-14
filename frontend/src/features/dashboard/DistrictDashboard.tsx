@@ -383,10 +383,10 @@ export default function DistrictDashboard() {
   // ── Filter dropdown options for this district ───────────────────────────
   useEffect(() => {
     if (!districtName) return;
-    fetchGujaratFilterOptions(districtName)
+    fetchGujaratFilterOptions(districtName, filters.taluka)
       .then(setFilterOptions)
       .catch(() => {});
-  }, [districtName]);
+  }, [districtName, filters.taluka?.join(',')]);
 
   useEffect(() => {
     if (!districtSlug) return;
