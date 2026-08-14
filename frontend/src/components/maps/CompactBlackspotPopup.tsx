@@ -4,8 +4,10 @@
  * @responsibility Renders blackspot metadata (priority level, cluster ID, crash breakdown by severity, total crashes) in a sleek, space-efficient layout.
  */
 
-import { Download } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Download, MapPin } from "lucide-react";
 import { getPriorityColor, getPriorityLabel } from "../../config/blackspotConfig";
+import { reverseGeocode } from "../../api/geocodingApi";
 
 export interface BlackspotPopupData {
   bs_id?: number | string;
@@ -23,6 +25,8 @@ export interface BlackspotPopupData {
   start_m?: number;
   end_m?: number;
   vehicle_count?: number;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface CompactBlackspotPopupProps {
@@ -52,6 +56,31 @@ export default function CompactBlackspotPopup({
 
   const totalCrashes = data.crash_count ?? data.accident_count ?? 0;
   const qualifyingCrashes = data.qualifying_count ?? totalCrashes;
+
+  const [landmark, setLandmark] = useState<string | null>(null);
+  const [loadingLandmark, setLoadingLandmark] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (data.latitude === undefined || data.longitude === undefined) return;
+    
+    setLoadingLandmark(true);
+    reverseGeocode(data.latitude, data.longitude)
+      .then((res) => {
+        if (active) {
+          setLandmark(res);
+          setLoadingLandmark(false);
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          console.error("Failed to reverse geocode:", err);
+          setLoadingLandmark(false);
+        }
+      });
+
+    return () => { active = false; };
+  }, [data.latitude, data.longitude]);
 
   return (
     <div
@@ -93,6 +122,22 @@ export default function CompactBlackspotPopup({
             </span>
           )}
         </div>
+
+        {/* Landmark */}
+        {data.latitude !== undefined && data.longitude !== undefined && (
+          <div className="flex items-center gap-1.5 text-[10px] text-slate-600 bg-slate-50/80 rounded border border-slate-100 px-1.5 py-1">
+            <MapPin size={10} className="text-blue-500 shrink-0" />
+            <span className="truncate font-medium" title={landmark || "Unknown"}>
+              {loadingLandmark ? (
+                <span className="animate-pulse text-slate-400">Locating...</span>
+              ) : landmark ? (
+                landmark
+              ) : (
+                "Unknown Location"
+              )}
+            </span>
+          </div>
+        )}
 
         {/* 4-Stat Breakdown Grid */}
         <div className="grid grid-cols-4 gap-1 text-center">

@@ -28,44 +28,92 @@ export const searchLocation = async (
   try {
     const params: Record<string, string | number> = {
       q: query,
+      format: 'json',
+      addressdetails: 1,
+      countrycodes: 'in', // Constrain to India
       limit: 6,
     };
 
     if (bbox) {
       const [minLng, minLat, maxLng, maxLat] = bbox;
-      // Photon uses minLon,minLat,maxLon,maxLat format
-      params.bbox = `${minLng},${minLat},${maxLng},${maxLat}`;
+      // Nominatim viewbox format: <x1>,<y1>,<x2>,<y2> (left, top, right, bottom)
+      params.viewbox = `${minLng},${maxLat},${maxLng},${minLat}`;
+      params.bounded = 1;
     }
 
-    const response = await axios.get('https://photon.komoot.io/api/', {
+    const response = await axios.get<any[]>('https://nominatim.openstreetmap.org/search', {
       params,
+      headers: {
+        'Accept-Language': 'en-US,en;q=0.9',
+      }
     });
 
-    // Map Photon GeoJSON features to the expected GeocodingResult format
-    return response.data.features.map((feature: any) => {
-      const { properties, geometry } = feature;
-      
-      const parts = [];
-      if (properties.name) parts.push(properties.name);
-      if (properties.street && properties.street !== properties.name) parts.push(properties.street);
-      if (properties.district && properties.district !== properties.name) parts.push(properties.district);
-      if (properties.city && properties.city !== properties.district && properties.city !== properties.name) parts.push(properties.city);
-      if (properties.state) parts.push(properties.state);
-      
-      // Ensure we don't have duplicates in the display name
-      const uniqueParts = Array.from(new Set(parts)).filter(Boolean);
-
-      return {
-        place_id: properties.osm_id || Math.random().toString(),
-        lat: geometry.coordinates[1].toString(),
-        lon: geometry.coordinates[0].toString(),
-        display_name: uniqueParts.join(', ') || 'Unknown Location',
-        type: properties.type || '',
-        class: properties.osm_value || '',
-      };
-    });
+    return response.data.map((item) => ({
+      place_id: item.place_id,
+      lat: item.lat,
+      lon: item.lon,
+      display_name: item.display_name,
+      type: item.type,
+      class: item.class,
+    }));
   } catch (error) {
     console.error("Geocoding API error:", error);
     return [];
+  }
+};
+
+/**
+ * Performs reverse geocoding using the Nominatim API.
+ * 
+ * @param lat The latitude of the location
+ * @param lon The longitude of the location
+ * @returns The best matching address component or landmark name
+ */
+export const reverseGeocode = async (
+  lat: number,
+  lon: number
+): Promise<string | null> => {
+  try {
+    const params = {
+      lat,
+      lon,
+      format: 'json',
+      zoom: 18, // Detail level: building/street
+      addressdetails: 1,
+    };
+
+    const response = await axios.get('https://nominatim.openstreetmap.org/reverse', {
+      params,
+      headers: {
+        'Accept-Language': 'en-US,en;q=0.9',
+      }
+    });
+
+    if (response.data && response.data.address) {
+      const address = response.data.address;
+      
+      // Prioritize specific landmark/street over general area
+      const landmark = 
+        address.amenity || 
+        address.building || 
+        address.shop || 
+        address.office || 
+        address.highway || 
+        address.road || 
+        address.suburb || 
+        address.neighbourhood ||
+        address.village;
+        
+      if (landmark) {
+        return landmark;
+      }
+      
+      return response.data.display_name.split(',')[0];
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Reverse geocoding API error:", error);
+    return null;
   }
 };

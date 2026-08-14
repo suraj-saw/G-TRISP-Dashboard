@@ -501,6 +501,8 @@ function BlackspotPopup({ hovered }: { hovered: NonNullable<HoverState> }) {
         data={{
           priority_score: count,
           crash_count: count,
+          latitude: hovered.latitude,
+          longitude: hovered.longitude,
         }}
       />
     );
