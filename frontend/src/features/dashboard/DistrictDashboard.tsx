@@ -13,6 +13,8 @@ import {
   // AlertTriangle as NoDataIcon,
   MapPin,
 } from "lucide-react";
+import { Marker } from "react-map-gl/maplibre";
+import LocationSearchBar from "../../components/maps/LocationSearchBar";
 
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
@@ -252,6 +254,39 @@ export default function DistrictDashboard() {
   const [boundaryLoading, setBoundaryLoading] = useState(true);
   const [boundaryError, setBoundaryError] = useState<string | null>(null);
   const [districtName, setDistrictName] = useState<string>("");
+  
+  const [searchMarkerCoord, setSearchMarkerCoord] = useState<{lat: number, lng: number} | null>(null);
+
+  const districtBbox = useMemo(() => {
+    if (!boundary) return null;
+    let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+    for (const f of boundary.features) {
+      const g = f.geometry;
+      const scan = (coords: GeoJSON.Position[]) => {
+        for (const [lng, lat] of coords) {
+          if (lng < minLng) minLng = lng;
+          if (lat < minLat) minLat = lat;
+          if (lng > maxLng) maxLng = lng;
+          if (lat > maxLat) maxLat = lat;
+        }
+      };
+      if (g.type === "Polygon") scan(g.coordinates[0]);
+      if (g.type === "MultiPolygon") g.coordinates.forEach((p: any) => scan(p[0]));
+    }
+    return isFinite(minLng) ? [minLng, minLat, maxLng, maxLat] as [number, number, number, number] : null;
+  }, [boundary]);
+
+  const handleLocationSelect = (lat: number, lng: number) => {
+    setSearchMarkerCoord({ lat, lng });
+    const map = mapRef.current?.getMap();
+    if (map) {
+      map.flyTo({
+        center: [lng, lat],
+        zoom: 15,
+        duration: 1500,
+      });
+    }
+  };
 
   const [filters, setFilters] = useState<DashboardFilters>(
     defaultDistrictFilters
@@ -722,6 +757,13 @@ export default function DistrictDashboard() {
               Back to Gujarat map
             </button>
 
+            {/* Location Search Bar in the Sidebar */}
+            <LocationSearchBar 
+              bbox={districtBbox} 
+              onLocationSelect={handleLocationSelect} 
+              onClear={() => setSearchMarkerCoord(null)}
+            />
+
             <div className="flex items-center gap-2 px-1">
               <Filter size={13} className="text-[#1e3a8a]" />
               <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#1A1D2E]">
@@ -877,6 +919,18 @@ export default function DistrictDashboard() {
                       loadingLabel={`Loading ${districtName || "district"}…`}
                       overlays={undefined}
                     >
+                      {/* The red marker for searched locations */}
+                      {searchMarkerCoord && (
+                        <Marker
+                          longitude={searchMarkerCoord.lng}
+                          latitude={searchMarkerCoord.lat}
+                          anchor="bottom"
+                        >
+                          <div className="text-red-600 drop-shadow-md transition-transform hover:scale-110">
+                            <MapPin size={32} fill="currentColor" stroke="white" strokeWidth={1.5} />
+                          </div>
+                        </Marker>
+                      )}
                       {isPedestrianBlackspot ? (
                         <BlackspotDetectionLayers
                           key="pedestrian-blackspot"

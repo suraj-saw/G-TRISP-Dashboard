@@ -18,6 +18,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Copy } from "lucide-react";
 import { getMapStyleUrl } from "./mapStyles";
+import LocationSearchBar from "./LocationSearchBar";
 import {
   GUJARAT_MAP_CENTER,
   SATELLITE_BASE_MAP_IDS,
@@ -280,6 +281,17 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
       setContextMenuCoords({ lat: e.lngLat.lat, lng: e.lngLat.lng });
     }, []);
 
+    const handleLocationSelect = useCallback((lat: number, lng: number) => {
+      const map = mapRef.current?.getMap();
+      if (map) {
+        map.flyTo({
+          center: [lng, lat],
+          zoom: 15,
+          duration: 1500,
+        });
+      }
+    }, []);
+
     return (
       <div className="relative w-full overflow-hidden" style={{ height }}>
         {(boundaryLoading || !mapLoaded) && (
@@ -418,6 +430,11 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
         </Map>
 
         {overlays}
+        
+        <LocationSearchBar 
+          bbox={bboxRef.current} 
+          onLocationSelect={handleLocationSelect} 
+        />
 
         <div
           className="absolute bottom-1 right-2 z-10 text-[10px] text-slate-400"
