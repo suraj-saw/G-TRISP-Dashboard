@@ -29,10 +29,12 @@ import sys
 import uuid
 from pathlib import Path
 
+# pyrefly: ignore [missing-import]
 from geoalchemy2.shape import from_shape
 from shapely.geometry import shape as shapely_shape
 from shapely.geometry import MultiLineString, LineString
 from shapely.ops import transform as shapely_transform
+# pyrefly: ignore [missing-import]
 from pyproj import Transformer
 
 from app.database import Base, engine, SessionLocal

@@ -120,26 +120,35 @@ export default function GujaratChoroplethMap() {
 
 
 
-        const countByName = new Map(
+        const normalizeDistrictName = (rawName: string) => {
+          let name = rawName.trim().toLowerCase();
+          name = name.replace(/\s+city$/, "").replace(/\s+rural$/, "").replace(/^wrly\s+/, "");
+          if (name.includes("vav tharad") || name.includes("banaskantha")) return "banas kantha";
+          if (name.includes("vadodara")) return "vadodara";
+          if (name.includes("ahmedabad")) return "ahmadabad";
+          if (name.includes("surat")) return "surat";
+          if (name.includes("rajkot")) return "rajkot";
+          if (name.includes("kachchh") || name.includes("kutchh")) return "kachchh";
+          if (name.includes("panchmahal")) return "panch mahals";
+          if (name.includes("sabarkantha")) return "sabar kantha";
+          if (name.includes("chotaudepur")) return "chhotaudepur";
+          if (name.includes("devbhumi dwrka")) return "devbhumi dwarka";
+          if (name.includes("mahisagar")) return "mahisagar";
+          if (name.includes("bhavanagar")) return "bhavnagar";
+          return name;
+        };
 
-          summary.map((s) => [
+        const countByName = new Map<string, number>();
+        summary.forEach((s) => {
+          const mappedName = normalizeDistrictName(s.district);
+          const currentCount = countByName.get(mappedName) || 0;
+          countByName.set(mappedName, currentCount + s.accident_count);
+        });
 
-            s.district.trim().toLowerCase(),
-
-            s.accident_count,
-
-          ])
-
-        );
-
-        const maxVal = Math.max(1, ...summary.map((s) => s.accident_count));
-
-
+        const maxVal = Math.max(1, ...Array.from(countByName.values()));
 
         const colorScale = scaleSqrt<string>()
-
           .domain([0, maxVal])
-
           .range(["#EAF0FE", "#1E3A8A"]);
 
 

@@ -133,16 +133,10 @@ def is_inside_gujarat(
             SELECT EXISTS (
                 SELECT 1
                 FROM   gujarat_boundary
-                WHERE  ST_Within(
-                           ST_Buffer(
-                               ST_SetSRID(ST_MakePoint(:lon, :lat), :srid),
-                               :tol
-                           ),
-                           geometry
-                       )
-                    OR ST_Within(
+                WHERE  ST_DWithin(
                            ST_SetSRID(ST_MakePoint(:lon, :lat), :srid),
-                           ST_Buffer(geometry, :tol)
+                           geometry,
+                           :tol
                        )
             )
             """
@@ -192,9 +186,10 @@ def find_district(
             """
             SELECT shape_name, shape_id
             FROM   gujarat_districts
-            WHERE  ST_Within(
+            WHERE  ST_DWithin(
                        ST_SetSRID(ST_MakePoint(:lon, :lat), :srid),
-                       ST_Buffer(geometry, :tol)
+                       geometry,
+                       :tol
                    )
             ORDER BY shape_name
             """

@@ -48,18 +48,24 @@ EXPECTED_COLUMNS: List[str] = [
     "driver_killed",
     "driver_grievous_injury",
     "driver_minor_injury",
+    "driver_no_injury",
     "passenger_killed",
     "passenger_grievous_injury",
     "passenger_minor_injury",
+    "passenger_no_injury",
     "pedestrian_killed",
     "pedestrian_grievous_injury",
     "pedestrian_minor_injury",
+    "pedestrian_no_injury",
     "type_of_collision",
     "collision_feature",
     "weather_condition",
     "light_condition",
     "visibility",
     "traffic_violation",
+    "accident_location",
+    "landmark_name",
+    "accident_description",
 ]
 
 INTEGER_COLUMNS = {
@@ -67,12 +73,15 @@ INTEGER_COLUMNS = {
     "driver_killed",
     "driver_grievous_injury",
     "driver_minor_injury",
+    "driver_no_injury",
     "passenger_killed",
     "passenger_grievous_injury",
     "passenger_minor_injury",
+    "passenger_no_injury",
     "pedestrian_killed",
     "pedestrian_grievous_injury",
     "pedestrian_minor_injury",
+    "pedestrian_no_injury",
 }
 
 FLOAT_COLUMNS = {"latitude", "longitude"}
@@ -269,18 +278,22 @@ def add_accident(
         driver_killed=row.get("driver_killed"),
         driver_grievous_injury=row.get("driver_grievous_injury"),
         driver_minor_injury=row.get("driver_minor_injury"),
+        driver_no_injury=row.get("driver_no_injury"),
         passenger_killed=row.get("passenger_killed"),
         passenger_grievous_injury=row.get("passenger_grievous_injury"),
         passenger_minor_injury=row.get("passenger_minor_injury"),
+        passenger_no_injury=row.get("passenger_no_injury"),
         pedestrian_killed=row.get("pedestrian_killed"),
         pedestrian_grievous_injury=row.get("pedestrian_grievous_injury"),
         pedestrian_minor_injury=row.get("pedestrian_minor_injury"),
+        pedestrian_no_injury=row.get("pedestrian_no_injury"),
         type_of_collision=row.get("type_of_collision"),
         collision_feature=row.get("collision_feature"),
         weather_condition=row.get("weather_condition"),
         light_condition=row.get("light_condition"),
         visibility=row.get("visibility"),
         traffic_violation=row.get("traffic_violation"),
+        is_valid_coordinates=row.get("is_valid_coordinates", True),
     )
 
     db.add(record)
@@ -309,6 +322,7 @@ def get_accidents(
     visibility: Optional[str] = None,
     traffic_violation: Optional[str] = None,
     collision_feature: Optional[str] = None,
+    requires_attention: Optional[bool] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
@@ -325,6 +339,9 @@ def get_accidents(
             | (Accident.type_of_collision.ilike(pattern))
             | (Accident.traffic_violation.ilike(pattern))
         )
+
+    if requires_attention is not None:
+        query = query.filter(Accident.requires_attention == requires_attention)
 
     filter_map = {
         "district": district,
@@ -384,18 +401,23 @@ def update_accident(
     record.driver_killed = row.get("driver_killed")
     record.driver_grievous_injury = row.get("driver_grievous_injury")
     record.driver_minor_injury = row.get("driver_minor_injury")
+    record.driver_no_injury = row.get("driver_no_injury")
     record.passenger_killed = row.get("passenger_killed")
     record.passenger_grievous_injury = row.get("passenger_grievous_injury")
     record.passenger_minor_injury = row.get("passenger_minor_injury")
+    record.passenger_no_injury = row.get("passenger_no_injury")
     record.pedestrian_killed = row.get("pedestrian_killed")
     record.pedestrian_grievous_injury = row.get("pedestrian_grievous_injury")
     record.pedestrian_minor_injury = row.get("pedestrian_minor_injury")
+    record.pedestrian_no_injury = row.get("pedestrian_no_injury")
     record.type_of_collision = row.get("type_of_collision")
     record.collision_feature = row.get("collision_feature")
     record.weather_condition = row.get("weather_condition")
     record.light_condition = row.get("light_condition")
     record.visibility = row.get("visibility")
     record.traffic_violation = row.get("traffic_violation")
+    if "is_valid_coordinates" in payload:
+        record.is_valid_coordinates = payload["is_valid_coordinates"]
 
     db.commit()
     db.refresh(record)
@@ -640,18 +662,22 @@ def import_accidents(
             driver_killed=row.get("driver_killed") or 0,
             driver_grievous_injury=row.get("driver_grievous_injury") or 0,
             driver_minor_injury=row.get("driver_minor_injury") or 0,
+            driver_no_injury=row.get("driver_no_injury") or 0,
             passenger_killed=row.get("passenger_killed") or 0,
             passenger_grievous_injury=row.get("passenger_grievous_injury") or 0,
             passenger_minor_injury=row.get("passenger_minor_injury") or 0,
+            passenger_no_injury=row.get("passenger_no_injury") or 0,
             pedestrian_killed=row.get("pedestrian_killed") or 0,
             pedestrian_grievous_injury=row.get("pedestrian_grievous_injury") or 0,
             pedestrian_minor_injury=row.get("pedestrian_minor_injury") or 0,
+            pedestrian_no_injury=row.get("pedestrian_no_injury") or 0,
             type_of_collision=row.get("type_of_collision"),
             collision_feature=row.get("collision_feature"),
             weather_condition=row.get("weather_condition"),
             light_condition=row.get("light_condition"),
             visibility=row.get("visibility"),
             traffic_violation=row.get("traffic_violation"),
+            is_valid_coordinates=row.get("is_valid_coordinates", True),
         )
         db.add(record)
         inserted += 1

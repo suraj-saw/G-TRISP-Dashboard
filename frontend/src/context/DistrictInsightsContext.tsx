@@ -130,11 +130,71 @@ export function DistrictInsightsProvider({
 
   const lookup = useMemo(() => {
     const map = new Map<string, DistrictInsight>();
-    if (districts) {
-      Object.values(districts).forEach((d) =>
-        map.set(normalize(d.district), d)
-      );
-    }
+    if (!districts) return map;
+
+    const normalizeDistrictName = (rawName: string) => {
+      let name = rawName.trim().toLowerCase();
+      name = name.replace(/\s+city$/, "").replace(/\s+rural$/, "").replace(/^wrly\s+/, "");
+      if (name.includes("vav tharad") || name.includes("banaskantha")) return "banas kantha";
+      if (name.includes("vadodara")) return "vadodara";
+      if (name.includes("ahmedabad")) return "ahmadabad";
+      if (name.includes("surat")) return "surat";
+      if (name.includes("rajkot")) return "rajkot";
+      if (name.includes("kachchh") || name.includes("kutchh")) return "kachchh";
+      if (name.includes("panchmahal")) return "panch mahals";
+      if (name.includes("sabarkantha")) return "sabar kantha";
+      if (name.includes("chotaudepur")) return "chhotaudepur";
+      if (name.includes("devbhumi dwrka")) return "devbhumi dwarka";
+      if (name.includes("mahisagar")) return "mahisagar";
+      if (name.includes("bhavanagar")) return "bhavnagar";
+      return name;
+    };
+
+    Object.values(districts).forEach((d) => {
+      const rootName = normalizeDistrictName(d.district);
+      if (!map.has(rootName)) {
+        const clone = JSON.parse(JSON.stringify(d)) as DistrictInsight;
+        clone.district = rootName.toUpperCase();
+        map.set(rootName, clone);
+      } else {
+        const existing = map.get(rootName)!;
+        existing.total_accidents += d.total_accidents;
+        existing.fatal_accidents += d.fatal_accidents;
+        existing.fatalities += d.fatalities;
+        existing.grievous_injuries += d.grievous_injuries;
+        existing.minor_injuries += d.minor_injuries;
+        existing.police_stations += d.police_stations;
+        existing.blackspots_count += d.blackspots_count;
+
+        existing.fatality_rate = existing.total_accidents > 0
+          ? Number(((existing.fatal_accidents / existing.total_accidents) * 100).toFixed(2))
+          : 0;
+
+        // Keep the strings of the sub-district with more total accidents
+        if (d.total_accidents > existing.total_accidents - d.total_accidents) {
+          existing.most_affected_police_station = d.most_affected_police_station;
+          existing.highest_accident_month = d.highest_accident_month;
+          existing.peak_accident_time = d.peak_accident_time;
+          existing.risk_level = d.risk_level;
+        }
+
+        const mergeNamedCounts = (arr1: any[], arr2: any[], key = "label") => {
+           arr2.forEach(item2 => {
+              const item1 = arr1.find(i => i[key] === item2[key]);
+              if (item1) item1.count += item2.count;
+              else arr1.push({ ...item2 });
+           });
+        };
+
+        mergeNamedCounts(existing.severity, d.severity, "label");
+        mergeNamedCounts(existing.monthly_trend, d.monthly_trend, "month_label");
+        mergeNamedCounts(existing.time_of_day, d.time_of_day, "label");
+        mergeNamedCounts(existing.weekday, d.weekday, "label");
+        mergeNamedCounts(existing.road_type, d.road_type, "label");
+        mergeNamedCounts(existing.collision_type, d.collision_type, "label");
+      }
+    });
+
     return map;
   }, [districts]);
 

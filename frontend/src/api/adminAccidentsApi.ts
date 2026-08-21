@@ -31,6 +31,13 @@ export interface AccidentRecord {
   light_condition: string | null;
   visibility: string | null;
   traffic_violation: string | null;
+  accident_location: string | null;
+  landmark_name: string | null;
+  accident_description: string | null;
+  is_duplicate: boolean;
+  requires_attention: boolean;
+  is_valid_coordinates: boolean;
+  invalidation_reasons: string | null;
 }
 
 /**
@@ -48,6 +55,7 @@ export interface AccidentFilters {
   visibility?: string;
   traffic_violation?: string;
   collision_feature?: string;
+  requires_attention?: boolean;
 }
 
 /**
@@ -134,8 +142,8 @@ export const adminAccidentsApi = {
     }
     if (filters) {
       for (const [key, value] of Object.entries(filters)) {
-        if (value) {
-          params.append(key, value);
+        if (value !== undefined && value !== "") {
+          params.append(key, String(value));
         }
       }
     }

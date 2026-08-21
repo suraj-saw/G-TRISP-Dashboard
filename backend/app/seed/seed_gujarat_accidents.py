@@ -2,19 +2,7 @@
 """
 Unified multi-district accident seeder.
 
-Loads every district's "<District> 2023-2026 overall data.xlsx" file and
-inserts all rows into the single shared `accidents` table (the Accident
-model), instead of each district living in its own table.
-
-The column layout in these files is identical to the one used by
-seed_surat_accidents.py ("Accident ID", "District", "Police Station", ...),
-so we reuse that exact COLUMN_MAP.
-
-Usage:
-    python -m app.seed.seed_gujarat_accidents                 # skip if already seeded
-    python -m app.seed.seed_gujarat_accidents --force         # wipe accidents table and re-seed everything
-    python -m app.seed.seed_gujarat_accidents --skip-validation
-    python -m app.seed.seed_gujarat_accidents --only surat,rajkot
+Dynamically scans for .xlsx files in the data directory and matches them to official districts using fuzzy matching.
 """
 
 from __future__ import annotations
@@ -23,7 +11,8 @@ import argparse
 import logging
 import os
 import sys
-import uuid
+import difflib
+import re
 from pathlib import Path
 
 # pyrefly: ignore
@@ -41,6 +30,7 @@ if str(_BACKEND) not in sys.path:
 
 from app.database import Base, engine, SessionLocal
 from app.models.accident import Accident
+from app.models.gujarat_district import GujaratDistrict
 from app.core.config import POSTGIS_SRID
 from app.core.constants import NULL_TEXT_SENTINEL, DEFAULT_SEED_BATCH_SIZE
 from app.utils.datetime_utils import parse_accident_datetime
@@ -53,65 +43,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger("seed_gujarat_accidents")
 
-# ---------------------------------------------------------------------------
-# File config
-# ---------------------------------------------------------------------------
-
 _THIS_DIR    = Path(__file__).resolve().parent
-_APP_DIR     = _THIS_DIR.parent
-_BACKEND_DIR = _APP_DIR.parent
+_BACKEND_DIR = _THIS_DIR.parent.parent
 
 DATA_DIR = Path(
     os.getenv("GUJARAT_ACCIDENTS_DATA_DIR", str(_BACKEND_DIR / "data"))
 ).resolve()
 
 CHUNK_SIZE = int(os.getenv("SEED_BATCH_SIZE", str(DEFAULT_SEED_BATCH_SIZE)))
-
-# key -> (filename, fallback district name used only when a row's own
-# "District" cell is blank, and short tag used for accident_id de-duplication)
-DISTRICT_FILES: dict[str, dict] = {
-    # ── Original Seeded Districts ──
-    "ahmedabad":     {"file": "Ahmedabad City 2023-2026 overall data.xlsx", "default_district": "Ahmadabad",    "tag": "AHM"},
-    "bhavnagar":     {"file": "Bhavnagar 2023-2026 overall data.xlsx",      "default_district": "Bhavnagar",    "tag": "BHV"},
-    "dang":          {"file": "Ahwa Dang 2023-2026 overall data.xlsx",      "default_district": "Dangs",        "tag": "DNG"},
-    "jamnagar":      {"file": "Jamnagar 2023-2026 overall data.xlsx",       "default_district": "Jamnagar",     "tag": "JAM"},
-    "rajkot":        {"file": "Rajkot 2023-2026 overall data.xlsx",         "default_district": "Rajkot",       "tag": "RAJ"},
-    "surat_city":    {"file": "Surat City 2023-2026 overall data.xlsx",     "default_district": "Surat",        "tag": "SURC"},
-    "surat_rural":   {"file": "Surat Rural 2023-2026 overall data.xlsx",    "default_district": "Surat",        "tag": "SURR"},
-    "vadodara":      {"file": "Vadodara 2023-2026 overall data.xlsx",       "default_district": "Vadodara",     "tag": "VAD"},
-    
-    # ── Newly Added Districts ──
-    "amreli":        {"file": "Amreli 2023-2026 overall data.xlsx",         "default_district": "Amreli",       "tag": "AMR"},
-    "anand":         {"file": "Anand 2023-2026 overall data.xlsx",          "default_district": "Anand",        "tag": "AND"},
-    "arvalli":       {"file": "Arvalli 2023-2026 overall data.xlsx",        "default_district": "Arvalli",      "tag": "ARV"},
-    "banas_kantha":  {"file": "Banas Kantha 2023-2026 overall data.xlsx",   "default_district": "Banas Kantha", "tag": "BNK"},
-    "bharuch":       {"file": "Bharuch 2023-2026 overall data.xlsx",        "default_district": "Bharuch",      "tag": "BHR"},
-    "botad":         {"file": "Botad 2023-2026 overall data.xlsx",          "default_district": "Botad",        "tag": "BOT"},
-    "chhotaudepur":  {"file": "Chhotaudepur 2023-2026 overall data.xlsx",   "default_district": "Chhotaudepur", "tag": "CHU"},
-    "dahod":         {"file": "Dahod 2023-2026 overall data.xlsx",          "default_district": "Dahod",        "tag": "DHD"},
-    "devbhumi_dwarka":{"file": "Devbhumi Dwarka 2023-2026 overall data.xlsx","default_district": "Devbhumi Dwarka","tag": "DVK"},
-    "gandhinagar":   {"file": "Gandhinagar 2023-2026 overall data.xlsx",    "default_district": "Gandhinagar",  "tag": "GAN"},
-    "gir_somnath":   {"file": "Gir Somnath 2023-2026 overall data.xlsx",    "default_district": "Gir Somnath",  "tag": "GIR"},
-    "junagadh":      {"file": "Junagadh 2023-2026 overall data.xlsx",       "default_district": "Junagadh",     "tag": "JUN"},
-    "kachchh":       {"file": "Kachchh 2023-2026 overall data.xlsx",        "default_district": "Kachchh",      "tag": "KCH"},
-    "kheda":         {"file": "Kheda 2023-2026 overall data.xlsx",          "default_district": "Kheda",        "tag": "KHD"},
-    "mahesana":      {"file": "Mahesana 2023-2026 overall data.xlsx",       "default_district": "Mahesana",     "tag": "MHS"},
-    "mahisagar":     {"file": "Mahisagar 2023-2026 overall data.xlsx",      "default_district": "Mahisagar",    "tag": "MHG"},
-    "morbi":         {"file": "Morbi 2023-2026 overall data.xlsx",          "default_district": "Morbi",        "tag": "MRB"},
-    "narmada":       {"file": "Narmada 2023-2026 overall data.xlsx",        "default_district": "Narmada",      "tag": "NRM"},
-    "navsari":       {"file": "Navsari 2023-2026 overall data.xlsx",        "default_district": "Navsari",      "tag": "NVS"},
-    "panch_mahals":  {"file": "Panch Mahals 2023-2026 overall data.xlsx",   "default_district": "Panch Mahals", "tag": "PNM"},
-    "patan":         {"file": "Patan 2023-2026 overall data.xlsx",          "default_district": "Patan",        "tag": "PTN"},
-    "porbandar":     {"file": "Porbandar 2023-2026 overall data.xlsx",      "default_district": "Porbandar",    "tag": "POR"},
-    "sabar_kantha":  {"file": "Sabar Kantha 2023-2026 overall data.xlsx",   "default_district": "Sabar Kantha", "tag": "SBK"},
-    "surendranagar": {"file": "Surendranagar 2023-2026 overall data.xlsx",  "default_district": "Surendranagar","tag": "SRN"},
-    "tapi":          {"file": "Tapi 2023-2026 overall data.xlsx",           "default_district": "Tapi",         "tag": "TPI"},
-    "valsad":        {"file": "Valsad 2023-2026 overall data.xlsx",         "default_district": "Valsad",       "tag": "VLS"},
-}
-
-# ---------------------------------------------------------------------------
-# Column mapping — identical to seed_surat_accidents.py
-# ---------------------------------------------------------------------------
 
 COLUMN_MAP: dict[str, str] = {
     "Accident ID":                  "accident_id",
@@ -120,6 +59,8 @@ COLUMN_MAP: dict[str, str] = {
     "Accident Date Time":           "accident_date_time",
     "Latitude":                     "latitude",
     "Longitude":                    "longitude",
+    "Accident Location":            "accident_location",
+    "Land Mark Name":               "landmark_name",
     "Road Name":                    "road_name",
     "Road Classification":          "road_classification",
     "Severity of the Accident":     "severity",
@@ -127,31 +68,29 @@ COLUMN_MAP: dict[str, str] = {
     "Drivers Killed":               "driver_killed",
     "Drivers Grievous Injury":      "driver_grievous_injury",
     "Drivers Minor Injury":         "driver_minor_injury",
+    "Drivers No Injury":            "driver_no_injury",
     "Passengers Killed":            "passenger_killed",
     "Passengers Grievous Injury":   "passenger_grievous_injury",
     "Passengers Minor Injury":      "passenger_minor_injury",
+    "Passengers No Injury":         "passenger_no_injury",
     "Pedestrian Killed":            "pedestrian_killed",
     "Pedestrian Grievous Injury":   "pedestrian_grievous_injury",
     "Pedestrian Minor Injury":      "pedestrian_minor_injury",
+    "Pedestrian No Injury":         "pedestrian_no_injury",
     "Collision Type":               "type_of_collision",
     "Collision Nature":             "collision_feature",
     "Weather Condition":            "weather_condition",
     "Light Condition":              "light_condition",
     "Visibility":                   "visibility",
     "Traffic Violation":            "traffic_violation",
+    "Accident Description":         "accident_description",
 }
-
-
-# ---------------------------------------------------------------------------
-# Cleaners (same behaviour as the other seeders)
-# ---------------------------------------------------------------------------
 
 def _clean_text(value) -> str | None:
     if pd.isna(value):
         return None
     s = str(value).strip()
     return None if s == "" or s.lower() == NULL_TEXT_SENTINEL else s
-
 
 def _clean_int_zero(value) -> int:
     if pd.isna(value):
@@ -161,7 +100,6 @@ def _clean_int_zero(value) -> int:
     except (TypeError, ValueError):
         return 0
 
-
 def _clean_float(value) -> float | None:
     if pd.isna(value):
         return None
@@ -169,7 +107,6 @@ def _clean_float(value) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
-
 
 def _make_point(lat: float | None, lon: float | None):
     if lat is None or lon is None:
@@ -179,152 +116,162 @@ def _make_point(lat: float | None, lon: float | None):
     except Exception:
         return None
 
-
-# ---------------------------------------------------------------------------
-# accident_id de-duplication
-#
-# Different district exports may reuse the same short accident_id sequence
-# (e.g. "0001", "0002", ...). Accident.accident_id has a DB-level unique
-# constraint, so we guarantee uniqueness in Python before insert rather than
-# trusting the source files.
-# ---------------------------------------------------------------------------
-
-def _unique_id(raw_id: str | None, tag: str, district: str, seen_records: set[tuple[str, str]]) -> str:
-    if not raw_id:
-        candidate = f"{tag}-{uuid.uuid4().hex[:8].upper()}"
-        seen_records.add((candidate, district))
-        return candidate
-    seen_records.add((raw_id, district))
+def _get_raw_id(raw_id: str | None, district: str, seen_records: set[tuple[str, str]]) -> str | None:
+    """Return the raw accident ID as-is. Register it in seen_records for duplicate detection."""
+    if raw_id:
+        seen_records.add((raw_id, district))
     return raw_id
-
-
-# ---------------------------------------------------------------------------
-# Load + build
-# ---------------------------------------------------------------------------
 
 def _load_dataset(path: Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Dataset not found at:\n  {path}")
-
-    logger.info("Reading dataset: %s", path)
+    logger.info("Reading dataset: %s", path.name)
     df = pd.read_excel(path)
-
     missing = set(COLUMN_MAP.keys()) - set(df.columns)
     if missing:
-        raise ValueError(
-            f"'{path.name}' is missing expected columns: {sorted(missing)}"
-        )
-
+        raise ValueError(f"'{path.name}' is missing expected columns: {sorted(missing)}")
     df = df.rename(columns=COLUMN_MAP)
-    df["accident_date_time"] = df["accident_date_time"].apply(parse_accident_datetime)
+    
+    # Drop rows missing accident_id (handles empty rows at the end of sheets)
+    initial_len = len(df)
+    # Convert empty strings/whitespace to NaN so dropna works
+    df["accident_id"] = df["accident_id"].apply(lambda x: None if pd.isna(x) or str(x).strip() == "" else x)
+    df = df.dropna(subset=["accident_id"])
+    if len(df) < initial_len:
+        logger.info("  dropped %d empty rows missing accident_id", initial_len - len(df))
 
+    df["accident_date_time"] = df["accident_date_time"].apply(parse_accident_datetime)
     parsed_count = df["accident_date_time"].notna().sum()
     logger.info("  parsed accident_date_time for %d / %d rows", parsed_count, len(df))
     return df
 
+def _get_official_district(raw_name: str | None, official_districts: list[str]) -> str | None:
+    if not raw_name:
+        return None
+    clean = str(raw_name).strip().replace("-", " ")
+    
+    # Hardcoded overrides for specific files
+    clean_lower_override = clean.lower()
+    if "vav tharad" in clean_lower_override or "banaskantha" in clean_lower_override:
+        return "BANAS KANTHA"
+    if "wrly vadodara" in clean_lower_override:
+        return "VADODARA"
 
-def _build_accident(row, tag: str, default_district: str, seen_records: set[tuple[str, str]]) -> Accident:
+    clean = clean.replace(" City", "").replace(" Rural", "").replace(" District", "")
+    
+    # Do case-insensitive fuzzy matching
+    clean_lower = clean.lower()
+    official_lower = [d.lower() for d in official_districts]
+    
+    matches = difflib.get_close_matches(clean_lower, official_lower, n=1, cutoff=0.3)
+    if matches:
+        # Return the original case from the official list by finding its index
+        idx = official_lower.index(matches[0])
+        return official_districts[idx]
+    return None
+
+def _build_accident(row, official_district: str, seen_records: set[tuple[str, str]], is_duplicate: bool = False, requires_attention: bool = False, is_valid_coordinates: bool = True, invalidation_reasons: str | None = None) -> Accident:
     lat = _clean_float(row["latitude"])
     lon = _clean_float(row["longitude"])
 
-    district = _clean_text(row["district"]) or default_district
-    accident_id = _unique_id(_clean_text(row["accident_id"]), tag, district, seen_records)
-
     return Accident(
-        accident_id         = accident_id,
-        district            = district,
+        accident_id         = _clean_text(row["accident_id"]),
+        district            = official_district,
         police_station      = _clean_text(row["police_station"]),
         accident_date_time  = row["accident_date_time"] if not pd.isna(row["accident_date_time"]) else None,
         latitude            = lat,
         longitude           = lon,
         location            = _make_point(lat, lon),
+        accident_location   = _clean_text(row.get("accident_location")),
+        landmark_name       = _clean_text(row.get("landmark_name")),
         road_name           = _clean_text(row["road_name"]),
         road_classification = _clean_text(row["road_classification"]),
         severity            = _clean_text(row["severity"]),
         number_of_vehicles  = _clean_int_zero(row["number_of_vehicles"]),
 
-        driver_killed          = _clean_int_zero(row["driver_killed"]),
-        driver_grievous_injury = _clean_int_zero(row["driver_grievous_injury"]),
-        driver_minor_injury    = _clean_int_zero(row["driver_minor_injury"]),
+        driver_killed          = _clean_int_zero(row.get("driver_killed")),
+        driver_grievous_injury = _clean_int_zero(row.get("driver_grievous_injury")),
+        driver_minor_injury    = _clean_int_zero(row.get("driver_minor_injury")),
+        driver_no_injury       = _clean_int_zero(row.get("driver_no_injury")),
 
-        passenger_killed          = _clean_int_zero(row["passenger_killed"]),
-        passenger_grievous_injury = _clean_int_zero(row["passenger_grievous_injury"]),
-        passenger_minor_injury    = _clean_int_zero(row["passenger_minor_injury"]),
+        passenger_killed          = _clean_int_zero(row.get("passenger_killed")),
+        passenger_grievous_injury = _clean_int_zero(row.get("passenger_grievous_injury")),
+        passenger_minor_injury    = _clean_int_zero(row.get("passenger_minor_injury")),
+        passenger_no_injury       = _clean_int_zero(row.get("passenger_no_injury")),
 
-        pedestrian_killed          = _clean_int_zero(row["pedestrian_killed"]),
-        pedestrian_grievous_injury = _clean_int_zero(row["pedestrian_grievous_injury"]),
-        pedestrian_minor_injury    = _clean_int_zero(row["pedestrian_minor_injury"]),
+        pedestrian_killed          = _clean_int_zero(row.get("pedestrian_killed")),
+        pedestrian_grievous_injury = _clean_int_zero(row.get("pedestrian_grievous_injury")),
+        pedestrian_minor_injury    = _clean_int_zero(row.get("pedestrian_minor_injury")),
+        pedestrian_no_injury       = _clean_int_zero(row.get("pedestrian_no_injury")),
 
-        type_of_collision = _clean_text(row["type_of_collision"]),
-        collision_feature = _clean_text(row["collision_feature"]),
-        weather_condition = _clean_text(row["weather_condition"]),
-        light_condition   = _clean_text(row["light_condition"]),
-        visibility        = _clean_text(row["visibility"]),
-        traffic_violation = _clean_text(row["traffic_violation"]),
+        type_of_collision = _clean_text(row.get("type_of_collision")),
+        collision_feature = _clean_text(row.get("collision_feature")),
+        weather_condition = _clean_text(row.get("weather_condition")),
+        light_condition   = _clean_text(row.get("light_condition")),
+        visibility        = _clean_text(row.get("visibility")),
+        traffic_violation = _clean_text(row.get("traffic_violation")),
+        accident_description = _clean_text(row.get("accident_description")),
+        
+        is_duplicate = is_duplicate,
+        requires_attention = requires_attention,
+        is_valid_coordinates = is_valid_coordinates,
+        invalidation_reasons = invalidation_reasons,
     )
-
-
-# ---------------------------------------------------------------------------
-# Coordinate validation (state-level, fast path — no per-row district lookup)
-# ---------------------------------------------------------------------------
-
-def _normalize_district_name(name: str) -> str:
-    if not name:
-        return ""
-    s = name.strip().lower()
-    
-    # Strip common suffixes/prefixes used in the dataset
-    s = s.replace(" city", "").replace(" rural", "").replace(" district", "")
-    
-    if s == "ahmedabad":
-        return "ahmadabad"
-    if "dang" in s or "ahwa" in s:
-        return "the dangs"
-    
-    return s.strip()
 
 def _validate_coordinates(df: pd.DataFrame, db: Session, default_district: str) -> tuple[pd.DataFrame, int]:
     logger.info("  validating coordinates against Gujarat district boundaries…")
+    # Reset index so list indices align with DataFrame rows
+    df = df.reset_index(drop=True)
     coords = list(zip(df["latitude"].tolist(), df["longitude"].tolist()))
     report = validate_coordinates_batch(
         coords, db, check_district=True, log_progress_every=1000
     )
-    
-    valid_mask = [r.is_valid for r in report.results]
-    mismatches = 0
-    
-    for idx, result in enumerate(report.results):
-        if result.is_valid and result.matched_district:
-            claimed_district = _clean_text(df.iloc[idx]["district"]) or default_district
-            
-            norm_claimed = _normalize_district_name(claimed_district)
-            norm_matched = _normalize_district_name(result.matched_district)
-            
-            if norm_claimed != norm_matched:
-                # The point falls physically inside a different district boundary
-                # The user requested these rows be dropped/ignored.
-                valid_mask[idx] = False
-                mismatches += 1
+
+    results = report.results if hasattr(report, 'results') else []
+    is_valid_list = [res.is_valid for res in results] if results else [True] * len(df)
+    # Per-row invalidation reason from coordinate validation
+    coord_reasons: list[str | None] = [None] * len(df)
+
+    for idx, res in enumerate(results):
+        if not res.is_valid:
+            status_val = res.status.value if hasattr(res.status, 'value') else str(res.status)
+            if status_val == "outside_state" or status_val == "no_district":
+                coord_reasons[idx] = "Outside Gujarat State"
+            elif status_val == "invalid_coords":
+                coord_reasons[idx] = "Invalid Coordinates"
+            elif status_val == "db_error":
+                coord_reasons[idx] = "Validation Error"
             else:
-                # We use the exact PostGIS matched district string for database consistency
-                df.at[df.index[idx], "district"] = result.matched_district
+                coord_reasons[idx] = "Invalid Coordinates"
 
-    valid_df = pd.DataFrame(df[valid_mask].copy())
+    is_valid_series = pd.Series(is_valid_list, index=df.index)
+    df["is_valid_coordinates"] = is_valid_series
+    df["coord_reason"] = coord_reasons
 
-    if mismatches > 0:
-        logger.warning("  dropped %d rows where claimed district differs from physical PostGIS boundary.", mismatches)
+    reported_districts = [res.matched_district for res in results] if results else []
+    mismatches = 0
+    if reported_districts:
+        for idx, reported_dist in enumerate(reported_districts):
+            if is_valid_list[idx] and reported_dist:
+                dist = default_district
+                if dist and dist.lower() != reported_dist.lower():
+                    # Allow Ahmadabad/Ahmedabad spelling variant
+                    if not (dist.lower() == 'ahmadabad' and reported_dist.lower() == 'ahmedabad'):
+                        is_valid_series.iloc[idx] = False
+                        coord_reasons[idx] = f"District Mismatch (coordinate falls in {reported_dist}, claimed {dist})"
+                        mismatches += 1
 
-    rejected = len(df) - len(valid_df)
-    logger.info("  valid: %d, rejected: %d", len(valid_df), rejected)
-    return valid_df, rejected
+    # Re-sync after district mismatch updates
+    df["is_valid_coordinates"] = is_valid_series
+    df["coord_reason"] = coord_reasons
 
-
-# ---------------------------------------------------------------------------
-# Main seeder
-# ---------------------------------------------------------------------------
+    invalid_count = len(df) - int(sum(is_valid_series))
+    logger.info("  valid: %d, flagged invalid: %d (district mismatches: %d)", int(sum(is_valid_series)), invalid_count, mismatches)
+    return df, invalid_count
 
 def seed_gujarat_accidents(
     force: bool = False,
+    append: bool = False,
     skip_validation: bool = False,
     only: list[str] | None = None,
 ) -> None:
@@ -333,11 +280,8 @@ def seed_gujarat_accidents(
 
     try:
         existing = db.query(Accident).count()
-        if existing > 0 and not force:
-            logger.info(
-                "accidents table already has %d rows — skipping. Pass --force to re-seed.",
-                existing,
-            )
+        if existing > 0 and not force and not append:
+            logger.info("accidents table already has %d rows — skipping. Pass --force to re-seed or --append to append.", existing)
             return
 
         if force and existing > 0:
@@ -349,44 +293,99 @@ def seed_gujarat_accidents(
             (row.accident_id, row.district)
             for row in db.query(Accident.accident_id, Accident.district).filter(Accident.accident_id.isnot(None)).all()
         )
+        
+        # Get official districts from database
+        official_districts = [r[0] for r in db.query(GujaratDistrict.shape_name).all()]
+        if not official_districts:
+            logger.error("No official districts found in the database. Please seed districts first.")
+            return
 
-        keys = only or list(DISTRICT_FILES.keys())
         total_inserted = 0
         total_rejected = 0
+        
+        # Scan data directory for Excel files
+        all_files = [f for f in DATA_DIR.glob("*.xlsx") if f.name != "accident_dummy_data.xlsx" and not f.name.startswith("~")]
+        
+        if only:
+            only_lower = [k.lower() for k in only]
+            files_to_process = [f for f in all_files if any(k in f.name.lower() for k in only_lower)]
+            if not files_to_process:
+                logger.warning(f"No files matched the keywords: {only}")
+                return
+        else:
+            files_to_process = all_files
 
-        for key in keys:
-            cfg = DISTRICT_FILES.get(key)
-            if not cfg:
-                logger.warning("Unknown district key '%s' — skipping.", key)
+        for path in files_to_process:
+            logger.info("=== Processing %s ===", path.name)
+            
+            # Infer official district from filename
+            base_name = re.sub(r"(?i)\s*\d{4}-\d{4}.*$", "", path.stem).strip()
+            official_district = _get_official_district(base_name, official_districts)
+            if not official_district:
+                logger.warning(f"Could not map filename '{path.name}' to an official district. Skipping.")
                 continue
-
-            path = DATA_DIR / cfg["file"]
-            logger.info("=== %s (%s) ===", key, cfg["file"])
-
+                
+            logger.info(f"Mapped filename '{path.name}' to official district: '{official_district}'")
+            
             try:
                 df = _load_dataset(path)
-            except FileNotFoundError as exc:
+            except Exception as exc:
                 logger.warning(str(exc))
                 continue
 
             if skip_validation:
                 valid_df, rejected = df, 0
+                valid_df["is_valid_coordinates"] = True
             else:
-                valid_df, rejected = _validate_coordinates(df, db, cfg["default_district"])
+                valid_df, rejected = _validate_coordinates(df, db, official_district)
             total_rejected += rejected
 
             objects = []
             duplicate_skips = 0
             for _, row in valid_df.iterrows():
                 raw_id = _clean_text(row["accident_id"])
-                district = _clean_text(row["district"]) or cfg["default_district"]
                 
-                # Check for duplicates using both accident_id and district
-                if raw_id and (raw_id, district) in seen_records:
+                # Respect Excel's district column if it specifies Vav-Tharad
+                row_district = _clean_text(row.get("district"))
+                base_name_lower = base_name.lower()
+                if row_district and "vav tharad" in row_district.lower():
+                    actual_district = row_district
+                elif any(word in base_name_lower for word in ["city", "rural", "wrly"]):
+                    actual_district = base_name.title() if base_name.islower() else base_name
+                else:
+                    actual_district = official_district
+
+                is_valid = bool(row.get("is_valid_coordinates", True))
+                is_duplicate = False
+                requires_attention = False
+                reasons = []
+
+                if not is_valid:
+                    requires_attention = True
+                    # Use the specific reason determined during validation
+                    coord_reason = row.get("coord_reason") or "Invalid Coordinates"
+                    reasons.append(coord_reason)
+
+                # Check for duplicates: same accident_id already seen for this district
+                if raw_id and (raw_id, actual_district) in seen_records:
                     duplicate_skips += 1
-                    continue
-                    
-                objects.append(_build_accident(row, cfg["tag"], cfg["default_district"], seen_records))
+                    is_duplicate = True
+                    requires_attention = True
+                    reasons.append("Duplicate Record")
+
+                invalidation_reasons = ", ".join(reasons) if reasons else None
+
+                # Register this ID so subsequent rows can detect duplicates
+                if raw_id:
+                    seen_records.add((raw_id, actual_district))
+
+                objects.append(_build_accident(
+                    row, actual_district, seen_records,
+                    is_duplicate=is_duplicate,
+                    requires_attention=requires_attention,
+                    is_valid_coordinates=is_valid,
+                    invalidation_reasons=invalidation_reasons
+                ))
 
             for start in range(0, len(objects), CHUNK_SIZE):
                 chunk = objects[start:start + CHUNK_SIZE]
@@ -395,38 +394,29 @@ def seed_gujarat_accidents(
 
             logger.info(
                 "  [%s] Summary: parsed valid=%d, duplicate skips=%d, inserted=%d",
-                key, len(valid_df), duplicate_skips, len(objects)
+                path.name, len(valid_df), duplicate_skips, len(objects)
             )
             total_inserted += len(objects)
 
         logger.info(
-            "=== Seed complete — %d inserted across %d file(s), %d rejected (outside Gujarat / bad coords) ===",
-            total_inserted, len(keys), total_rejected,
+            "Overall seeding complete. total inserted=%d, total flagged invalid=%d",
+            total_inserted, total_rejected
         )
 
-    except Exception:
-        db.rollback()
-        logger.exception("Seed failed — transaction rolled back.")
-        raise
     finally:
         db.close()
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Seed multi-district accident data into the shared accidents table."
-    )
+    parser = argparse.ArgumentParser(description="Multi-district Accident Seeder")
     parser.add_argument("--force", action="store_true", help="Delete existing rows and re-seed.")
+    parser.add_argument("--append", action="store_true", help="Append to existing data instead of skipping if table is not empty.")
     parser.add_argument("--skip-validation", action="store_true", help="Skip PostGIS boundary validation (faster).")
     parser.add_argument(
         "--only",
         type=str,
         default=None,
-        help=f"Comma-separated subset of keys to seed: {', '.join(DISTRICT_FILES.keys())}",
+        help="Comma-separated subset of filename keywords to seed (e.g., 'surat,ahmedabad')",
     )
     args = parser.parse_args()
 
@@ -434,6 +424,7 @@ if __name__ == "__main__":
 
     seed_gujarat_accidents(
         force=args.force,
+        append=args.append,
         skip_validation=args.skip_validation,
         only=only_list,
     )

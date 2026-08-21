@@ -43,7 +43,8 @@ interface ColumnDef {
 }
 
 const ALL_COLUMNS: ColumnDef[] = [
-  { key: "accident_id", label: "Accident ID", group: "Identification", defaultVisible: true, width: 160, filterable: false, type: "text" },
+  { key: "status", label: "Status", group: "Identification", defaultVisible: true, width: 140, filterable: false, type: "text" },
+  { key: "accident_id", label: "Accident ID", group: "Identification", defaultVisible: true, width: 180, filterable: false, type: "text" },
   { key: "district", label: "District", group: "Identification", defaultVisible: true, width: 120, filterable: true, type: "text" },
   { key: "police_station", label: "Police Station", group: "Identification", defaultVisible: true, width: 160, filterable: true, type: "text" },
   { key: "accident_date_time", label: "Date & Time", group: "Identification", defaultVisible: true, width: 170, filterable: false, type: "datetime" },
@@ -51,6 +52,8 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: "longitude", label: "Longitude", group: "Location", defaultVisible: false, width: 110, type: "number" },
   { key: "road_name", label: "Road Name", group: "Location", defaultVisible: true, width: 180, filterable: true, type: "text" },
   { key: "road_classification", label: "Road Classification", group: "Location", defaultVisible: false, width: 160, filterable: true, type: "text" },
+  { key: "accident_location", label: "Accident Location", group: "Location", defaultVisible: false, width: 180, filterable: false, type: "text" },
+  { key: "landmark_name", label: "Landmark Name", group: "Location", defaultVisible: false, width: 160, filterable: false, type: "text" },
   { key: "severity", label: "Severity", group: "Characteristics", defaultVisible: true, width: 130, filterable: true, type: "severity" },
   { key: "number_of_vehicles", label: "Vehicles", group: "Characteristics", defaultVisible: true, width: 90, type: "number" },
   { key: "driver_killed", label: "Driver Killed", group: "Driver Casualties", defaultVisible: false, width: 110, type: "number" },
@@ -68,6 +71,7 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: "light_condition", label: "Light Condition", group: "Environment", defaultVisible: false, width: 200, filterable: true, type: "text" },
   { key: "visibility", label: "Visibility", group: "Environment", defaultVisible: false, width: 110, filterable: true, type: "text" },
   { key: "traffic_violation", label: "Traffic Violation", group: "Violation", defaultVisible: false, width: 160, filterable: true, type: "text" },
+  { key: "accident_description", label: "Accident Description", group: "Miscellaneous", defaultVisible: false, width: 260, filterable: false, type: "text" },
 ];
 
 const SEVERITY_STYLES: Record<string, string> = {
@@ -97,6 +101,21 @@ const FILTER_OPTION_KEY: Partial<
 };
 
 /**
+ * Returns a short badge label for an invalidation reason.
+ * The full reason is shown in the tooltip.
+ */
+function getShortReason(reason: string | null | undefined): string {
+  if (!reason) return "Review";
+  const r = reason.toLowerCase();
+  if (r.includes("outside gujarat") || r.includes("outside state")) return "Outside State";
+  if (r.includes("district mismatch")) return "District Mismatch";
+  if (r.includes("duplicate")) return "Duplicate";
+  if (r.includes("invalid coord")) return "Invalid Coords";
+  // For any other reason, truncate at 20 chars
+  return reason.length > 20 ? reason.slice(0, 18) + "…" : reason;
+}
+
+/**
  * AccidentManagement Component
  * @component_responsibility Manages the state and rendering of the primary accident data table, including fetching data, filtering, column visibility, and row selection.
  * @state_management Uses complex local state for pagination, debounced search, active filters, selected rows, and visible columns.
@@ -105,6 +124,11 @@ const FILTER_OPTION_KEY: Partial<
  */
 export default function AccidentManagement() {
   const [accidents, setAccidents] = useState<AccidentRecord[]>([]);
+  const [activeFilterCount, setActiveFilterCount] = useState(0);
+
+  // Status Filter for requires_attention
+  const [statusFilter, setStatusFilter] = useState<"all" | "review" | "valid">("all");
+
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -172,8 +196,19 @@ export default function AccidentManagement() {
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
+    
+    const count = Object.values(columnFilters).filter((val) => val && val.trim() !== "").length + (statusFilter !== "all" ? 1 : 0);
+    setActiveFilterCount(count);
+
+    let requiresAttentionQuery: boolean | undefined = undefined;
+    if (statusFilter === "review") {
+      requiresAttentionQuery = true;
+    } else if (statusFilter === "valid") {
+      requiresAttentionQuery = false;
+    }
+
     try {
-      const res = await adminAccidentsApi.getAccidents(skip, limit, debouncedSearch, columnFilters);
+      const res = await adminAccidentsApi.getAccidents(skip, limit, debouncedSearch, { ...columnFilters, requires_attention: requiresAttentionQuery });
       setAccidents(res.data);
       setTotal(res.total);
     } catch {
@@ -181,7 +216,7 @@ export default function AccidentManagement() {
     } finally {
       setLoading(false);
     }
-  }, [skip, limit, debouncedSearch, columnFilters]);
+  }, [skip, limit, debouncedSearch, columnFilters, statusFilter]);
 
   useEffect(() => {
     loadData();
@@ -189,7 +224,7 @@ export default function AccidentManagement() {
 
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [debouncedSearch, columnFilters]);
+  }, [debouncedSearch, columnFilters, statusFilter]);
 
   useEffect(() => {
     adminAccidentsApi.getFilterOptions().then(setFilterOptions).catch(() => {
@@ -297,10 +332,9 @@ export default function AccidentManagement() {
 
   const clearFilters = () => {
     setColumnFilters({});
+    setStatusFilter("all");
     setSkip(0);
   };
-
-  const activeFilterCount = Object.values(columnFilters).filter(Boolean).length;
 
   const visibleCols = ALL_COLUMNS.filter((c) => visibleColumns.has(c.key));
   const totalPages = Math.ceil(total / limit);
@@ -447,6 +481,18 @@ export default function AccidentManagement() {
               className="overflow-hidden"
             >
               <div className="flex items-start gap-2 flex-wrap pt-1 pb-1">
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Record Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    className="w-40 px-2 py-1.5 bg-white border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-400"
+                  >
+                    <option value="all">All Records</option>
+                    <option value="review">Requires Review</option>
+                    <option value="valid">Valid Records</option>
+                  </select>
+                </div>
                 {ALL_COLUMNS.filter((c) => c.filterable).map((col) => {
                   const filterKey = col.key as keyof AccidentFilters;
                   const filterValue = columnFilters[filterKey] || "";
@@ -460,13 +506,13 @@ export default function AccidentManagement() {
                         <input
                           type="text"
                           placeholder={`Filter ${col.label.toLowerCase()}...`}
-                          value={filterValue}
+                          value={typeof filterValue === "string" ? filterValue : ""}
                           onChange={(e) => updateFilter(col.key, e.target.value)}
                           className="w-32 px-2 py-1.5 bg-white border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-400"
                         />
                       ) : (
                         <select
-                          value={filterValue}
+                          value={typeof filterValue === "string" ? filterValue : ""}
                           onChange={(e) => updateFilter(col.key, e.target.value)}
                           className="w-40 max-w-[12rem] px-2 py-1.5 bg-white border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-400 truncate"
                         >
@@ -615,8 +661,24 @@ export default function AccidentManagement() {
                     style={{ minWidth: col.width, maxWidth: col.width + 60 }}
                     title={String((acc as any)[col.key] ?? "")}
                   >
-                    <div className="truncate">
-                      {formatCellValue(col, (acc as any)[col.key])}
+                    <div className="truncate flex items-center gap-2">
+                      {col.key === "status" ? (
+                        acc.requires_attention ? (
+                          <div
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200 shadow-sm cursor-help w-full"
+                            title={acc.invalidation_reasons || "Requires Review"}
+                          >
+                            <AlertCircle className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{getShortReason(acc.invalidation_reasons)}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 border border-emerald-200">
+                            <span>Valid</span>
+                          </div>
+                        )
+                      ) : (
+                        formatCellValue(col, (acc as any)[col.key])
+                      )}
                     </div>
                   </td>
                 ))}

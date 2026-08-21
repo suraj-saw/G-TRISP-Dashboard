@@ -62,11 +62,42 @@ def apply_filters(
     sqlalchemy.orm.Query
         The modified query with applied filters.
     """
+    def _expand_districts(districts: list[str]) -> list[str]:
+        expanded = []
+        for d in districts:
+            expanded.append(d)
+            d_lower = d.lower()
+            if d_lower in ("ahmadabad", "ahmedabad"):
+                expanded.extend(["Ahmedabad City", "Ahmedabad Rural", "WRLY Ahmedabad"])
+            elif d_lower == "surat":
+                expanded.extend(["Surat City", "Surat Rural"])
+            elif d_lower == "vadodara":
+                expanded.extend(["Vadodara City", "Vadodara Rural", "WRLY Vadodara"])
+            elif d_lower == "rajkot":
+                expanded.extend(["Rajkot City", "Rajkot Rural"])
+            elif d_lower in ("banas kantha", "banaskantha"):
+                expanded.extend(["Banaskantha-PLNPR", "Vav-Tharad"])
+            elif d_lower in ("kachchh", "kutch", "kutchh"):
+                expanded.extend(["Kachchh East, GANDHIDHAM", "Kutchh"])
+            elif d_lower in ("panch mahals", "panchmahal"):
+                expanded.extend(["Panchmahal", "Panch Mahals"])
+            elif d_lower in ("sabar kantha", "sabarkantha"):
+                expanded.extend(["Sabarkantha", "Sabar Kantha"])
+            elif d_lower in ("devbhumi dwarka", "devbhumi dwrka"):
+                expanded.extend(["Devbhumi Dwrka", "Devbhumi Dwarka"])
+            elif d_lower == "chhotaudepur":
+                expanded.extend(["Chotaudepur", "Chhotaudepur"])
+            elif d_lower == "bhavnagar":
+                expanded.extend(["Bhavanagar", "Bhavnagar"])
+        return expanded
+
+    # Always filter out records that require attention (duplicates, invalid coordinates, etc.)
+    query = query.filter(Accident.requires_attention == False)
+
     if district:
-        if isinstance(district, list):
-            query = query.filter(Accident.district.in_(district))
-        else:
-            query = query.filter(Accident.district == district)
+        dist_list = district if isinstance(district, list) else [district]
+        expanded_districts = _expand_districts(dist_list)
+        query = query.filter(Accident.district.in_(expanded_districts))
             
     if year:
         if isinstance(year, list):

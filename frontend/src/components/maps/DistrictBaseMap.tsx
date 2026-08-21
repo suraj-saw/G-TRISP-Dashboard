@@ -434,6 +434,7 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
         <LocationSearchBar 
           bbox={bboxRef.current} 
           onLocationSelect={handleLocationSelect} 
+          onClear={() => {}}
         />
 
         <div
