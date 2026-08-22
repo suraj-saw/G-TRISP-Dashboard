@@ -16,6 +16,34 @@ from app.models.accident import Accident
 from app.utils.taluka_utils import apply_taluka_spatial_filter
 from app.utils.datetime_utils import parse_accident_datetime_from_str
 
+def expand_districts(districts: list[str]) -> list[str]:
+    expanded = []
+    for d in districts:
+        expanded.append(d)
+        d_lower = d.lower()
+        if d_lower in ("ahmadabad", "ahmedabad"):
+            expanded.extend(["Ahmedabad City", "Ahmedabad Rural", "WRLY Ahmedabad"])
+        elif d_lower == "surat":
+            expanded.extend(["Surat City", "Surat Rural"])
+        elif d_lower == "vadodara":
+            expanded.extend(["Vadodara City", "Vadodara Rural", "WRLY Vadodara"])
+        elif d_lower == "rajkot":
+            expanded.extend(["Rajkot City", "Rajkot Rural"])
+        elif d_lower in ("banas kantha", "banaskantha"):
+            expanded.extend(["Banaskantha-PLNPR", "Vav-Tharad"])
+        elif d_lower in ("kachchh", "kutch", "kutchh"):
+            expanded.extend(["Kachchh East, GANDHIDHAM", "Kutchh"])
+        elif d_lower in ("panch mahals", "panchmahal"):
+            expanded.extend(["Panchmahal", "Panch Mahals"])
+        elif d_lower in ("sabar kantha", "sabarkantha"):
+            expanded.extend(["Sabarkantha", "Sabar Kantha"])
+        elif d_lower in ("devbhumi dwarka", "devbhumi dwrka"):
+            expanded.extend(["Devbhumi Dwrka", "Devbhumi Dwarka"])
+        elif d_lower == "chhotaudepur":
+            expanded.extend(["Chotaudepur", "Chhotaudepur"])
+        elif d_lower == "bhavnagar":
+            expanded.extend(["Bhavanagar", "Bhavnagar"])
+    return expanded
 
 def apply_filters(
     query,
@@ -29,6 +57,7 @@ def apply_filters(
     date_to: Optional[str] = None,
     taluka=None,
     police_station=None, 
+    visibility=None,
     db=None,
 ):
     """
@@ -54,6 +83,7 @@ def apply_filters(
     taluka : str, optional
         Triggers a spatial intersection query if provided alongside `db`.
     police_station : str or list, optional
+    visibility : str or list, optional
     db : sqlalchemy.orm.Session, optional
         Required only if `taluka` spatial filtering is needed.
 
@@ -62,41 +92,12 @@ def apply_filters(
     sqlalchemy.orm.Query
         The modified query with applied filters.
     """
-    def _expand_districts(districts: list[str]) -> list[str]:
-        expanded = []
-        for d in districts:
-            expanded.append(d)
-            d_lower = d.lower()
-            if d_lower in ("ahmadabad", "ahmedabad"):
-                expanded.extend(["Ahmedabad City", "Ahmedabad Rural", "WRLY Ahmedabad"])
-            elif d_lower == "surat":
-                expanded.extend(["Surat City", "Surat Rural"])
-            elif d_lower == "vadodara":
-                expanded.extend(["Vadodara City", "Vadodara Rural", "WRLY Vadodara"])
-            elif d_lower == "rajkot":
-                expanded.extend(["Rajkot City", "Rajkot Rural"])
-            elif d_lower in ("banas kantha", "banaskantha"):
-                expanded.extend(["Banaskantha-PLNPR", "Vav-Tharad"])
-            elif d_lower in ("kachchh", "kutch", "kutchh"):
-                expanded.extend(["Kachchh East, GANDHIDHAM", "Kutchh"])
-            elif d_lower in ("panch mahals", "panchmahal"):
-                expanded.extend(["Panchmahal", "Panch Mahals"])
-            elif d_lower in ("sabar kantha", "sabarkantha"):
-                expanded.extend(["Sabarkantha", "Sabar Kantha"])
-            elif d_lower in ("devbhumi dwarka", "devbhumi dwrka"):
-                expanded.extend(["Devbhumi Dwrka", "Devbhumi Dwarka"])
-            elif d_lower == "chhotaudepur":
-                expanded.extend(["Chotaudepur", "Chhotaudepur"])
-            elif d_lower == "bhavnagar":
-                expanded.extend(["Bhavanagar", "Bhavnagar"])
-        return expanded
-
     # Always filter out records that require attention (duplicates, invalid coordinates, etc.)
     query = query.filter(Accident.requires_attention == False)
 
     if district:
         dist_list = district if isinstance(district, list) else [district]
-        expanded_districts = _expand_districts(dist_list)
+        expanded_districts = expand_districts(dist_list)
         query = query.filter(Accident.district.in_(expanded_districts))
             
     if year:
@@ -124,6 +125,12 @@ def apply_filters(
             query = query.filter(Accident.light_condition.in_(light_condition))
         else:
             query = query.filter(Accident.light_condition == light_condition)
+            
+    if visibility:
+        if isinstance(visibility, list):
+            query = query.filter(Accident.visibility.in_(visibility))
+        else:
+            query = query.filter(Accident.visibility == visibility)
             
     if collision_type:
         # Note: Internal DB field is 'type_of_collision' based on iRAD standards

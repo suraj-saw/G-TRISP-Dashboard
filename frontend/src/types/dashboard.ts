@@ -26,6 +26,8 @@ export interface DashboardFilters {
   weather_condition: string[];
   /** Light conditions to include in the filter */
   light_condition: string[];
+  /** Visibility conditions to include in the filter */
+  visibility?: string[];
   /** Collision types to include in the filter */
   collision_type: string[];
   /** Police stations to include in the filter (optional) */
@@ -54,6 +56,8 @@ export interface FilterOptions {
   weather_conditions: string[];
   /** Available light condition options */
   light_conditions: string[];
+  /** Available visibility options (optional) */
+  visibilities?: string[];
   /** Available collision type options */
   collision_types: string[];
   /** Available police station options (optional) */

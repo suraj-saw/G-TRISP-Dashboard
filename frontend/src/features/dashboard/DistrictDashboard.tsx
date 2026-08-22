@@ -137,6 +137,7 @@ type FilterId =
   | "road_classification"
   | "weather_condition"
   | "light_condition"
+  | "visibility"
   | "collision_type"
   | "police_station"
   | "taluka"
@@ -162,6 +163,7 @@ const MAP_FILTERS: FilterConfigItem[] = [
   { id: "road_classification", label: "Road type" },
   { id: "weather_condition", label: "Weather" },
   { id: "light_condition", label: "Light condition" },
+  { id: "visibility", label: "Visibility" },
   { id: "collision_type", label: "Collision type" },
 ];
 
@@ -181,6 +183,7 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "road_classification", label: "Road type" },
   { id: "weather_condition", label: "Weather Condition" },
   { id: "light_condition", label: "Light Condition" },
+  { id: "visibility", label: "Visibility" },
   { id: "collision_type", label: "Collision type" },
 ];
 
@@ -198,6 +201,7 @@ const defaultDistrictFilters: DashboardFilters = {
   road_classification: [],
   weather_condition: [],
   light_condition: [],
+  visibility: [],
   collision_type: [],
   police_station: [],
   taluka: [],
@@ -554,6 +558,10 @@ export default function DistrictDashboard() {
       value: l,
       label: l,
     })),
+    visibility: (filterOptions?.visibilities || []).map((v) => ({
+      value: v,
+      label: v,
+    })),
     collision_type: (filterOptions?.collision_types || []).map((c) => ({
       value: c,
       label: c,
@@ -776,7 +784,7 @@ export default function DistrictDashboard() {
               const TIME_FILTER_IDS = ["date_from", "date_to", "year", "month", "day", "time_period"];
               const LOCATION_FILTER_IDS = ["taluka", "police_station"];
               const INCIDENT_FILTER_IDS = ["severity", "collision_type"];
-              const ENVIRONMENT_FILTER_IDS = ["road_classification", "weather_condition", "light_condition"];
+              const ENVIRONMENT_FILTER_IDS = ["road_classification", "weather_condition", "light_condition", "visibility"];
 
               const mapFilters = activeFilterConfig.filter((f) => MAP_FILTER_IDS.includes(f.id));
               const timeFilters = activeFilterConfig.filter((f) => TIME_FILTER_IDS.includes(f.id));

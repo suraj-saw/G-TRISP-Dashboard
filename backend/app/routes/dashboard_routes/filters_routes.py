@@ -35,7 +35,8 @@ def get_filter_options(
     def distinct(col):
         q = db.query(col).filter(col.isnot(None), col != "", col != "nan")
         if district:
-            q = q.filter(Accident.district.in_(district))
+            from app.utils.accident_utils import expand_districts
+            q = q.filter(Accident.district.in_(expand_districts(district)))
         if taluka:
             q = apply_taluka_spatial_filter(q, Accident, Accident.location, taluka, db)
         return [r[0] for r in q.distinct().order_by(col).all()]
@@ -45,7 +46,8 @@ def get_filter_options(
         func.max(Accident.accident_date_time)
     )
     if district:
-        date_q = date_q.filter(Accident.district.in_(district))
+        from app.utils.accident_utils import expand_districts
+        date_q = date_q.filter(Accident.district.in_(expand_districts(district)))
     if taluka:
         date_q = apply_taluka_spatial_filter(date_q, Accident, Accident.location, taluka, db)
     min_dt, max_dt = date_q.first()
@@ -55,7 +57,8 @@ def get_filter_options(
         Accident.accident_date_time.isnot(None)
     )
     if district:
-        year_q = year_q.filter(Accident.district.in_(district))
+        from app.utils.accident_utils import expand_districts
+        year_q = year_q.filter(Accident.district.in_(expand_districts(district)))
     if taluka:
         year_q = apply_taluka_spatial_filter(year_q, Accident, Accident.location, taluka, db)
     years = sorted([int(r[0]) for r in year_q.distinct().all()])
@@ -67,6 +70,7 @@ def get_filter_options(
         collision_types=distinct(Accident.type_of_collision),
         police_stations=distinct(Accident.police_station),
         severities=distinct(Accident.severity),
+        visibilities=distinct(Accident.visibility),
         years=years,
         min_date=min_dt.date().isoformat() if min_dt else None,
         max_date=max_dt.date().isoformat() if max_dt else None,
@@ -87,6 +91,7 @@ def get_summary(
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
     severity: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -94,7 +99,8 @@ def get_summary(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility
     )
     if severity:
         query = query.filter(Accident.severity.in_(severity))

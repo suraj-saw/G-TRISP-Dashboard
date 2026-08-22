@@ -206,40 +206,46 @@ export default function FilterSelect({
             }}
             className="overflow-y-auto no-scrollbar rounded-xl border border-[#E4E8F4] bg-white p-1.5 shadow-[0_12px_32px_rgba(15,23,42,0.18)]"
           >
-            {options.map((option) => {
-              const isSelected = isMulti
-                ? (value as string[]).includes(option.value)
-                : option.value === value;
-              return (
-                <li key={option.value} role="option" aria-selected={isSelected}>
-                  <button
-                    type="button"
-                    onClick={() => handleOptionClick(option.value)}
-                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition ${
-                      isSelected && !isMulti
-                        ? "bg-[#1e3a8a] font-semibold text-white"
-                        : "font-medium text-[#3A4060] hover:bg-[#EEF2FB] hover:text-[#1e3a8a]"
-                    }`}
-                  >
-                    {isMulti && (
-                      <div
-                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                          isSelected
-                            ? "border-[#1e3a8a] bg-[#1e3a8a] text-white"
-                            : "border-[#C9CEDF] bg-white text-transparent"
-                        }`}
-                      >
-                        <Check size={12} strokeWidth={3} />
-                      </div>
-                    )}
-                    <span className="truncate">{option.label}</span>
-                    {!isMulti && isSelected && (
-                      <Check size={14} className="ml-auto shrink-0" />
-                    )}
-                  </button>
-                </li>
-              );
-            })}
+            {options.length === 0 ? (
+              <li className="px-3 py-2 text-center text-[13px] italic text-[#9BA3C2]">
+                No options available
+              </li>
+            ) : (
+              options.map((option) => {
+                const isSelected = isMulti
+                  ? (value as string[]).includes(option.value)
+                  : option.value === value;
+                return (
+                  <li key={option.value} role="option" aria-selected={isSelected}>
+                    <button
+                      type="button"
+                      onClick={() => handleOptionClick(option.value)}
+                      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition ${
+                        isSelected && !isMulti
+                          ? "bg-[#1e3a8a] font-semibold text-white"
+                          : "font-medium text-[#3A4060] hover:bg-[#EEF2FB] hover:text-[#1e3a8a]"
+                      }`}
+                    >
+                      {isMulti && (
+                        <div
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                            isSelected
+                              ? "border-[#1e3a8a] bg-[#1e3a8a] text-white"
+                              : "border-[#C9CEDF] bg-white text-transparent"
+                          }`}
+                        >
+                          <Check size={12} strokeWidth={3} />
+                        </div>
+                      )}
+                      <span className="truncate">{option.label}</span>
+                      {!isMulti && isSelected && (
+                        <Check size={14} className="ml-auto shrink-0" />
+                      )}
+                    </button>
+                  </li>
+                );
+              })
+            )}
           </ul>,
           document.body
         )}

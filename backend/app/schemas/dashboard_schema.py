@@ -340,6 +340,7 @@ class FilterOptions(ResponseModel):
     police_stations: List[str] = []
     severities: List[str] = []
     years: List[int] = []
+    visibilities: List[str] = []
     
     min_date: Optional[str] = None
     max_date: Optional[str] = None

@@ -76,6 +76,8 @@ function getParams(
     );
   if (filters.light_condition?.length)
     filters.light_condition.forEach((l) => params.append("light_condition", l));
+  if (filters.visibility?.length)
+    filters.visibility.forEach((v) => params.append("visibility", v));
   if (filters.collision_type?.length)
     filters.collision_type.forEach((c) => params.append("collision_type", c));
   // NEW
