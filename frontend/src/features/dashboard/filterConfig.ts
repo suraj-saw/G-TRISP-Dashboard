@@ -9,7 +9,6 @@ import { isBlackspotVisualization } from "../../utils/dashboardFilters";
 
 /** Type representing all possible visualization types */
 export type VisualizationType =
-  | "location_markers"
   | "density_heatmap"
   | "kde_heatmap"
   | "weighted_kde_heatmap"
@@ -50,7 +49,6 @@ export interface FilterConfigItem {
 
 /** Available visualization options for the dashboard */
 export const VISUALIZATION_OPTIONS = [
-  { value: "location_markers", label: "Markers" },
   { value: "density_heatmap", label: "Density Heatmap" },
   // { value: "kde_heatmap", label: "Kernel Density Heatmap (KDE)" },
   // { value: "weighted_kde_heatmap", label: "Severity-Weighted KDE Heatmap" },
@@ -166,6 +164,6 @@ export const defaultFilters: DashboardFilters = {
   date_from: "",
   date_to: "",
   baseMap: DEFAULT_BASE_MAP,
-  visualization_type: "location_markers",
+  visualization_type: "density_heatmap",
   visualization_variant: "accident",
 };

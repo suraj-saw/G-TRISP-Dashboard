@@ -9,6 +9,7 @@ import { SEVERITY_LEGEND_PALETTE as SEVERITY_LEGEND_ITEMS } from "../../config/t
 
 interface SeverityLegendProps {
   visualizationLayerType?: string;
+  showMarkers?: boolean;
 }
 
 /**
@@ -20,36 +21,19 @@ interface SeverityLegendProps {
  */
 export default function SeverityLegend({
   visualizationLayerType,
+  showMarkers,
 }: SeverityLegendProps) {
   const { current: map } = useMap();
-  const [zoom, setZoom] = useState(map?.getZoom() || 0);
-
-  useEffect(() => {
-    if (!map) return;
-    const onZoom = () => setZoom(map.getZoom());
-    map.on("zoom", onZoom);
-    setZoom(map.getZoom());
-    return () => {
-      map.off("zoom", onZoom);
-    };
-  }, [map]);
 
   const type = visualizationLayerType || "";
-  let isVisible = false;
+
+  let isVisible = !!showMarkers;
 
   if (
-    type === "location_markers" ||
     type === "clusters" ||
-    type === "pedestrian_accidents" ||
     type === "snapped_accidents"
   ) {
     isVisible = true;
-  } else if (type.includes("blackspot")) {
-    // Show legend only when zoom is 12 or greater (when individual points start showing)
-    isVisible = zoom >= 12;
-  } else if (type === "density_heatmap") {
-    // Density heatmap no longer shows individual accident markers when zoomed in
-    isVisible = false;
   }
 
   if (!isVisible) return null;

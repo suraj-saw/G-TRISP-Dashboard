@@ -50,72 +50,8 @@ interface HoveredIrcBlackspot {
   isPoint?: boolean;
 }
 
-const SEVERITY_COLORS = {
-  Fatal: "#78350F",
-  "Grievous Injury": "#EA580C",
-  "Minor Injury Hospitalized": "#EAB308",
-  "Minor Injury Non Hospitalized": "#0284C7",
-  "No Injury": "#16A34A",
-  default: "#64748B",
-} as const;
 
-const severityColorExpression = [
-  "case",
-  ["in", "fatal", ["downcase", ["coalesce", ["get", "severity"], ""]]],
-  SEVERITY_COLORS.Fatal,
-  ["in", "grievous", ["downcase", ["coalesce", ["get", "severity"], ""]]],
-  SEVERITY_COLORS["Grievous Injury"],
-  [
-    "in",
-    "minor injury hospitalized",
-    ["downcase", ["coalesce", ["get", "severity"], ""]],
-  ],
-  SEVERITY_COLORS["Minor Injury Hospitalized"],
-  [
-    "in",
-    "minor injury non",
-    ["downcase", ["coalesce", ["get", "severity"], ""]],
-  ],
-  SEVERITY_COLORS["Minor Injury Non Hospitalized"],
-  [
-    "any",
-    ["in", "no injury", ["downcase", ["coalesce", ["get", "severity"], ""]]],
-    ["in", "damage only", ["downcase", ["coalesce", ["get", "severity"], ""]]],
-  ],
-  SEVERITY_COLORS["No Injury"],
-  SEVERITY_COLORS.default,
-] as const;
 
-function buildAccidentGeojson(
-  data?: HeatmapPoint[]
-): GeoJSON.FeatureCollection {
-  return {
-    type: "FeatureCollection",
-    features:
-      data
-        ?.filter(
-          (p) => Number.isFinite(p.longitude) && Number.isFinite(p.latitude)
-        )
-        .map((p) => ({
-          type: "Feature" as const,
-          geometry: {
-            type: "Point" as const,
-            coordinates: [p.longitude, p.latitude],
-          },
-          properties: {
-            accident_id: p.accident_id,
-            severity: p.severity,
-            police_station: p.police_station ?? p.district,
-            road_name: p.road_name,
-            road_classification: p.road_classification,
-            weather_condition: p.weather_condition,
-            light_condition: p.light_condition,
-            collision_type: p.collision_type,
-            accident_date_time: p.accident_date_time,
-          },
-        })) || [],
-  };
-}
 
 export default function IrcBlackspotDetectionLayers({
   filters,
@@ -324,41 +260,8 @@ export default function IrcBlackspotDetectionLayers({
     );
   }
 
-  const accidentGeojson = buildAccidentGeojson(heatmapData);
-
   return (
     <>
-      {accidentGeojson.features.length > 0 && (
-        <Source
-          id="irc-blackspot-accident-source"
-          type="geojson"
-          data={accidentGeojson as any}
-        >
-          <Layer
-            id="irc-blackspot-accident-halo"
-            type="circle"
-            paint={{
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 4, 15, 7, 17, 10],
-              "circle-color": severityColorExpression as any,
-              "circle-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 13, 0.15, 15, 0.25],
-              "circle-blur": 0.8,
-            }}
-          />
-          <Layer
-            id="irc-blackspot-accident-points"
-            type="circle"
-            paint={{
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 1.5, 13, 2.5, 15, 4, 17, 5.5, 19, 7],
-              "circle-color": severityColorExpression as any,
-              "circle-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 13, 0.65, 14, 0.85, 15, 0.95],
-              "circle-stroke-width": 1,
-              "circle-stroke-color": "#FFFFFF",
-              "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 13, 0.6, 15, 0.9],
-            }}
-          />
-        </Source>
-      )}
-
       <Source
         id="irc-blackspot-circles-source"
         type="geojson"

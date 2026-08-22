@@ -276,17 +276,14 @@ function BlackspotLayers({
 }) {
   const { current: mapRef } = useMap();
   const [hovered, setHovered] = useState<HoverState>(null);
-  const [selected, setSelected] = useState<SelectedAccident | null>(null);
 
   useEffect(() => {
     const map = mapRef?.getMap();
     if (!map) return;
 
     const clusterLayers = ["blackspot-core", "blackspot-halo"];
-    const pointLayers = ["blackspot-single-point"];
 
     const onMove = (e: any) => {
-      if (selected) return;
       const clusters = map.queryRenderedFeatures(e.point, {
         layers: clusterLayers,
       });
@@ -300,40 +297,8 @@ function BlackspotLayers({
         });
         return;
       }
-      const points = map.queryRenderedFeatures(e.point, {
-        layers: pointLayers,
-      });
-      if (points.length) {
-        map.getCanvas().style.cursor = "pointer";
-        const f = points[0];
-        setHovered({
-          longitude: e.lngLat.lng,
-          latitude: e.lngLat.lat,
-          severity: f.properties?.severity,
-          police_station: f.properties?.police_station,
-          road_name: f.properties?.road_name,
-        });
-        return;
-      }
       map.getCanvas().style.cursor = "";
       setHovered(null);
-    };
-
-    const onClick = (e: any) => {
-      const points = map.queryRenderedFeatures(e.point, {
-        layers: pointLayers,
-      });
-      if (points.length) {
-        const f = points[0];
-        setSelected({
-          longitude: e.lngLat.lng,
-          latitude: e.lngLat.lat,
-          ...f.properties,
-        });
-        setHovered(null);
-        return;
-      }
-      setSelected(null);
     };
 
     const onLeave = () => {
@@ -342,15 +307,13 @@ function BlackspotLayers({
     };
 
     map.on("mousemove", onMove);
-    map.on("click", onClick);
     map.on("mouseout", onLeave);
     return () => {
       map.off("mousemove", onMove);
-      map.off("click", onClick);
       map.off("mouseout", onLeave);
       map.getCanvas().style.cursor = "";
     };
-  }, [mapRef, selected]);
+  }, [mapRef]);
 
   return (
     <>
@@ -406,52 +369,10 @@ function BlackspotLayers({
             "text-halo-width": 1.2,
           }}
         />
-
-        {/* ── Unclustered point halo (zoom 15+) ───────────────────────── */}
-        <Layer
-          id="blackspot-single-halo"
-          type="circle"
-          filter={["!", ["has", "point_count"]]}
-          paint={{
-            "circle-color": "rgba(220,38,38,0.18)",
-            "circle-radius": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              13,
-              7,
-              17,
-              14,
-            ],
-            "circle-blur": 0.65,
-          }}
-        />
-
-        {/* ── Unclustered point core (severity-colored) ───────────────── */}
-        <Layer
-          id="blackspot-single-point"
-          type="circle"
-          filter={["!", ["has", "point_count"]]}
-          paint={{
-            "circle-color": PRIORITY_SINGLE_COLOR_EXPR as any,
-            "circle-radius": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              13,
-              4,
-              17,
-              7,
-            ],
-            "circle-opacity": 0.9,
-            "circle-stroke-width": 1.2,
-            "circle-stroke-color": "#FFFFFF",
-          }}
-        />
       </Source>
 
       {/* ── Hover tooltip ───────────────────────────────────────────────── */}
-      {hovered && !selected && (
+      {hovered && (
         <Popup
           longitude={hovered.longitude}
           latitude={hovered.latitude}
@@ -462,26 +383,6 @@ function BlackspotLayers({
           className="accident-popup"
         >
           <BlackspotPopup hovered={hovered} />
-        </Popup>
-      )}
-
-      {/* ── Accident popup ───────────────────────────────────────────────── */}
-      {selected && (
-        <Popup
-          longitude={selected.longitude}
-          latitude={selected.latitude}
-          closeOnClick={true}
-          offset={12}
-          closeButton={false}
-          className="accident-popup"
-          style={{ "--popup-bg": getSeverityTheme(selected.severity).bg } as React.CSSProperties}
-          onClose={() => setSelected(null)}
-        >
-          <AccidentPopupBody
-            selected={selected}
-            showPedestrianCasualties={false}
-            onClose={() => setSelected(null)}
-          />
         </Popup>
       )}
     </>
@@ -564,11 +465,9 @@ export function VisualizationLayers({
   // location-marker mode and density mode (graduated points).
   useEffect(() => {
     const interactiveLayers =
-      type === "location_markers" || type === "pedestrian_accidents"
-        ? ["accident-points"]
-        : type === "density_heatmap"
-          ? ["density-points"]
-          : [];
+      type === "density_heatmap"
+        ? ["density-points"]
+        : [];
 
     if (!interactiveLayers.length) {
       setSelected(null);
@@ -647,97 +546,7 @@ export function VisualizationLayers({
     return <BlackspotLayers geojsonData={geojsonData} />;
   }
 
-  // ── Location markers ─────────────────────────────────────────────────────
-  const markerColor = severityColorExpression as any;
-
-  return (
-    <>
-      <Source
-        id="accident-marker-source"
-        type="geojson"
-        data={geojsonData as any}
-        cluster={false}
-      >
-        <Layer
-          id="accident-points"
-          type="circle"
-          paint={{
-            "circle-radius": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              7,
-              1.5,
-              9,
-              2.0,
-              11,
-              2.8,
-              13,
-              3.5,
-              15,
-              4.2,
-            ],
-            "circle-color": markerColor as any,
-            "circle-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              7,
-              0.7,
-              11,
-              0.8,
-              13,
-              0.9,
-            ],
-            "circle-stroke-width": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              7,
-              0.4,
-              10,
-              0.6,
-              13,
-              0.8,
-              15,
-              1.0,
-            ],
-            "circle-stroke-color": "#FFFFFF",
-            "circle-stroke-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              7,
-              0.7,
-              11,
-              0.85,
-              13,
-              0.95,
-            ],
-          }}
-        />
-      </Source>
-
-      {selected && (
-        <Popup
-          longitude={selected.longitude}
-          latitude={selected.latitude}
-          closeOnClick={true}
-          offset={12}
-          closeButton={false}
-          className="accident-popup"
-          style={{ "--popup-bg": getSeverityTheme(selected.severity).bg } as React.CSSProperties}
-          onClose={() => setSelected(null)}
-        >
-          <AccidentPopupBody
-            selected={selected}
-            showPedestrianCasualties={type === "pedestrian_accidents"}
-            onClose={() => setSelected(null)}
-          />
-        </Popup>
-      )}
-    </>
-  );
+  return null;
 }
 
 // ---------------------------------------------------------------------------

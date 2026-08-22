@@ -25,6 +25,8 @@ import NetworkBlackspotLayers from "../../components/maps/NetworkBlackspotLayers
 import RiskCorridorLayers from "../../components/maps/RiskCorridorLayers";
 import RoadNetworkLayers from "../../components/maps/RoadNetworkLayers";
 import RoadNetworkLegend from "../../components/maps/RoadNetworkLegend";
+import MarkerOverlayLayer from "../../components/maps/MarkerOverlayLayer";
+import MarkerLayerToggle from "../../components/maps/MarkerLayerToggle";
 // import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
 // import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
 // import DensityMapOverlays from "../../components/maps/DensityMapOverlays";
@@ -208,7 +210,7 @@ const defaultDistrictFilters: DashboardFilters = {
   date_from: "",
   date_to: "",
   baseMap: DEFAULT_BASE_MAP,
-  visualization_type: "location_markers",
+  visualization_type: "density_heatmap",
   visualization_variant: "accident",
 };
 
@@ -314,20 +316,10 @@ export default function DistrictDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [snappedHeatmapData, setSnappedHeatmapData] = useState<HeatmapPoint[] | null>(null);
   const [roadNetworkData, setRoadNetworkData] = useState<GeoJSON.FeatureCollection | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    if (filters.visualization_type === "density_heatmap" && districtName) {
-      fetchGujaratSnappedAccidents(filters, districtName).then(res => {
-        if (active) setSnappedHeatmapData(res.data);
-      }).catch(console.error);
-    } else {
-      setSnappedHeatmapData(null);
-    }
-    return () => { active = false; };
-  }, [filters, districtSlug]);
+  // ── Marker overlay toggle state ──────────────────────────────────────────
+  const [showMarkerOverlay, setShowMarkerOverlay] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -591,20 +583,13 @@ export default function DistrictDashboard() {
   const isDbscanBlackspot = filters.visualization_type === "dbscan_blackspot";
   const isIrcGreedyBlackspot = filters.visualization_type === "irc_greedy_blackspot";
   const isIrcGridBlackspot = filters.visualization_type === "irc_grid_blackspot";
-  const isSnappedAccidents =
-    filters.visualization_type === "snapped_accidents";
-  const isNetworkBlackspot =
-    filters.visualization_type === "network_blackspot";
-  const isNetworkBlackspotMerged =
-    filters.visualization_type === "network_blackspot_merged";
-  const isRiskCorridors =
-    filters.visualization_type === "risk_corridors";
-  const isRoadNetwork =
-    filters.visualization_type === "road_network";
-  const isLocationMarkers =
-    filters.visualization_type === "location_markers" ||
-    !filters.visualization_type;
-  const baseHeatmapData = snappedHeatmapData || data.heatmap;
+  const isSnappedAccidents = filters.visualization_type === "snapped_accidents";
+  const isNetworkBlackspot = filters.visualization_type === "network_blackspot";
+  const isNetworkBlackspotMerged = filters.visualization_type === "network_blackspot_merged";
+  const isRiskCorridors = filters.visualization_type === "risk_corridors";
+  const isRoadNetwork = filters.visualization_type === "road_network";
+  
+  const baseHeatmapData = data.heatmap;
   const displayHeatmapData = isPedestrianVariant
     ? baseHeatmapData.filter(isPedestrianAccident)
     : baseHeatmapData;
@@ -615,10 +600,7 @@ export default function DistrictDashboard() {
   //   : isKdeHeatmap
   //     ? "KDE Density"
   //     : "Accident Density";
-  const visualizationLayerType =
-    isLocationMarkers && isPedestrianVariant
-      ? "pedestrian_accidents"
-      : filters.visualization_type || "location_markers";
+  const visualizationLayerType = filters.visualization_type || "density_heatmap";
 
   // const overlaySubtitle = useMemo(() => {
   //   const parts: string[] = [districtName || "District"];
@@ -707,6 +689,29 @@ export default function DistrictDashboard() {
             onChange={handleChange}
             multiSelect={isMultiSelect}
           />
+        )}
+        
+        {/* Render the Markers toggle switch directly below the Visualization Type dropdown */}
+        {filter.id === "visualization_type" && (
+          <div className="mt-2 flex items-center justify-between rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] p-2">
+            <span className="text-[12px] font-semibold text-[#1e3a8a]">Show Markers Overlay</span>
+            <button
+              onClick={() => setShowMarkerOverlay(!showMarkerOverlay)}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a] focus-visible:ring-offset-2 ${
+                showMarkerOverlay ? 'bg-[#1e3a8a]' : 'bg-slate-300'
+              }`}
+              role="switch"
+              aria-checked={showMarkerOverlay}
+            >
+              <span className="sr-only">Toggle markers</span>
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  showMarkerOverlay ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
         )}
       </div>
     );
@@ -1103,6 +1108,15 @@ export default function DistrictDashboard() {
                           selectedSeverity={filters.severity}
                         />
                       )}
+
+                      {/* ── Marker Overlay Layer (rendered on top of primary visualization) ── */}
+                      {showMarkerOverlay && (
+                        <MarkerOverlayLayer
+                          data={displayHeatmapData}
+                          isPedestrianVariant={isPedestrianVariant}
+                        />
+                      )}
+
                       {filters.visualization_type === "risk_corridors" ? (
                         <RiskCorridorLegend
                           visualizationLayerType={visualizationLayerType}
@@ -1110,6 +1124,7 @@ export default function DistrictDashboard() {
                       ) : (
                         <SeverityLegend
                           visualizationLayerType={visualizationLayerType}
+                          showMarkers={showMarkerOverlay}
                         />
                       )}
                       <RoadNetworkLegend isVisible={isRoadNetwork} />
