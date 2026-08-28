@@ -8,10 +8,12 @@ the main project's SQLAlchemy `Accident` model.
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Union
 
 # pyrefly: ignore
-from sqlalchemy import extract
+from sqlalchemy import extract, func, String
+# pyrefly: ignore [missing-import]
+from sqlalchemy.orm import Session
 from app.models.accident import Accident
 from app.utils.taluka_utils import apply_taluka_spatial_filter
 from app.utils.datetime_utils import parse_accident_datetime_from_str
@@ -52,13 +54,14 @@ def apply_filters(
     road_classification=None,
     weather_condition=None,
     light_condition=None,
-    collision_type=None,
+    collision_type: Optional[Union[str, List[str]]] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    taluka=None,
-    police_station=None, 
+    taluka: Optional[Union[str, List[str]]] = None,
+    db: Optional[Session] = None,
+    police_station: Optional[Union[str, List[str]]] = None,
+    number_of_vehicles: Optional[Union[str, List[str]]] = None,
     visibility=None,
-    db=None,
 ):
     """
     Apply standard dashboard UI filters to an active SQLAlchemy query object.
@@ -138,6 +141,12 @@ def apply_filters(
             query = query.filter(Accident.type_of_collision.in_(collision_type))
         else:
             query = query.filter(Accident.type_of_collision == collision_type)
+
+    if number_of_vehicles:
+        if isinstance(number_of_vehicles, list):
+            query = query.filter(func.cast(Accident.number_of_vehicles, String).in_(number_of_vehicles))
+        else:
+            query = query.filter(func.cast(Accident.number_of_vehicles, String) == number_of_vehicles)
 
     # Date range — enforced specifically on the accident_date_time column
     if date_from:

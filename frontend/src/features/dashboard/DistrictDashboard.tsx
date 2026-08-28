@@ -148,6 +148,7 @@ type FilterId =
   | "collision_type"
   | "police_station"
   | "taluka"
+  | "number_of_vehicles"
   | "date_from"
   | "date_to";
 
@@ -173,6 +174,7 @@ const MAP_FILTERS: FilterConfigItem[] = [
   { id: "light_condition", label: "Light condition" },
   { id: "visibility", label: "Visibility" },
   { id: "collision_type", label: "Collision type" },
+  { id: "number_of_vehicles", label: "No. of Vehicles" },
 ];
 
 const TEMPORAL_FILTERS: FilterConfigItem[] = [
@@ -194,6 +196,7 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "light_condition", label: "Light Condition" },
   { id: "visibility", label: "Visibility" },
   { id: "collision_type", label: "Collision type" },
+  { id: "number_of_vehicles", label: "No. of Vehicles" },
 ];
 
 const DISTRICT_VISUALIZATION_OPTIONS = VISUALIZATION_OPTIONS.filter(
@@ -212,6 +215,7 @@ const defaultDistrictFilters: DashboardFilters = {
   light_condition: [],
   visibility: [],
   collision_type: [],
+  number_of_vehicles: [],
   police_station: [],
   taluka: [],
   date_from: "",
@@ -597,6 +601,10 @@ export default function DistrictDashboard() {
       value: c,
       label: c,
     })),
+    number_of_vehicles: (filterOptions?.number_of_vehicles || []).map((n) => ({
+      value: n,
+      label: n,
+    })),
     police_station: (filterOptions?.police_stations || []).map((p) => ({
       value: p,
       label: p,
@@ -696,91 +704,7 @@ export default function DistrictDashboard() {
       );
     }
 
-    // ── Map Overlays (Toggle Switches) ──
-    if (filter.id === "visualization_type") {
-      const activeTypes = filters.visualization_type || [];
-      const handleToggle = (val: string) => {
-        setFilters((current) => {
-          const currentTypes = current.visualization_type || [];
-          const newTypes = currentTypes.includes(val)
-            ? currentTypes.filter((t) => t !== val)
-            : [...currentTypes, val];
 
-          return {
-            ...current,
-            visualization_type: newTypes,
-            visualization_variant: hasVisualizationVariants(newTypes)
-              ? current.visualization_variant || "accident"
-              : "accident",
-            month: [],
-            day: [],
-            time_period: [],
-            severity: newTypes.some(isBlackspotVisualization)
-              ? []
-              : current.severity,
-          };
-        });
-      };
-
-      return (
-        <div key={filter.id} className="flex flex-col gap-1.5">
-          <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#1e3a8a]">
-            {filter.icon === "layers" && (
-              <Layers size={12} className="text-[#1e3a8a]" />
-            )}
-            Map Overlays
-          </label>
-          <div className="flex flex-col gap-2.5 rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] p-3 shadow-sm">
-            {filterOptionsById[filter.id].map((opt) => {
-              const isChecked = activeTypes.includes(opt.value);
-              return (
-                <div key={opt.value} className="flex items-center justify-between">
-                  <span className="text-[12px] font-medium text-[#3A4060]">{opt.label}</span>
-                  <button
-                    onClick={() => handleToggle(opt.value)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a] focus-visible:ring-offset-2 ${
-                      isChecked ? 'bg-[#1e3a8a]' : 'bg-slate-300'
-                    }`}
-                    role="switch"
-                    aria-checked={isChecked}
-                  >
-                    <span className="sr-only">Toggle {opt.label}</span>
-                    <span
-                      aria-hidden="true"
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        isChecked ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-              );
-            })}
-            
-            <hr className="border-[#E4E8F4] my-1" />
-            
-            <div className="flex items-center justify-between">
-              <span className="text-[12px] font-bold text-[#1e3a8a]">Show Markers Overlay</span>
-              <button
-                onClick={() => setShowMarkerOverlay(!showMarkerOverlay)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a] focus-visible:ring-offset-2 ${
-                  showMarkerOverlay ? 'bg-[#1e3a8a]' : 'bg-slate-300'
-                }`}
-                role="switch"
-                aria-checked={showMarkerOverlay}
-              >
-                <span className="sr-only">Toggle markers</span>
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    showMarkerOverlay ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
 
     const value = filters[filter.id] ?? [];
     const isMultiSelect =
@@ -798,6 +722,19 @@ export default function DistrictDashboard() {
           newFilters.date_to = "";
         } else if ((filter.id === "date_from" || filter.id === "date_to") && nextValue) {
           newFilters.year = [];
+        }
+        
+        if (filter.id === "visualization_type") {
+          const newTypes = nextValue as string[];
+          newFilters.visualization_variant = hasVisualizationVariants(newTypes)
+            ? current.visualization_variant || "accident"
+            : "accident";
+          newFilters.month = [];
+          newFilters.day = [];
+          newFilters.time_period = [];
+          if (newTypes.some(isBlackspotVisualization)) {
+            newFilters.severity = [];
+          }
         }
 
         return newFilters;
@@ -905,7 +842,7 @@ export default function DistrictDashboard() {
               const MAP_FILTER_IDS = ["baseMap", "visualization_type", "visualization_variant"];
               const TIME_FILTER_IDS = ["date_from", "date_to", "year", "year_range", "month", "day", "time_period"];
               const LOCATION_FILTER_IDS = ["taluka", "police_station"];
-              const INCIDENT_FILTER_IDS = ["severity", "collision_type"];
+              const INCIDENT_FILTER_IDS = ["severity", "collision_type", "number_of_vehicles"];
               const ENVIRONMENT_FILTER_IDS = ["road_classification", "weather_condition", "light_condition", "visibility"];
 
               const mapFilters = activeFilterConfig.filter((f) => MAP_FILTER_IDS.includes(f.id));
@@ -944,6 +881,30 @@ export default function DistrictDashboard() {
                     {openPanels[key] && (
                       <div className="flex flex-col gap-3 p-3">
                         {filters.map(renderFilter)}
+                        {key === "map" && (
+                          <>
+                            <hr className="border-[#E4E8F4] my-1" />
+                            <div className="flex items-center justify-between">
+                              <span className="text-[12px] font-bold text-[#1e3a8a]">Show Markers Overlay</span>
+                              <button
+                                onClick={() => setShowMarkerOverlay(!showMarkerOverlay)}
+                                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a] focus-visible:ring-offset-2 ${
+                                  showMarkerOverlay ? 'bg-[#1e3a8a]' : 'bg-slate-300'
+                                }`}
+                                role="switch"
+                                aria-checked={showMarkerOverlay}
+                              >
+                                <span className="sr-only">Toggle markers</span>
+                                <span
+                                  aria-hidden="true"
+                                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                    showMarkerOverlay ? 'translate-x-4' : 'translate-x-0'
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </section>

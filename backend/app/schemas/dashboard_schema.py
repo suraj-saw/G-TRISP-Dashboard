@@ -148,6 +148,7 @@ class HeatmapPoint(ResponseModel):
     weather_condition: Optional[str] = None
     light_condition: Optional[str] = None
     collision_type: Optional[str] = None
+    collision_nature: Optional[str] = None
     accident_date_time: Optional[datetime] = None
     
     # Specific casualty metrics for point-level analysis
@@ -341,6 +342,7 @@ class FilterOptions(ResponseModel):
     severities: List[str] = []
     years: List[int] = []
     visibilities: List[str] = []
+    number_of_vehicles: List[str] = []
     
     min_date: Optional[str] = None
     max_date: Optional[str] = None

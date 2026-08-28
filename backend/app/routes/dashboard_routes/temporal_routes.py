@@ -46,6 +46,7 @@ def get_temporal_analysis(
     taluka: Optional[List[str]] = Query(None),
     road_classification: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
 ):
@@ -55,6 +56,7 @@ def get_temporal_analysis(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity:

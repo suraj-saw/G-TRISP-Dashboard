@@ -114,6 +114,8 @@ function getParams(
     filters.visibility.forEach((v) => params.append("visibility", v));
   if (filters.collision_type?.length)
     filters.collision_type.forEach((c) => params.append("collision_type", c));
+  if (filters.number_of_vehicles?.length)
+    filters.number_of_vehicles.forEach((n) => params.append("number_of_vehicles", n));
   // NEW
   if (filters.police_station?.length)
     filters.police_station.forEach((p) => params.append("police_station", p));

@@ -49,6 +49,7 @@ def get_heatmap(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -61,6 +62,7 @@ def get_heatmap(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity:
@@ -86,6 +88,7 @@ def get_heatmap(
                 weather_condition=safe_text(a.weather_condition),
                 light_condition=safe_text(a.light_condition),
                 collision_type=safe_text(a.type_of_collision),
+                collision_nature=safe_text(a.collision_feature),
                 accident_date_time=a.accident_date_time,
                 pedestrian_killed=a.pedestrian_killed or 0,
                 pedestrian_grievous_injury=a.pedestrian_grievous_injury or 0,
@@ -106,6 +109,7 @@ def get_kde_heatmap(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     radius_m: float = Query(KDE_RADIUS_METERS, ge=100, le=2000),
@@ -121,6 +125,7 @@ def get_kde_heatmap(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity:
@@ -172,6 +177,7 @@ def get_weighted_kde_heatmap(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     radius_m: float = Query(KDE_RADIUS_METERS, ge=100, le=2000),
@@ -187,6 +193,7 @@ def get_weighted_kde_heatmap(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity:
@@ -253,6 +260,7 @@ def get_snapped_accidents(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -273,6 +281,7 @@ def get_snapped_accidents(
         Accident.weather_condition,
         Accident.light_condition,
         Accident.type_of_collision.label("collision_type"),
+        Accident.collision_feature.label("collision_nature"),
         Accident.accident_date_time,
         Accident.pedestrian_killed,
         Accident.pedestrian_grievous_injury,
@@ -299,6 +308,7 @@ def get_snapped_accidents(
         query, district, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to, taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     
@@ -321,6 +331,7 @@ def get_snapped_accidents(
             "weather_condition": r.weather_condition,
             "light_condition": r.light_condition,
             "collision_type": r.collision_type,
+            "collision_nature": r.collision_nature,
             "accident_date_time": r.accident_date_time,
             "pedestrian_killed": r.pedestrian_killed,
             "pedestrian_grievous_injury": r.pedestrian_grievous_injury,

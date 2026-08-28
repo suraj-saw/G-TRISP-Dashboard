@@ -52,6 +52,7 @@ type SelectedAccident = {
   weather_condition?: string | null;
   light_condition?: string | null;
   collision_type?: string | null;
+  collision_nature?: string | null;
   accident_date_time?: string | null;
   pedestrian_killed?: number | null;
   pedestrian_grievous_injury?: number | null;
@@ -196,6 +197,7 @@ function buildGeojson(data?: HeatmapPoint[]): GeoJSON.FeatureCollection {
             weather_condition: p.weather_condition,
             light_condition: p.light_condition,
             collision_type: p.collision_type,
+            collision_nature: p.collision_nature,
             accident_date_time: p.accident_date_time,
             pedestrian_killed: p.pedestrian_killed ?? 0,
             pedestrian_grievous_injury: p.pedestrian_grievous_injury ?? 0,
@@ -674,10 +676,23 @@ function AccidentPopupBody({
 
       {/* ── Main Details Grid ── */}
       <div className="mt-1.5 space-y-1 text-[10.5px]">
+        {/* Collision Nature */}
+        <div className="flex items-baseline justify-between gap-1">
+          <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
+            Nature
+          </span>
+          <span
+            className="font-semibold text-slate-700 text-right truncate max-w-[110px]"
+            title={safeText(selected.collision_nature)}
+          >
+            {safeText(selected.collision_nature)}
+          </span>
+        </div>
+
         {/* Collision Type */}
         <div className="flex items-baseline justify-between gap-1">
           <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
-            Collision
+            Type
           </span>
           <span
             className="font-semibold text-slate-700 text-right truncate max-w-[110px]"

@@ -196,10 +196,23 @@ function SnappedAccidentPopupBody({
 
       {/* ── Main Details Grid ── */}
       <div className="mt-1.5 space-y-1 text-[10.5px]">
+        {/* Collision Nature */}
+        <div className="flex items-baseline justify-between gap-1">
+          <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
+            Nature
+          </span>
+          <span
+            className="font-semibold text-slate-700 text-right truncate max-w-[110px]"
+            title={safeText(selected.collision_nature)}
+          >
+            {safeText(selected.collision_nature)}
+          </span>
+        </div>
+
         {/* Collision Type */}
         <div className="flex items-baseline justify-between gap-1">
           <span className={`text-[9.5px] uppercase tracking-wider ${theme.labelColor} shrink-0`}>
-            Collision
+            Type
           </span>
           <span
             className="font-semibold text-slate-700 text-right truncate max-w-[110px]"

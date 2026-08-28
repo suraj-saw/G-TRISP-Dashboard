@@ -142,6 +142,7 @@ def export_dashboard_data(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -154,6 +155,7 @@ def export_dashboard_data(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity and "all" not in severity:

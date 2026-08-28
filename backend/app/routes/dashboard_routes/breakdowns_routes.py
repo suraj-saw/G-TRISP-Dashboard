@@ -45,6 +45,7 @@ def get_by_violation(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -60,6 +61,7 @@ def get_by_violation(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     rows = (
@@ -89,6 +91,7 @@ def get_by_road(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -101,6 +104,7 @@ def get_by_road(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
 
@@ -134,6 +138,7 @@ def get_by_weather(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -149,6 +154,7 @@ def get_by_weather(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     rows = (
@@ -177,6 +183,7 @@ def get_by_light(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -192,6 +199,7 @@ def get_by_light(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     rows = (
@@ -220,6 +228,7 @@ def get_by_police_station(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -231,6 +240,7 @@ def get_by_police_station(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
     )
 
     stations: dict = defaultdict(
@@ -263,6 +273,7 @@ def get_casualty_breakdown(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -275,6 +286,7 @@ def get_casualty_breakdown(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     ).all()
 

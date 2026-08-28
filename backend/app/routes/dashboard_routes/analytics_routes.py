@@ -61,6 +61,7 @@ def get_by_district(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -72,6 +73,7 @@ def get_by_district(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
     )
 
     rows = query.with_entities(
@@ -114,6 +116,7 @@ def get_by_severity(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -126,6 +129,7 @@ def get_by_severity(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     rows = query.group_by(Accident.severity).all()
@@ -146,6 +150,7 @@ def get_by_collision(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -161,6 +166,7 @@ def get_by_collision(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     rows = (
@@ -188,6 +194,7 @@ def get_time_series(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     granularity: str = Query("month", enum=["month", "year"]),
@@ -201,6 +208,7 @@ def get_time_series(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
 
@@ -239,6 +247,7 @@ def get_top_dangerous(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -251,6 +260,7 @@ def get_top_dangerous(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
 
@@ -284,6 +294,7 @@ def get_yearly_comparison(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -296,6 +307,7 @@ def get_yearly_comparison(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
 
@@ -586,6 +598,7 @@ def get_district_stats(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     police_station: Optional[List[str]] = Query(None),
     taluka: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
@@ -606,6 +619,7 @@ def get_district_stats(
         date_from=date_from,
         date_to=date_to,
         db=db,
+        number_of_vehicles=number_of_vehicles,
     )
     if severity:
         query = query.filter(Accident.severity.in_(severity))

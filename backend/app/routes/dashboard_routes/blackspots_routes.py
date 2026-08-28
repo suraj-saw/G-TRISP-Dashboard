@@ -66,6 +66,7 @@ def get_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
@@ -80,6 +81,7 @@ def get_blackspots(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity:
@@ -131,6 +133,7 @@ def get_pedestrian_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
@@ -145,6 +148,7 @@ def get_pedestrian_blackspots(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity:
@@ -202,6 +206,7 @@ def get_dbscan_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
@@ -216,6 +221,7 @@ def get_dbscan_blackspots(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity:
@@ -267,6 +273,7 @@ def get_pedestrian_dbscan_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
@@ -281,6 +288,7 @@ def get_pedestrian_dbscan_blackspots(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity:
@@ -338,6 +346,7 @@ def get_irc_greedy_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -354,7 +363,8 @@ def get_irc_greedy_blackspots(
     
     base_query = apply_filters(
         db.query(Accident),
-        district, year, None, None, None, None, date_from, date_to, taluka=None, db=db, police_station=None
+        district, year, None, None, None, None, date_from, date_to, taluka=None, db=db,
+        number_of_vehicles=number_of_vehicles, police_station=None
     )
     total_network_crashes = base_query.count()
 
@@ -364,6 +374,7 @@ def get_irc_greedy_blackspots(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity:
@@ -425,6 +436,7 @@ def get_irc_grid_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -442,7 +454,8 @@ def get_irc_grid_blackspots(
     
     base_query = apply_filters(
         db.query(Accident),
-        district, year, None, None, None, None, date_from, date_to, taluka=None, db=db, police_station=None
+        district, year, None, None, None, None, date_from, date_to, taluka=None, db=db,
+        number_of_vehicles=number_of_vehicles, police_station=None
     )
     total_network_crashes = base_query.count()
 
@@ -452,6 +465,7 @@ def get_irc_grid_blackspots(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity:
@@ -513,6 +527,7 @@ def get_pedestrian_irc_greedy_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -529,7 +544,8 @@ def get_pedestrian_irc_greedy_blackspots(
     
     base_query = apply_filters(
         db.query(Accident),
-        district, year, None, None, None, None, date_from, date_to, taluka=None, db=db, police_station=None
+        district, year, None, None, None, None, date_from, date_to, taluka=None, db=db,
+        number_of_vehicles=number_of_vehicles, police_station=None
     )
     total_network_crashes = base_query.count()
 
@@ -539,6 +555,7 @@ def get_pedestrian_irc_greedy_blackspots(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity:
@@ -608,6 +625,7 @@ def get_pedestrian_irc_grid_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -625,7 +643,8 @@ def get_pedestrian_irc_grid_blackspots(
     
     base_query = apply_filters(
         db.query(Accident),
-        district, year, None, None, None, None, date_from, date_to, taluka=None, db=db, police_station=None
+        district, year, None, None, None, None, date_from, date_to, taluka=None, db=db,
+        number_of_vehicles=number_of_vehicles, police_station=None
     )
     total_network_crashes = base_query.count()
 
@@ -635,6 +654,7 @@ def get_pedestrian_irc_grid_blackspots(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity:
@@ -705,6 +725,7 @@ def get_network_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -745,6 +766,7 @@ def get_network_blackspots(
         query, district, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to, taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     
@@ -925,6 +947,7 @@ def export_blackspots(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
@@ -943,6 +966,7 @@ def export_blackspots(
         weather_condition, light_condition, collision_type,
         date_from, date_to,
         taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     if severity and "all" not in severity:

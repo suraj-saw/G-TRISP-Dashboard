@@ -30,6 +30,8 @@ export interface DashboardFilters {
   visibility?: string[];
   /** Collision types to include in the filter */
   collision_type: string[];
+  /** Number of vehicles to include in the filter */
+  number_of_vehicles: string[];
   /** Police stations to include in the filter (optional) */
   police_station?: string[];
   /** Talukas to include in the filter (optional) */
@@ -60,6 +62,8 @@ export interface FilterOptions {
   visibilities?: string[];
   /** Available collision type options */
   collision_types: string[];
+  /** Available number of vehicles options */
+  number_of_vehicles: string[];
   /** Available police station options (optional) */
   police_stations?: string[];
   /** Available severity options */
@@ -158,6 +162,8 @@ export interface HeatmapPoint {
   light_condition?: string | null;
   /** Type of collision (optional) */
   collision_type?: string | null;
+  /** Nature of collision (optional) */
+  collision_nature?: string | null;
   /** Date and time of the accident (optional) */
   accident_date_time?: string | null;
   /** Number of pedestrians killed (optional) */

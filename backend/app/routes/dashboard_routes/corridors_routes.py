@@ -38,6 +38,7 @@ def get_risk_corridors(
     weather_condition: Optional[List[str]] = Query(None),
     light_condition: Optional[List[str]] = Query(None),
     collision_type: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
@@ -77,6 +78,7 @@ def get_risk_corridors(
         query, district, year, road_classification,
         weather_condition, light_condition, collision_type,
         date_from, date_to, taluka=taluka, db=db,
+        number_of_vehicles=number_of_vehicles,
         police_station=police_station
     )
     

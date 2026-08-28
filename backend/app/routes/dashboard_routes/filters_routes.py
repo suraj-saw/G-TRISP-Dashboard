@@ -71,6 +71,7 @@ def get_filter_options(
         police_stations=distinct(Accident.police_station),
         severities=distinct(Accident.severity),
         visibilities=distinct(Accident.visibility),
+        number_of_vehicles=[str(int(r[0])) for r in db.query(Accident.number_of_vehicles).filter(Accident.number_of_vehicles.isnot(None)).distinct().order_by(Accident.number_of_vehicles).all()],
         years=years,
         min_date=min_dt.date().isoformat() if min_dt else None,
         max_date=max_dt.date().isoformat() if max_dt else None,
@@ -92,6 +93,7 @@ def get_summary(
     police_station: Optional[List[str]] = Query(None),
     severity: Optional[List[str]] = Query(None),
     visibility: Optional[List[str]] = Query(None),
+    number_of_vehicles: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -100,7 +102,8 @@ def get_summary(
         date_from, date_to,
         taluka=taluka, db=db,
         police_station=police_station,
-        visibility=visibility
+        visibility=visibility,
+        number_of_vehicles=number_of_vehicles
     )
     if severity:
         query = query.filter(Accident.severity.in_(severity))
