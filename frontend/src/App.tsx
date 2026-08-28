@@ -24,6 +24,7 @@ import Signup from "./features/auth/Register";
 import Login from "./features/auth/Login";
 import ForgotPassword from "./features/auth/ForgotPassword";
 import ResetPassword from "./features/auth/ResetPassword";
+import Profile from "./features/auth/Profile";
 import GujaratOverview from "./features/dashboard/GujaratOverview";
 import DistrictDashboard from "./features/dashboard/DistrictDashboard";
 import AdminDashboard from "./features/dashboard/AdminDashboard";
@@ -111,6 +112,7 @@ function App() {
         {/* Core User Metrics Segment */}
         <Route path={ROUTES.DASHBOARD} element={<GujaratOverview />} />
         <Route path={ROUTES.ABOUT} element={<AboutPage />} />
+        <Route path={ROUTES.PROFILE} element={<Profile />} />
         <Route
           path={ROUTES.DISTRICT_DASHBOARD}
           element={<DistrictDashboard />}

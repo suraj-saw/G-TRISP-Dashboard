@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, LogOut, PanelRight, Mail, Info } from "lucide-react";
+import { ChevronDown, LogOut, PanelRight, Mail, Info, UserCircle } from "lucide-react";
 
 import NotificationBell from "./NotificationBell";
 import type { User } from "../../types/user";
@@ -45,38 +45,14 @@ function TopBar({
 }: Props) {
   const navigate = useNavigate();
 
-  // State for toggling the user profile dropdown menu
-  const [open, setOpen] = useState(false);
-
   // State for toggling the logout confirmation modal
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
-
-  // Ref to track clicks outside the dropdown menu
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  /**
-   * Effect to handle "click outside" logic for the user dropdown.
-   * Closes the dropdown if the user clicks anywhere else on the document.
-   */
-  useEffect(() => {
-    const closeDropdown = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", closeDropdown);
-    return () => document.removeEventListener("mousedown", closeDropdown);
-  }, []);
 
   /**
    * Executes the actual logout process and closes all menus.
    */
   const handleLogoutConfirm = () => {
     setLogoutDialogOpen(false);
-    setOpen(false);
     onLogout();
   };
 
@@ -149,20 +125,19 @@ function TopBar({
           {/* Divider */}
           <span className="hidden sm:block h-5 w-px bg-slate-200" aria-hidden />
 
-          {/* User Profile Dropdown */}
-          <div ref={dropdownRef} className="relative">
+          {/* User Profile Link & Logout */}
+          <div className="flex items-center gap-1 sm:gap-2">
             <button
-              onClick={() => setOpen((prev) => !prev)}
-              aria-haspopup="menu"
-              aria-expanded={open}
+              onClick={() => navigate(ROUTES.PROFILE)}
               className="
                 flex items-center gap-2.5
                 p-1.5 pr-3
                 rounded-full
                 border border-transparent
-                hover:bg-slate-50 hover:border-slate-100
+                hover:bg-slate-50 hover:border-slate-200
                 transition-all duration-200
               "
+              title="My Profile"
             >
               <div
                 className="
@@ -179,108 +154,20 @@ function TopBar({
               <span className="hidden md:block text-sm font-semibold text-slate-700">
                 {user.username}
               </span>
-
-              <ChevronDown
-                size={14}
-                className={`text-slate-400 transition-transform duration-200 ${
-                  open ? "rotate-180" : ""
-                }`}
-              />
             </button>
-
-            {/* DROPDOWN MENU */}
-            {open && (
-              <div
-                role="menu"
-                style={{
-                  fontFamily: '"Public Sans", system-ui, sans-serif',
-                }}
-                className="
-                  absolute right-0 top-full
-                  w-80 mt-2
-                  rounded-2xl
-                  bg-white
-                  border border-slate-100
-                  shadow-[0_20px_50px_rgba(79,70,229,0.12)]
-                  overflow-hidden
-                  z-50
-                  animate-in fade-in slide-in-from-top-2 duration-200
-                "
-              >
-              {/* DROPDOWN HEADER */}
-              <div className="px-5 pt-6 pb-5 bg-gradient-to-br from-indigo-900 to-slate-900">
-                <div className="flex items-center gap-3.5">
-                  <div
-                    className="
-                      h-12 w-12 shrink-0
-                      rounded-full
-                      bg-white/10
-                      ring-2 ring-white/20
-                      flex items-center justify-center
-                      text-lg font-bold text-white
-                    "
-                  >
-                    {user.username.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-base font-bold text-white truncate">
-                      {user.username}
-                    </h3>
-                    <span
-                      className="
-                        mt-1 inline-flex items-center
-                        rounded-full
-                        bg-indigo-500/30 backdrop-blur-md
-                        px-2.5 py-0.5
-                        text-[11px] font-bold uppercase tracking-wider text-indigo-200
-                      "
-                    >
-                      {user.role}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* DROPDOWN BODY */}
-              <div className="p-2">
-                <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-slate-50 transition-colors">
-                  <div className="h-8 w-8 shrink-0 rounded-lg bg-indigo-50 flex items-center justify-center">
-                    <Mail size={15} className="text-indigo-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Email Address
-                    </p>
-                    <p className="text-sm font-medium text-slate-700 truncate">
-                      {user.email}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="my-1 h-px bg-slate-100" />
-
-                {/* LOGOUT TRIGGER */}
-                <button
-                  onClick={() => setLogoutDialogOpen(true)}
-                  className="
-                    w-full
-                    flex items-center gap-3
-                    rounded-xl
-                    px-3 py-2.5
-                    text-sm font-semibold text-red-600
-                    hover:bg-red-50/60
-                    transition-all
-                  "
-                >
-                  <div className="h-8 w-8 shrink-0 rounded-lg bg-red-50 flex items-center justify-center">
-                    <LogOut size={15} />
-                  </div>
-                  Sign out
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+            
+            <button
+              onClick={() => setLogoutDialogOpen(true)}
+              className="
+                p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 
+                transition-colors
+              "
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
 
         {/* Divider */}
         {onToggleSidebar && (

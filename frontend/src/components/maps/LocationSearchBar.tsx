@@ -74,7 +74,7 @@ export default function LocationSearchBar({ bbox, onLocationSelect, onClear }: L
   };
 
   return (
-    <div ref={wrapperRef} className="relative z-30 w-full font-sans mb-4 px-1">
+    <div ref={wrapperRef} className="relative z-30 w-full font-sans px-1">
       <div className="relative flex items-center w-full h-[42px] rounded-xl bg-white shadow-sm border border-[#E4E8F4] focus-within:border-[#1e3a8a] focus-within:ring-4 focus-within:ring-[#1e3a8a]/10 transition-all duration-200 group">
         <div className="flex items-center justify-center w-11 h-full text-[#6B7299] group-focus-within:text-[#1e3a8a] transition-colors">
           <Search size={16} strokeWidth={2.5} />

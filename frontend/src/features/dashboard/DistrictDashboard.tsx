@@ -20,13 +20,14 @@ import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
 import DbscanBlackspotDetectionLayers from "../../components/maps/DbscanBlackspotDetectionLayers";
 import IrcBlackspotDetectionLayers from "../../components/maps/IrcBlackspotDetectionLayers";
-import SnappedAccidentLayers from "../../components/maps/SnappedAccidentLayers";
+// import SnappedAccidentLayers from "../../components/maps/SnappedAccidentLayers";
 import NetworkBlackspotLayers from "../../components/maps/NetworkBlackspotLayers";
 import RiskCorridorLayers from "../../components/maps/RiskCorridorLayers";
 import RoadNetworkLayers from "../../components/maps/RoadNetworkLayers";
+import MergedRoadNetworkLayers from "../../components/maps/MergedRoadNetworkLayers";
 import RoadNetworkLegend from "../../components/maps/RoadNetworkLegend";
 import MarkerOverlayLayer from "../../components/maps/MarkerOverlayLayer";
-import MarkerLayerToggle from "../../components/maps/MarkerLayerToggle";
+// import MarkerLayerToggle from "../../components/maps/MarkerLayerToggle";
 // import KdeHeatmapLayers from "../../components/maps/KdeHeatmapLayers";
 // import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
 // import DensityMapOverlays from "../../components/maps/DensityMapOverlays";
@@ -81,12 +82,14 @@ import {
   fetchGujaratRiskCorridors,
   fetchGujaratPedestrianRiskCorridors,
   fetchGujaratRoadNetwork,
+  fetchGujaratMergedRoadNetwork,
 } from "../../api/gujaratDashboardApi";
 import type {
   DashboardFilters,
   FilterOptions,
   DashboardData,
   HeatmapPoint,
+  SnappedHeatmapPoint,
 } from "../../types/dashboard";
 import { ROUTES, DEFAULT_BASE_MAP } from "../../config/constants";
 import {
@@ -105,6 +108,7 @@ import {
 import { isBlackspotVisualization, toDataFilterKey } from "../../utils/dashboardFilters";
 import { MAP_STYLES } from "../../components/maps/mapStyles";
 import { DateFilterInput } from "./district/DateFilterInput";
+import YearRangeFilter from "./district/YearRangeFilter";
 import { SpatialExportRegistrar } from "./district/SpatialExportRegistrar";
 
 
@@ -132,6 +136,7 @@ type FilterId =
   | "visualization_type"
   | "visualization_variant"
   | "year"
+  | "year_range"
   | "month"
   | "day"
   | "time_period"
@@ -159,6 +164,7 @@ const MAP_FILTERS: FilterConfigItem[] = [
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
+  { id: "year_range", label: "Year Range" },
   { id: "taluka", label: "Taluka" },
   { id: "police_station", label: "Police Station" },
   { id: "severity", label: "Severity" },
@@ -176,6 +182,7 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
+  { id: "year_range", label: "Year Range" },
   { id: "month", label: "Month" },
   { id: "day", label: "Day" },
   { id: "time_period", label: "Time Period" },
@@ -210,7 +217,7 @@ const defaultDistrictFilters: DashboardFilters = {
   date_from: "",
   date_to: "",
   baseMap: DEFAULT_BASE_MAP,
-  visualization_type: "density_heatmap",
+  visualization_type: ["density_heatmap"],
   visualization_variant: "accident",
 };
 
@@ -317,18 +324,32 @@ export default function DistrictDashboard() {
   const [error, setError] = useState<string | null>(null);
 
   const [roadNetworkData, setRoadNetworkData] = useState<GeoJSON.FeatureCollection | null>(null);
+  const [mergedRoadNetworkData, setMergedRoadNetworkData] = useState<GeoJSON.FeatureCollection | null>(null);
+  const [snappedData, setSnappedData] = useState<SnappedHeatmapPoint[] | null>(null);
 
   // ── Marker overlay toggle state ──────────────────────────────────────────
-  const [showMarkerOverlay, setShowMarkerOverlay] = useState(false);
+  const [showMarkerOverlay, setShowMarkerOverlay] = useState(true);
 
   useEffect(() => {
     let active = true;
-    if (filters.visualization_type === "road_network" && districtName) {
+    if (filters.visualization_type?.includes("road_network") && districtName) {
       fetchGujaratRoadNetwork(districtName).then(res => {
         if (active) setRoadNetworkData(res);
       }).catch(console.error);
     } else {
       setRoadNetworkData(null);
+    }
+    return () => { active = false; };
+  }, [filters.visualization_type, districtName]);
+
+  useEffect(() => {
+    let active = true;
+    if (filters.visualization_type?.includes("merged_road_network") && districtName) {
+      fetchGujaratMergedRoadNetwork(districtName).then(res => {
+        if (active) setMergedRoadNetworkData(res);
+      }).catch(console.error);
+    } else {
+      setMergedRoadNetworkData(null);
     }
     return () => { active = false; };
   }, [filters.visualization_type, districtName]);
@@ -418,6 +439,24 @@ export default function DistrictDashboard() {
         if (generation === fetchGenRef.current) setLoading(false);
       });
   }, [districtName, filterKey]);
+
+  useEffect(() => {
+    if (!districtName) return;
+    const isNetwork = filters.visualization_type?.some(t => ["network_blackspot", "network_blackspot_merged", "risk_corridors"].includes(t));
+    if (isNetwork) {
+      let active = true;
+      fetchGujaratSnappedAccidents(filters, districtName)
+        .then((res) => {
+          if (active && res && res.data) setSnappedData(res.data);
+        })
+        .catch(() => {
+          if (active) setSnappedData(null);
+        });
+      return () => { active = false; };
+    } else {
+      setSnappedData(null);
+    }
+  }, [districtName, filterKey, filters.visualization_type]);
 
   // Fetch unfiltered data for this district to populate the year and severity dropdowns
   useEffect(() => {
@@ -565,31 +604,53 @@ export default function DistrictDashboard() {
     taluka: talukaOptions, // NEW
     date_from: [],
     date_to: [],
+    year_range: [],
   };
+
+  /** IDs replaced by year_range for blackspot visualizations */
+  const BLACKSPOT_REPLACED_IDS = useMemo(() => new Set<FilterId>(["date_from", "date_to", "year"]), []);
 
   const activeFilterConfig = useMemo(() => {
     const base = analysisView === "temporal" ? TEMPORAL_FILTERS : MAP_FILTERS;
-    if (filters.visualization_type === "road_network") {
+    const types = filters.visualization_type || [];
+    
+    // Default to non-blackspot filters if nothing is selected
+    if (types.length === 0) {
+      return base.filter((f) => f.id !== "year_range");
+    }
+
+    if (types.includes("road_network")) {
       return base.filter((filter) => filter.id !== "baseMap" && filter.id !== "visualization_variant");
     }
-    return isBlackspotVisualization(filters.visualization_type)
-      ? base.filter((filter) => filter.id !== "severity")
-      : base;
-  }, [analysisView, filters.visualization_type]);
-  // const isDensityHeatmap = filters.visualization_type === "density_heatmap";
-  const isBlackspotDetection = filters.visualization_type === "blackspot";
+
+    const hasBlackspot = types.some(isBlackspotVisualization);
+    const hasNonBlackspot = types.some(t => !isBlackspotVisualization(t));
+
+    if (hasBlackspot && hasNonBlackspot) {
+      // Both active: keep all filters (date, year, year_range, severity)
+      return base;
+    } else if (hasBlackspot) {
+      return base.filter((f) => !BLACKSPOT_REPLACED_IDS.has(f.id) && f.id !== "severity");
+    } else {
+      return base.filter((f) => f.id !== "year_range");
+    }
+  }, [analysisView, filters.visualization_type, BLACKSPOT_REPLACED_IDS]);
+
+  const isDensityHeatmap = filters.visualization_type?.includes("density_heatmap");
+  const isBlackspotDetection = filters.visualization_type?.includes("blackspot") ?? false;
   const isPedestrianVariant = filters.visualization_variant === "pedestrian";
   const isPedestrianBlackspot = isBlackspotDetection && isPedestrianVariant;
-  const isDbscanBlackspot = filters.visualization_type === "dbscan_blackspot";
-  const isIrcGreedyBlackspot = filters.visualization_type === "irc_greedy_blackspot";
-  const isIrcGridBlackspot = filters.visualization_type === "irc_grid_blackspot";
-  const isSnappedAccidents = filters.visualization_type === "snapped_accidents";
-  const isNetworkBlackspot = filters.visualization_type === "network_blackspot";
-  const isNetworkBlackspotMerged = filters.visualization_type === "network_blackspot_merged";
-  const isRiskCorridors = filters.visualization_type === "risk_corridors";
-  const isRoadNetwork = filters.visualization_type === "road_network";
+  const isDbscanBlackspot = filters.visualization_type?.includes("dbscan_blackspot") ?? false;
+  const isIrcGreedyBlackspot = filters.visualization_type?.includes("irc_greedy_blackspot") ?? false;
+  const isIrcGridBlackspot = filters.visualization_type?.includes("irc_grid_blackspot") ?? false;
+  const isNetworkBlackspot = filters.visualization_type?.includes("network_blackspot") ?? false;
+  const isNetworkBlackspotMerged = filters.visualization_type?.includes("network_blackspot_merged") ?? false;
+  const isRiskCorridors = filters.visualization_type?.includes("risk_corridors") ?? false;
+  const isRoadNetwork = filters.visualization_type?.includes("road_network") ?? false;
+  const isMergedRoadNetwork = filters.visualization_type?.includes("merged_road_network") ?? false;
   
-  const baseHeatmapData = data.heatmap;
+  const isNetwork = filters.visualization_type?.some(t => ["network_blackspot", "network_blackspot_merged", "risk_corridors"].includes(t));
+  const baseHeatmapData = isNetwork && snappedData ? snappedData : data.heatmap;
   const displayHeatmapData = isPedestrianVariant
     ? baseHeatmapData.filter(isPedestrianAccident)
     : baseHeatmapData;
@@ -599,8 +660,7 @@ export default function DistrictDashboard() {
   //   ? "Severity-Weighted KDE"
   //   : isKdeHeatmap
   //     ? "KDE Density"
-  //     : "Accident Density";
-  const visualizationLayerType = filters.visualization_type || "density_heatmap";
+  // const visualizationLayerType = filters.visualization_type || "density_heatmap";
 
   // const overlaySubtitle = useMemo(() => {
   //   const parts: string[] = [districtName || "District"];
@@ -610,39 +670,126 @@ export default function DistrictDashboard() {
   // }, [districtName, filters.year, filters.severity]);
 
   const renderFilter = (filter: FilterConfigItem) => {
-    const variantLabel =
-      VISUALIZATION_VARIANT_LABELS[filters.visualization_type || ""];
+    const variantLabel = "Crash Type";
 
     if (filter.id === "visualization_variant" && !variantLabel) {
       return null;
     }
 
-    const value = filters[filter.id] ?? [];
-    const isMultiSelect =
-      filter.id !== "baseMap" &&
-      filter.id !== "visualization_type" &&
-      filter.id !== "visualization_variant";
-    const isDateFilter = filter.id === "date_from" || filter.id === "date_to";
+    // ── Year Range filter for blackspot visualizations ──
+    if (filter.id === "year_range") {
+      return (
+        <div key={filter.id}>
+          <YearRangeFilter
+            availableYears={years}
+            selectedYears={filters.year || []}
+            onChange={(nextYears) => {
+              setFilters((current) => ({
+                ...current,
+                year: nextYears,
+                date_from: "",
+                date_to: "",
+              }));
+            }}
+          />
+        </div>
+      );
+    }
 
-    const handleChange = (nextValue: string | string[]) => {
-      setFilters((current) => {
-        if (filter.id === "visualization_type") {
-          const visualizationType = nextValue as string;
+    // ── Map Overlays (Toggle Switches) ──
+    if (filter.id === "visualization_type") {
+      const activeTypes = filters.visualization_type || [];
+      const handleToggle = (val: string) => {
+        setFilters((current) => {
+          const currentTypes = current.visualization_type || [];
+          const newTypes = currentTypes.includes(val)
+            ? currentTypes.filter((t) => t !== val)
+            : [...currentTypes, val];
+
           return {
             ...current,
-            visualization_type: visualizationType,
-            visualization_variant: hasVisualizationVariants(visualizationType)
+            visualization_type: newTypes,
+            visualization_variant: hasVisualizationVariants(newTypes)
               ? current.visualization_variant || "accident"
               : "accident",
             month: [],
             day: [],
             time_period: [],
-            severity: isBlackspotVisualization(visualizationType)
+            severity: newTypes.some(isBlackspotVisualization)
               ? []
               : current.severity,
           };
-        }
+        });
+      };
 
+      return (
+        <div key={filter.id} className="flex flex-col gap-1.5">
+          <label className="px-0.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#1e3a8a]">
+            {filter.icon === "layers" && (
+              <Layers size={12} className="text-[#1e3a8a]" />
+            )}
+            Map Overlays
+          </label>
+          <div className="flex flex-col gap-2.5 rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] p-3 shadow-sm">
+            {filterOptionsById[filter.id].map((opt) => {
+              const isChecked = activeTypes.includes(opt.value);
+              return (
+                <div key={opt.value} className="flex items-center justify-between">
+                  <span className="text-[12px] font-medium text-[#3A4060]">{opt.label}</span>
+                  <button
+                    onClick={() => handleToggle(opt.value)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a] focus-visible:ring-offset-2 ${
+                      isChecked ? 'bg-[#1e3a8a]' : 'bg-slate-300'
+                    }`}
+                    role="switch"
+                    aria-checked={isChecked}
+                  >
+                    <span className="sr-only">Toggle {opt.label}</span>
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        isChecked ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              );
+            })}
+            
+            <hr className="border-[#E4E8F4] my-1" />
+            
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-bold text-[#1e3a8a]">Show Markers Overlay</span>
+              <button
+                onClick={() => setShowMarkerOverlay(!showMarkerOverlay)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a] focus-visible:ring-offset-2 ${
+                  showMarkerOverlay ? 'bg-[#1e3a8a]' : 'bg-slate-300'
+                }`}
+                role="switch"
+                aria-checked={showMarkerOverlay}
+              >
+                <span className="sr-only">Toggle markers</span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    showMarkerOverlay ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const value = filters[filter.id] ?? [];
+    const isMultiSelect =
+      filter.id !== "baseMap" &&
+      filter.id !== "visualization_variant";
+    const isDateFilter = filter.id === "date_from" || filter.id === "date_to";
+
+    const handleChange = (nextValue: string | string[]) => {
+      setFilters((current) => {
         const newFilters = { ...current, [filter.id]: nextValue };
         
         // Handle redundancy between Year and Date Range
@@ -689,29 +836,6 @@ export default function DistrictDashboard() {
             onChange={handleChange}
             multiSelect={isMultiSelect}
           />
-        )}
-        
-        {/* Render the Markers toggle switch directly below the Visualization Type dropdown */}
-        {filter.id === "visualization_type" && (
-          <div className="mt-2 flex items-center justify-between rounded-lg border border-[#E4E8F4] bg-[#F7F9FD] p-2">
-            <span className="text-[12px] font-semibold text-[#1e3a8a]">Show Markers Overlay</span>
-            <button
-              onClick={() => setShowMarkerOverlay(!showMarkerOverlay)}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a] focus-visible:ring-offset-2 ${
-                showMarkerOverlay ? 'bg-[#1e3a8a]' : 'bg-slate-300'
-              }`}
-              role="switch"
-              aria-checked={showMarkerOverlay}
-            >
-              <span className="sr-only">Toggle markers</span>
-              <span
-                aria-hidden="true"
-                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  showMarkerOverlay ? 'translate-x-4' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
         )}
       </div>
     );
@@ -770,14 +894,7 @@ export default function DistrictDashboard() {
               Back to Gujarat map
             </button>
 
-            {/* Location Search Bar in the Sidebar */}
-            <LocationSearchBar 
-              bbox={districtBbox} 
-              onLocationSelect={handleLocationSelect} 
-              onClear={() => setSearchMarkerCoord(null)}
-            />
-
-            <div className="flex items-center gap-2 px-1">
+            <div className="flex items-center gap-2 px-1 mt-2">
               <Filter size={13} className="text-[#1e3a8a]" />
               <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#1A1D2E]">
                 Filters
@@ -786,7 +903,7 @@ export default function DistrictDashboard() {
 
             {(() => {
               const MAP_FILTER_IDS = ["baseMap", "visualization_type", "visualization_variant"];
-              const TIME_FILTER_IDS = ["date_from", "date_to", "year", "month", "day", "time_period"];
+              const TIME_FILTER_IDS = ["date_from", "date_to", "year", "year_range", "month", "day", "time_period"];
               const LOCATION_FILTER_IDS = ["taluka", "police_station"];
               const INCIDENT_FILTER_IDS = ["severity", "collision_type"];
               const ENVIRONMENT_FILTER_IDS = ["road_classification", "weather_condition", "light_condition", "visibility"];
@@ -885,6 +1002,15 @@ export default function DistrictDashboard() {
                 isBlackspotDetection={isBlackspotDetection}
                 isDbscanBlackspot={isDbscanBlackspot}
                 isPedestrianVariant={isPedestrianVariant}
+                searchBar={
+                  analysisView === "spatial" ? (
+                    <LocationSearchBar
+                      bbox={districtBbox}
+                      onLocationSelect={handleLocationSelect}
+                      onClear={() => setSearchMarkerCoord(null)}
+                    />
+                  ) : undefined
+                }
               />
               <motion.div
                 className={`min-h-0 w-full flex-1 ${
@@ -944,7 +1070,7 @@ export default function DistrictDashboard() {
                           </div>
                         </Marker>
                       )}
-                      {isPedestrianBlackspot ? (
+                      {isPedestrianBlackspot && (
                         <BlackspotDetectionLayers
                           key="pedestrian-blackspot"
                           filters={filters}
@@ -958,7 +1084,8 @@ export default function DistrictDashboard() {
                           analysisLabel="Pedestrian MoRTH Blackspot (Greedy)"
                           crashLabel="pedestrian crashes"
                         />
-                      ) : isBlackspotDetection ? (
+                      )}
+                      {isBlackspotDetection && !isPedestrianVariant && (
                         <BlackspotDetectionLayers
                           key="blackspot"
                           filters={filters}
@@ -968,7 +1095,8 @@ export default function DistrictDashboard() {
                           exportFn={exportGujaratBlackspotCrashes}
                           heatmapData={data.heatmap}
                         />
-                      ) : isDbscanBlackspot && isPedestrianVariant ? (
+                      )}
+                      {isDbscanBlackspot && isPedestrianVariant && (
                         <DbscanBlackspotDetectionLayers
                           key="pedestrian-dbscan-blackspot"
                           filters={filters}
@@ -985,7 +1113,8 @@ export default function DistrictDashboard() {
                           analysisLabel="Pedestrian MoRTH Blackspot (DBSCAN)"
                           crashLabel="pedestrian crashes"
                         />
-                      ) : isDbscanBlackspot ? (
+                      )}
+                      {isDbscanBlackspot && !isPedestrianVariant && (
                         <DbscanBlackspotDetectionLayers
                           key="dbscan-blackspot"
                           filters={filters}
@@ -995,7 +1124,8 @@ export default function DistrictDashboard() {
                           }
                           exportFn={exportGujaratBlackspotCrashes}
                         />
-                      ) : isIrcGreedyBlackspot && isPedestrianVariant ? (
+                      )}
+                      {isIrcGreedyBlackspot && isPedestrianVariant && (
                         <IrcBlackspotDetectionLayers
                           key="pedestrian-irc-greedy-blackspot"
                           filters={filters}
@@ -1007,7 +1137,8 @@ export default function DistrictDashboard() {
                           analysisLabel="Pedestrian IRC 131 Blackspot (Greedy)"
                           crashLabel="pedestrian crashes"
                         />
-                      ) : isIrcGreedyBlackspot ? (
+                      )}
+                      {isIrcGreedyBlackspot && !isPedestrianVariant && (
                         <IrcBlackspotDetectionLayers
                           key="irc-greedy-blackspot"
                           filters={filters}
@@ -1018,7 +1149,8 @@ export default function DistrictDashboard() {
                           exportFn={exportGujaratBlackspotCrashes}
                           analysisLabel="IRC 131 Blackspot (Greedy)"
                         />
-                      ) : isIrcGridBlackspot && isPedestrianVariant ? (
+                      )}
+                      {isIrcGridBlackspot && isPedestrianVariant && (
                         <IrcBlackspotDetectionLayers
                           key="pedestrian-irc-grid-blackspot"
                           filters={filters}
@@ -1030,7 +1162,8 @@ export default function DistrictDashboard() {
                           analysisLabel="Pedestrian IRC 131 Blackspot (Grid)"
                           crashLabel="pedestrian crashes"
                         />
-                      ) : isIrcGridBlackspot ? (
+                      )}
+                      {isIrcGridBlackspot && !isPedestrianVariant && (
                         <IrcBlackspotDetectionLayers
                           key="irc-grid-blackspot"
                           filters={filters}
@@ -1041,7 +1174,8 @@ export default function DistrictDashboard() {
                           exportFn={exportGujaratBlackspotCrashes}
                           analysisLabel="IRC 131 Blackspot (Grid)"
                         />
-                      ) : isNetworkBlackspot && isPedestrianVariant ? (
+                      )}
+                      {isNetworkBlackspot && isPedestrianVariant && (
                         <NetworkBlackspotLayers
                           key="pedestrian-network-blackspot"
                           filters={filters}
@@ -1049,7 +1183,8 @@ export default function DistrictDashboard() {
                           fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
                           analysisLabel="Pedestrian Network Blackspots (Segments)"
                         />
-                      ) : isNetworkBlackspot ? (
+                      )}
+                      {isNetworkBlackspot && !isPedestrianVariant && (
                         <NetworkBlackspotLayers
                           key="network-blackspot"
                           filters={filters}
@@ -1057,7 +1192,8 @@ export default function DistrictDashboard() {
                           fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
                           analysisLabel="Network Blackspots (Segments)"
                         />
-                      ) : isNetworkBlackspotMerged && isPedestrianVariant ? (
+                      )}
+                      {isNetworkBlackspotMerged && isPedestrianVariant && (
                         <NetworkBlackspotLayers
                           key="pedestrian-network-blackspot-merged"
                           filters={filters}
@@ -1065,7 +1201,8 @@ export default function DistrictDashboard() {
                           fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
                           analysisLabel="Pedestrian Network Blackspots (Merged Lanes)"
                         />
-                      ) : isNetworkBlackspotMerged ? (
+                      )}
+                      {isNetworkBlackspotMerged && !isPedestrianVariant && (
                         <NetworkBlackspotLayers
                           key="network-blackspot-merged"
                           filters={filters}
@@ -1073,7 +1210,8 @@ export default function DistrictDashboard() {
                           fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
                           analysisLabel="Network Blackspots (Merged Lanes)"
                         />
-                      ) : isRiskCorridors && isPedestrianVariant ? (
+                      )}
+                      {isRiskCorridors && isPedestrianVariant && (
                         <RiskCorridorLayers
                           key="pedestrian-risk-corridors"
                           filters={filters}
@@ -1081,7 +1219,8 @@ export default function DistrictDashboard() {
                           fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
                           analysisLabel="Pedestrian Risk Corridors"
                         />
-                      ) : isRiskCorridors ? (
+                      )}
+                      {isRiskCorridors && !isPedestrianVariant && (
                         <RiskCorridorLayers
                           key="risk-corridors"
                           filters={filters}
@@ -1089,22 +1228,24 @@ export default function DistrictDashboard() {
                           fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
                           analysisLabel="Risk Corridors"
                         />
-                      ) : isSnappedAccidents ? (
-                        <SnappedAccidentLayers
-                          key="snapped-accidents"
-                          filters={filters}
-                          fetchFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
-                        />
-                      ) : isRoadNetwork ? (
+                      )}
+                      {isRoadNetwork && (
                         <RoadNetworkLayers
                           key="road-network"
                           geojsonData={roadNetworkData}
                         />
-                      ) : (
+                      )}
+                      {isMergedRoadNetwork && (
+                        <MergedRoadNetworkLayers
+                          key="merged-road-network"
+                          geojsonData={mergedRoadNetworkData}
+                        />
+                      )}
+                      {isDensityHeatmap && (
                         <VisualizationLayers
-                          key={`${visualizationLayerType}-${filters.visualization_variant || "accident"}`}
+                          key={`density_heatmap-${filters.visualization_variant || "accident"}`}
                           data={displayHeatmapData}
-                          type={visualizationLayerType}
+                          type="density_heatmap"
                           selectedSeverity={filters.severity}
                         />
                       )}
@@ -1117,17 +1258,18 @@ export default function DistrictDashboard() {
                         />
                       )}
 
-                      {filters.visualization_type === "risk_corridors" ? (
+                      {isRiskCorridors && (
                         <RiskCorridorLegend
-                          visualizationLayerType={visualizationLayerType}
+                          visualizationLayerType="risk_corridors"
                         />
-                      ) : (
+                      )}
+                      {!isRoadNetwork && !isMergedRoadNetwork && !isRiskCorridors && (
                         <SeverityLegend
-                          visualizationLayerType={visualizationLayerType}
+                          visualizationLayerType={isDensityHeatmap ? "density_heatmap" : ""}
                           showMarkers={showMarkerOverlay}
                         />
                       )}
-                      <RoadNetworkLegend isVisible={isRoadNetwork} />
+                      <RoadNetworkLegend isVisible={isRoadNetwork || isMergedRoadNetwork} />
                     </DistrictBaseMap>
                     {!loading &&
                       !error &&

@@ -271,7 +271,10 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
       return () => cancelAnimationFrame(frameId);
     }, [sidebarOpen, mapLoaded, fitToBounds, applyMaxBounds]);
 
-    const handleMapLoad = useCallback(() => setMapLoaded(true), []);
+    const handleMapLoad = useCallback((e: any) => {
+      setMapLoaded(true);
+      (window as any)._globalMaplibreMap = e.target;
+    }, []);
     const mapStyleUrl = hideBaseMap 
       ? { version: 8, sources: {}, layers: [] } 
       : getMapStyleUrl(baseMap);
@@ -315,7 +318,6 @@ const DistrictBaseMap = forwardRef<DistrictBaseMapHandle, Props>(
           style={{ width: "100%", height: "100%" }}
           onLoad={handleMapLoad}
           attributionControl={false}
-          reuseMaps
           minZoom={MAP_MIN_ZOOM}
           maxBounds={maxBounds}
           onContextMenu={onContextMenu}

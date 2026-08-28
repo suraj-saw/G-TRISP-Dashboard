@@ -2,6 +2,8 @@
 # pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Integer, String, DateTime
 # pyrefly: ignore [missing-import]
+from sqlalchemy.orm import relationship
+# pyrefly: ignore [missing-import]
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -41,3 +43,6 @@ class User(Base):
 
     # Audit logging timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Extended profile
+    profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")

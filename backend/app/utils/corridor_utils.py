@@ -1,6 +1,12 @@
 from typing import List, Dict, Any, Optional
 import hashlib
-from app.core.constants import CORRIDOR_PRIORITY_THRESHOLDS, CORRIDOR_MERGE_THRESHOLD_M
+from app.core.constants import CORRIDOR_MERGE_THRESHOLD_M
+from app.core.gis_config import (
+    PRIORITY_WEIGHT_FATAL,
+    PRIORITY_WEIGHT_GRIEVOUS,
+    PRIORITY_WEIGHT_MINOR_HOSP,
+    PRIORITY_WEIGHT_MINOR_NON_HOSP
+)
 
 def _generate_corridor_id(road_id: int, start_m: float, end_m: float) -> str:
     """
@@ -11,13 +17,6 @@ def _generate_corridor_id(road_id: int, start_m: float, end_m: float) -> str:
     normalized_end = round(end_m)
     raw_str = f"corridor_{road_id}_{normalized_start}_{normalized_end}"
     return hashlib.md5(raw_str.encode('utf-8')).hexdigest()[:12]
-
-def get_corridor_priority_level(score: float) -> str:
-    """Returns the priority label based on the calculated score."""
-    for label, threshold in CORRIDOR_PRIORITY_THRESHOLDS.items():
-        if score >= threshold:
-            return label
-    return "Low"
 
 def generate_risk_corridors(
     blackspot_segments: List[Dict[str, Any]],
@@ -118,11 +117,12 @@ def rank_corridors(corridors: List[Dict[str, Any]], road_lengths_map: Optional[D
         road_lengths_map = {}
         
     for c in corridors:
-        # 1. Weighted severity score (similar to MoRTH weights)
+        # 1. Weighted severity score (using MoRTH standard weights)
         weighted_score = (
-            c.get("fatal_count", 0) * 6 +
-            c.get("grievous_count", 0) * 3 +
-            c.get("minor_hospitalized_count", 0) * 1
+            c.get("fatal_count", 0) * PRIORITY_WEIGHT_FATAL +
+            c.get("grievous_count", 0) * PRIORITY_WEIGHT_GRIEVOUS +
+            c.get("minor_hospitalized_count", 0) * PRIORITY_WEIGHT_MINOR_HOSP +
+            c.get("minor_non_hospitalized_count", 0) * PRIORITY_WEIGHT_MINOR_NON_HOSP
         )
         c["weighted_score"] = weighted_score
         
@@ -130,14 +130,43 @@ def rank_corridors(corridors: List[Dict[str, Any]], road_lengths_map: Optional[D
         length_km = c["corridor_length_m"] / 1000.0
         c["accident_density"] = c["accident_count"] / length_km if length_km > 0 else 0.0
         
-        # 3. Priority score calculation (can be adjusted)
+        # 3. Priority score calculation
         c["priority_score"] = weighted_score
         
-        # 4. Priority Level
-        c["priority_level"] = get_corridor_priority_level(c["priority_score"])
-        
-        # 5. Add road total length for context
+        # 4. Add road total length for context
         c["road_length"] = road_lengths_map.get(c["road_id"], 0.0)
+
+    # 5. Calculate Dynamic Priority Levels (Equal Interval Binning)
+    if corridors:
+        min_score = min(c["priority_score"] for c in corridors)
+        max_score = max(c["priority_score"] for c in corridors)
+        
+        if max_score == min_score:
+            # Fallback if all corridors have identical scores
+            for c in corridors:
+                c["priority_level"] = "Medium"
+        else:
+            interval = (max_score - min_score) / 5.0
+            thresholds = {
+                "Low": min_score + interval,
+                "Medium": min_score + 2 * interval,
+                "High": min_score + 3 * interval,
+                "Very High": min_score + 4 * interval
+                # Anything above Very High is Critical
+            }
+            
+            for c in corridors:
+                score = c["priority_score"]
+                if score < thresholds["Low"]:
+                    c["priority_level"] = "Low"
+                elif score < thresholds["Medium"]:
+                    c["priority_level"] = "Medium"
+                elif score < thresholds["High"]:
+                    c["priority_level"] = "High"
+                elif score < thresholds["Very High"]:
+                    c["priority_level"] = "Very High"
+                else:
+                    c["priority_level"] = "Critical"
 
     # Sort deterministically: highest priority score, then highest density, then ID
     corridors.sort(

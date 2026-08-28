@@ -1,6 +1,6 @@
 // frontend/src/api/blackspotExportApi.ts
 import type { DashboardFilters } from "../types/dashboard";
-import { SURAT_API_BASE, GUJARAT_API_BASE } from "../config/constants";
+import { GUJARAT_API_BASE } from "../config/constants";
 
 export type BlackspotExportFormat = "csv" | "excel";
 export type BlackspotAlgorithm = "greedy" | "dbscan" | "irc_greedy" | "irc_grid";
@@ -9,7 +9,6 @@ function buildBlackspotExportParams(
   filters: DashboardFilters,
   format: BlackspotExportFormat,
   algorithm: BlackspotAlgorithm,
-  isSurat: boolean,
   districtName?: string,
   bsIds?: string
 ): URLSearchParams {
@@ -21,16 +20,10 @@ function buildBlackspotExportParams(
     params.set("bs_ids", bsIds.trim());
   }
 
-  if (isSurat) {
-    if (filters.district?.length && !filters.district.includes("Surat")) {
-      filters.district.forEach((d) => params.append("police_station", d));
-    }
-  } else {
-    if (districtName && districtName !== "Gujarat") {
-      params.append("district", districtName);
-    } else if (filters.district?.length) {
-      filters.district.forEach((d) => params.append("district", d));
-    }
+  if (districtName && districtName !== "Gujarat") {
+    params.append("district", districtName);
+  } else if (filters.district?.length) {
+    filters.district.forEach((d) => params.append("district", d));
   }
 
   filters.year?.forEach((y) => params.append("year", y));
@@ -53,20 +46,17 @@ export async function downloadBlackspotExport(
   filters: DashboardFilters,
   format: BlackspotExportFormat,
   algorithm: BlackspotAlgorithm,
-  isSurat: boolean = true,
   districtName?: string,
   bsIds?: string
 ): Promise<void> {
-  const base = isSurat ? SURAT_API_BASE : GUJARAT_API_BASE;
   const params = buildBlackspotExportParams(
     filters,
     format,
     algorithm,
-    isSurat,
     districtName,
     bsIds
   );
-  const url = `/api${base}/blackspot-export?${params.toString()}`;
+  const url = `/api${GUJARAT_API_BASE}/blackspot-export?${params.toString()}`;
 
   const response = await fetch(url, {
     method: "GET",

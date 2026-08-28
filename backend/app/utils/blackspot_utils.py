@@ -224,6 +224,49 @@ def irc_risk_color(score: int) -> str:
 # BLACKSPOT BUILDER HELPER
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _apply_dynamic_priority_levels(blackspots: list[Blackspot]) -> None:
+    """
+    Applies dynamic Equal Interval binning to calculate priority levels and colors
+    based on the actual distribution of priority scores in the generated blackspots.
+    """
+    if not blackspots:
+        return
+        
+    min_score = min(bs.priority_score for bs in blackspots)
+    max_score = max(bs.priority_score for bs in blackspots)
+    
+    if max_score == min_score:
+        for bs in blackspots:
+            bs.priority_label = "Medium Risk Blackspot"
+            bs.priority_color = "#FC4E2A"
+    else:
+        interval = (max_score - min_score) / 5.0
+        thresholds = {
+            "Low": min_score + interval,
+            "Medium": min_score + 2 * interval,
+            "High": min_score + 3 * interval,
+            "Very High": min_score + 4 * interval
+        }
+        
+        for bs in blackspots:
+            score = bs.priority_score
+            if score < thresholds["Low"]:
+                bs.priority_label = "Low Risk Blackspot"
+                bs.priority_color = "#FD8D3C"
+            elif score < thresholds["Medium"]:
+                bs.priority_label = "Medium Risk Blackspot"
+                bs.priority_color = "#FC4E2A"
+            elif score < thresholds["High"]:
+                bs.priority_label = "High Risk Blackspot"
+                bs.priority_color = "#E31A1C"
+            elif score < thresholds["Very High"]:
+                bs.priority_label = "Very High Risk Blackspot"
+                bs.priority_color = "#BD0026"
+            else:
+                bs.priority_label = "Critical Blackspot"
+                bs.priority_color = "#800026"
+
+
 def _make_blackspot(
     bs_id: int,
     anchor_idx: int,
@@ -238,7 +281,7 @@ def _make_blackspot(
       2. Compute qualifying_count using QUALIFYING_SEVERITIES — independent of scoring.
       3. Build qualification reasons; return None if none are found.
       4. Compute priority_score using PRIORITY_WEIGHTS — independent of qualification.
-      5. Derive priority_label and priority_color from PRIORITY_LEVELS.
+      5. Priority label and color are left empty (to be assigned dynamically later).
     """
     severities = [points[i].severity for i in member_indices]
     counts = _severity_counts(severities)
@@ -251,7 +294,7 @@ def _make_blackspot(
 
     # ── Step 2: Prioritisation (independent of qualification) ─────────────────
     priority_score = _compute_priority_score(counts)
-    priority_label, priority_color = priority_label_and_color(priority_score)
+    priority_label, priority_color = "", ""
 
     return Blackspot(
         bs_id=bs_id,
@@ -444,6 +487,7 @@ def greedy_blackspots(
             pool.discard(best)
             density[best] = 0
 
+    _apply_dynamic_priority_levels(blackspots)
     return blackspots
 
 
@@ -532,6 +576,7 @@ def dbscan_blackspots(
         if bs is not None:
             blackspots.append(bs)
 
+    _apply_dynamic_priority_levels(blackspots)
     return blackspots
 
 

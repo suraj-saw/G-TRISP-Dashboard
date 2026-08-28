@@ -153,8 +153,6 @@ def network_sliding_window(
                 start_frac = final_start_m / length_m if length_m > 0 else 0.0
                 end_frac = final_end_m / length_m if length_m > 0 else 0.0
                 
-                label, color = priority_label_and_color(m["score"], m["qualifying_count"])
-                
                 candidate_segments.append({
                     "road_id": r_id,
                     "start_m": final_start_m,
@@ -162,8 +160,8 @@ def network_sliding_window(
                     "start_fraction": max(0.0, min(1.0, start_frac)),
                     "end_fraction": max(0.0, min(1.0, end_frac)),
                     "score": m["score"],
-                    "priority_label": label,
-                    "priority_color": color,
+                    "priority_label": "", # Assigned later dynamically
+                    "priority_color": "", # Assigned later dynamically
                     "qualifying_count": m["qualifying_count"],
                     "fatal_count": m["fatal_count"],
                     "grievous_count": m["grievous_count"],
@@ -173,5 +171,41 @@ def network_sliding_window(
                     "accident_count": m["count"],
                     "accident_ids": m["acc_ids"]
                 })
+
+    # Dynamic Priority Labeling (Equal Interval Binning)
+    if candidate_segments:
+        min_score = min(seg["score"] for seg in candidate_segments)
+        max_score = max(seg["score"] for seg in candidate_segments)
+        
+        if max_score == min_score:
+            for seg in candidate_segments:
+                seg["priority_label"] = "Medium Risk Blackspot"
+                seg["priority_color"] = "#FC4E2A"
+        else:
+            interval = (max_score - min_score) / 5.0
+            thresholds = {
+                "Low": min_score + interval,
+                "Medium": min_score + 2 * interval,
+                "High": min_score + 3 * interval,
+                "Very High": min_score + 4 * interval
+            }
+            
+            for seg in candidate_segments:
+                score = seg["score"]
+                if score < thresholds["Low"]:
+                    seg["priority_label"] = "Low Risk Blackspot"
+                    seg["priority_color"] = "#FD8D3C"
+                elif score < thresholds["Medium"]:
+                    seg["priority_label"] = "Medium Risk Blackspot"
+                    seg["priority_color"] = "#FC4E2A"
+                elif score < thresholds["High"]:
+                    seg["priority_label"] = "High Risk Blackspot"
+                    seg["priority_color"] = "#E31A1C"
+                elif score < thresholds["Very High"]:
+                    seg["priority_label"] = "Very High Risk Blackspot"
+                    seg["priority_color"] = "#BD0026"
+                else:
+                    seg["priority_label"] = "Critical Blackspot"
+                    seg["priority_color"] = "#800026"
 
     return candidate_segments

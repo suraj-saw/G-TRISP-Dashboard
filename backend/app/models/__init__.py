@@ -14,6 +14,7 @@ tracked by the SQLAlchemy metadata lifecycle.
 
 # ── Core & Authentication Models ──────────────────────────────────────────────
 from app.models.user              import User
+from app.models.user_profile      import UserProfile
 from app.models.notification      import Notification
 
 # ── State-Level Geographic Models (Gujarat ADM1, ADM2, ADM3) ──────────────────
@@ -21,6 +22,7 @@ from app.models.gujarat_boundary  import GujaratBoundary
 from app.models.gujarat_district  import GujaratDistrict
 from app.models.gujarat_taluka    import GujaratTaluka
 from app.models.gujarat_road      import GujaratRoad
+from app.models.gujarat_merged_road import GujaratMergedRoad
 
 # ── Incident & Accident Event Datasets ────────────────────────────────────────
 from app.models.accident          import Accident

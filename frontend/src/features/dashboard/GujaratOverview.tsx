@@ -41,7 +41,7 @@ const defaultFilters: DashboardFilters = {
   date_from: "",
   date_to: "",
   baseMap: "",
-  visualization_type: "",
+  visualization_type: [],
   visualization_variant: "",
 };
 

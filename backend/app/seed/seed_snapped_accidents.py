@@ -40,6 +40,7 @@ def run_snapping():
             CROSS JOIN LATERAL (
                 SELECT r.id, r.geometry
                 FROM gujarat_roads r
+                WHERE r.geometry && ST_Expand(a.location, 0.01)
                 ORDER BY r.geometry <-> a.location
                 LIMIT 1
             ) AS nearest_road

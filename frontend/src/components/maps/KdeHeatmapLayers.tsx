@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
-import { fetchKdeHeatmap, type KdeHeatmapData } from "../../api/dashboardApi";
+import { fetchGujaratKdeHeatmap, type KdeHeatmapData } from "../../api/gujaratDashboardApi";
 import type { DashboardFilters, HeatmapPoint } from "../../types/dashboard";
 import { VisualizationLayers } from "./VisualizationLayers";
 
@@ -36,7 +36,8 @@ export default function KdeHeatmapLayers({ filters, accidentPoints, fetchFn }: P
     setLoading(true);
     setError(null);
     setData(null);
-    (fetchFn ?? fetchKdeHeatmap)(filters)
+    const loader = fetchFn ?? fetchGujaratKdeHeatmap;
+    loader(filters, filters.district?.[0] || "")
       .then((response) => { if (active) setData(response); })
       .catch((requestError) => {
         if (!active) return;

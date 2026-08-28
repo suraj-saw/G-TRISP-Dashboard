@@ -28,6 +28,7 @@ export type FilterId =
   | "visualization_type"
   | "visualization_variant"
   | "year"
+  | "year_range"
   | "month"
   | "day"
   | "time_period"
@@ -56,11 +57,12 @@ export const VISUALIZATION_OPTIONS = [
   { value: "dbscan_blackspot", label: "MoRTH Blackspot (DBSCAN)" },
   { value: "irc_greedy_blackspot", label: "IRC 131 Blackspot (Greedy)" },
   { value: "irc_grid_blackspot", label: "IRC 131 Blackspot (Grid)" },
-  { value: "snapped_accidents", label: "Network Snapped" },
+  // { value: "snapped_accidents", label: "Network Snapped" },
   { value: "network_blackspot", label: "Network Blackspots (Segments)" },
   { value: "network_blackspot_merged", label: "Network Blackspots (Merged Lanes)" },
   { value: "risk_corridors", label: "Risk Corridors" },
   { value: "road_network", label: "Road Network" },
+  { value: "merged_road_network", label: "Merged Road Network" },
   { value: "temporal_analysis", label: "Temporal Analysis" },
 ];
 
@@ -80,20 +82,23 @@ export const VISUALIZATION_VARIANT_LABELS: Record<string, string> = {
   dbscan_blackspot: "Crash Type",
   irc_greedy_blackspot: "Crash Type",
   irc_grid_blackspot: "Crash Type",
-  snapped_accidents: "Crash Type",
+  // snapped_accidents: "Crash Type",
   network_blackspot: "Crash Type",
   network_blackspot_merged: "Crash Type",
   risk_corridors: "Crash Type",
   road_network: "Crash Type",
+  merged_road_network: "Crash Type",
 };
 
 /**
- * Checks if a given visualization type supports variants
- * @param visualizationType - The visualization type to check
- * @returns True if the visualization type supports variants
+ * Checks if any of the given visualization types support variants
+ * @param visualizationTypes - The visualization types to check
+ * @returns True if any visualization type supports variants
  */
-export const hasVisualizationVariants = (visualizationType?: string): boolean =>
-  Boolean(visualizationType && VISUALIZATION_VARIANT_LABELS[visualizationType]);
+export const hasVisualizationVariants = (visualizationTypes?: string[]): boolean => {
+  if (!visualizationTypes || visualizationTypes.length === 0) return false;
+  return visualizationTypes.some((type) => Boolean(VISUALIZATION_VARIANT_LABELS[type]));
+};
 
 /** Filter configuration for map-based visualizations */
 const MAP_FILTERS: FilterConfigItem[] = [
@@ -103,6 +108,7 @@ const MAP_FILTERS: FilterConfigItem[] = [
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
+  { id: "year_range", label: "Year Range" },
   // The label here is driven by config (Police Station vs District)
   { id: "district", label: GEO_FILTER_LABEL },
   { id: "severity", label: "Severity" },
@@ -119,6 +125,7 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
   { id: "year", label: "Year" },
+  { id: "year_range", label: "Year Range" },
   { id: "month", label: "Month" },
   { id: "day", label: "Day" },
   { id: "time_period", label: "Time Period" },
@@ -134,19 +141,56 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
 const withoutSeverity = (filters: FilterConfigItem[]): FilterConfigItem[] =>
   filters.filter((filter) => filter.id !== "severity");
 
+/** IDs that are replaced by year_range for blackspot visualizations */
+const BLACKSPOT_REPLACED_IDS = new Set<FilterId>(["date_from", "date_to", "year"]);
+
 /**
- * Gets the appropriate filter configuration based on visualization type
- * @param visualizationType - The current visualization type
- * @returns The filter configuration array for the given visualization
+ * For blackspot visualizations, replaces date_from, date_to, and year with year_range.
+ * Also removes the severity filter.
+ */
+const forBlackspot = (filters: FilterConfigItem[]): FilterConfigItem[] =>
+  withoutSeverity(
+    filters.filter((f) =>
+      !BLACKSPOT_REPLACED_IDS.has(f.id)
+    )
+  );
+
+/**
+ * For non-blackspot visualizations, removes the year_range filter (not applicable).
+ */
+const withoutYearRange = (filters: FilterConfigItem[]): FilterConfigItem[] =>
+  filters.filter((f) => f.id !== "year_range");
+
+/**
+ * Gets the appropriate filter configuration based on active visualization types
+ * @param visualizationTypes - The current active visualization types
+ * @returns The filter configuration array for the given visualizations
  */
 export const getFilterConfig = (
-  visualizationType?: string
+  visualizationTypes?: string[]
 ): FilterConfigItem[] => {
-  const base =
-    visualizationType === "temporal_analysis" ? TEMPORAL_FILTERS : MAP_FILTERS;
-  return isBlackspotVisualization(visualizationType)
-    ? withoutSeverity(base)
-    : base;
+  const types = visualizationTypes || [];
+  const hasTemporal = types.includes("temporal_analysis");
+  const base = hasTemporal ? TEMPORAL_FILTERS : MAP_FILTERS;
+  
+  // If nothing is selected, default to non-blackspot filters
+  if (types.length === 0) {
+    return withoutYearRange(base);
+  }
+
+  const hasBlackspot = types.some(isBlackspotVisualization);
+  const hasNonBlackspot = types.some(t => !isBlackspotVisualization(t));
+
+  if (hasBlackspot && hasNonBlackspot) {
+    // Both active: keep all filters (date, year, year_range, severity)
+    return base;
+  } else if (hasBlackspot) {
+    // Only blackspot active
+    return forBlackspot(base);
+  } else {
+    // Only non-blackspot active
+    return withoutYearRange(base);
+  }
 };
 
 /** Default filter values for the dashboard */
@@ -164,6 +208,6 @@ export const defaultFilters: DashboardFilters = {
   date_from: "",
   date_to: "",
   baseMap: DEFAULT_BASE_MAP,
-  visualization_type: "density_heatmap",
+  visualization_type: ["density_heatmap"],
   visualization_variant: "accident",
 };

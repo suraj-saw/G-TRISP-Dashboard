@@ -8,9 +8,6 @@
 // API base paths
 // ---------------------------------------------------------------------------
 
-/** Base path for the Surat-specific dashboard endpoints */
-export const SURAT_API_BASE = "/surat/dashboard";
-
 /** Base path for the Gujarat-wide dashboard endpoints */
 export const GUJARAT_API_BASE = "/dashboard";
 
@@ -28,24 +25,6 @@ export const AUTH_API_BASE = "/auth";
 
 /** Base path for admin endpoints */
 export const ADMIN_API_BASE = "/admin";
-
-// ---------------------------------------------------------------------------
-// Map defaults — Surat District
-// ---------------------------------------------------------------------------
-
-export const SURAT_MAP_CENTER = {
-  longitude: 72.83,
-  latitude: 21.17,
-  zoom: 10,
-} as const;
-
-/** Approximate bounding box used as a fallback when PostGIS boundary fails */
-export const SURAT_APPROX_BBOX = {
-  minLng: 72.6,
-  minLat: 20.9,
-  maxLng: 73.2,
-  maxLat: 21.4,
-} as const;
 
 // ---------------------------------------------------------------------------
 // Map defaults — Gujarat State
@@ -99,6 +78,7 @@ export const ROUTES = {
   FORGOT_PASSWORD: "/forgot-password",
   RESET_PASSWORD: "/reset-password",
   DASHBOARD: "/dashboard",
+  PROFILE: "/profile",
   ABOUT: "/about",
   DISTRICT_DASHBOARD: "/dashboard/district/:districtSlug",
   ADMIN: "/admin",
@@ -106,8 +86,7 @@ export const ROUTES = {
   ADMIN_ACCIDENTS: "/admin/accidents",
 } as const;
 
-export const DASHBOARD_MODE = (import.meta.env.VITE_DASHBOARD_MODE ||
-  "surat") as "surat" | "gujarat";
+export const GEO_FILTER_LABEL = "District";
 
 export const buildDistrictDashboardPath = (slug: string) =>
   `/dashboard/district/${slug}`;
@@ -123,9 +102,6 @@ export const buildDistrictDashboardPath = (slug: string) =>
  * agree on "carto-light".
  */
 export const DEFAULT_BASE_MAP = "carto-light";
-
-export const GEO_FILTER_LABEL =
-  DASHBOARD_MODE === "surat" ? "Police Station" : "District";
 
 // ---------------------------------------------------------------------------
 // Pagination / data limits

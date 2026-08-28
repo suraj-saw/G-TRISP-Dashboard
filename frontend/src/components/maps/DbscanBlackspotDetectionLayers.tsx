@@ -9,10 +9,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
 import { Loader2, AlertCircle } from "lucide-react";
 import {
-  fetchDbscanBlackspots,
-  exportBlackspotCrashes,
+  exportGujaratBlackspotCrashes,
   type BlackspotData,
-} from "../../api/dashboardApi";
+} from "../../api/gujaratDashboardApi";
+import { fetchGujaratDbscanBlackspots } from "../../api/gujaratDashboardApi";
 import type { DashboardFilters, HeatmapPoint } from "../../types/dashboard";
 import { toDataFilterKey } from "../../utils/dashboardFilters";
 import {
@@ -114,8 +114,8 @@ export default function DbscanBlackspotDetectionLayers({
     hoveredBsIdRef.current = null;
     setHovered(null);
 
-    const loader = fetchFn ?? fetchDbscanBlackspots;
-    loader(filters)
+    const loader = fetchFn ?? fetchGujaratDbscanBlackspots;
+    loader(filters, filters.district?.[0] || "")
       .then((res) => {
         if (!active) return;
         setData(res);
@@ -239,7 +239,7 @@ export default function DbscanBlackspotDetectionLayers({
       if (exportFn) {
         await exportFn(ids, filename);
       } else {
-        await exportBlackspotCrashes(ids, filename);
+        await exportGujaratBlackspotCrashes(ids, filename);
       }
     } catch (err) {
       console.error(

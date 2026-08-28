@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 # pyrefly: ignore [missing-import]
 from pydantic import ConfigDict
 from datetime import datetime
+from typing import Optional
 
 class UserCreate(BaseModel):
     """
@@ -102,6 +103,42 @@ class ResetPasswordRequest(BaseModel):
         return v
 
 
+class UserProfileBase(BaseModel):
+    """
+    Schema for serializing a user's profile information.
+    """
+    model_config = ConfigDict(from_attributes=True)
+    
+    phone_number: Optional[str] = None
+    department: Optional[str] = None
+    state: Optional[str] = None
+    district: Optional[str] = None
+    taluka: Optional[str] = None
+    local_address: Optional[str] = None
+
+class UserProfileUpdate(BaseModel):
+    """
+    Schema for updating a user's profile.
+    """
+    username: Optional[str] = None
+    phone_number: Optional[str] = None
+    department: Optional[str] = None
+    state: Optional[str] = None
+    district: Optional[str] = None
+    taluka: Optional[str] = None
+    local_address: Optional[str] = None
+    
+    @field_validator("username")
+    @classmethod
+    def username_valid(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if len(v) < 3:
+            raise ValueError("Username must be at least 3 characters long")
+        if not re.match(r"^[a-zA-Z0-9_ ]+$", v):
+            raise ValueError("Username can only contain letters, numbers, spaces, and underscores")
+        return v
+
 class UserResponse(BaseModel):
     """
     Schema for serializing SQLAlchemy User model instances into JSON responses.
@@ -116,3 +153,4 @@ class UserResponse(BaseModel):
     role: str
     status: str
     created_at: datetime
+    profile: Optional[UserProfileBase] = None

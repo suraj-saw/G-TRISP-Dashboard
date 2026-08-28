@@ -27,7 +27,41 @@ import type {
   SeverityCount,
   DangerousDistrict,
 } from "../types/dashboard";
-import type { BlackspotData, KdeHeatmapData } from "./dashboardApi";
+export interface BlackspotData {
+  /** Total number of crashes analyzed */
+  total_crashes: number;
+  /** Number of distinct blackspots (clusters) identified */
+  total_blackspots: number;
+  /** Number of crashes that did not fall into any cluster */
+  isolated_crashes: number;
+  /** The spatial search radius used for clustering (in meters) */
+  radius_m: number;
+  /** Minimum number of crashes required to form a cluster */
+  min_crashes: number;
+  /** GeoJSON representing the buffer zones of the clusters */
+  circles: GeoJSON.FeatureCollection;
+  /** GeoJSON representing the central point of each cluster */
+  centroids: GeoJSON.FeatureCollection;
+}
+
+export interface KdeHeatmapData {
+  /** Total number of crashes analyzed for density */
+  total_crashes: number;
+  /** The bandwidth/radius used for the KDE calculation (in meters) */
+  radius_m: number;
+  /** Spatial resolution of the generated grid (in meters) */
+  pixel_m: number;
+  /** The highest density value found in the heatmap */
+  max_density: number;
+  /** Sampling stride used during computation (for performance) */
+  sample_stride: number;
+  /** GeoJSON FeatureCollection containing the density polygons/points */
+  data: GeoJSON.FeatureCollection;
+  /** Number of grid cells along the X axis */
+  width: number;
+  /** Number of grid cells along the Y axis */
+  height: number;
+}
 
 const requestCache = new Map<string, Promise<any>>();
 
@@ -265,6 +299,26 @@ export const fetchGujaratRoadNetwork = async (
 };
 
 /**
+ * Fetch merged road network data for Gujarat
+ * @param district - District to scope the data
+ * @returns GeoJSON feature collection of the merged road network buffers
+ */
+export const fetchGujaratMergedRoadNetwork = async (
+  district: string
+): Promise<any> => {
+  const params = new URLSearchParams();
+  if (district && district !== "All Districts") {
+    params.append("district", district);
+  }
+  
+  const cacheKey = `gujarat_merged_road_network_${params.toString()}`;
+  return withCache(cacheKey, async () => {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/merged-road-network`, { params });
+    return data;
+  });
+};
+
+/**
  * Fetch snapped accidents data for Gujarat (Network Validation)
  * @param filters - Dashboard filter options
  * @param district - District to scope the data
@@ -431,7 +485,7 @@ export const fetchGujaratPedestrianIrcGridBlackspots = async (
  */
 export const fetchGujaratNetworkBlackspots = async (
   filters: DashboardFilters,
-  district: string,
+  district: string = "",
   mergeLanes: boolean = false
 ): Promise<any> => {
   const params = getParams(filters, district);
@@ -455,7 +509,7 @@ export const fetchGujaratNetworkBlackspots = async (
  */
 export const fetchGujaratPedestrianNetworkBlackspots = async (
   filters: DashboardFilters,
-  district: string,
+  district: string = "",
   mergeLanes: boolean = false
 ): Promise<any> => {
   const params = getParams(filters, district);

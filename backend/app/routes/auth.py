@@ -42,7 +42,8 @@ from jose import JWTError
 
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user_schema import UserCreate, UserLogin, UserResponse, ForgotPasswordRequest, ResetPasswordRequest
+from app.models.user_profile import UserProfile
+from app.schemas.user_schema import UserCreate, UserLogin, UserResponse, ForgotPasswordRequest, ResetPasswordRequest, UserProfileUpdate
 from app.services.auth_service import (
     hash_password,
     verify_password,
@@ -332,6 +333,40 @@ def get_me(current_user: User = Depends(get_current_user)):
     Returns:
         User: The user profile data.
     """
+    return current_user
+
+@router.put("/me", response_model=UserResponse)
+def update_me(update_data: UserProfileUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """
+    Update the profile of the currently authenticated user.
+    """
+    if update_data.username is not None and update_data.username != current_user.username:
+        # Check if username is already taken
+        existing_user = db.query(User).filter(User.username == update_data.username).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username already taken")
+        current_user.username = update_data.username
+
+    # Handle profile fields
+    if not current_user.profile:
+        current_user.profile = UserProfile(user_id=current_user.id)
+        db.add(current_user.profile)
+    
+    if update_data.phone_number is not None:
+        current_user.profile.phone_number = update_data.phone_number
+    if update_data.department is not None:
+        current_user.profile.department = update_data.department
+    if update_data.state is not None:
+        current_user.profile.state = update_data.state
+    if update_data.district is not None:
+        current_user.profile.district = update_data.district
+    if update_data.taluka is not None:
+        current_user.profile.taluka = update_data.taluka
+    if update_data.local_address is not None:
+        current_user.profile.local_address = update_data.local_address
+
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

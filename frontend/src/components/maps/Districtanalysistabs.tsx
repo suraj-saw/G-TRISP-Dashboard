@@ -3,7 +3,8 @@
  * @description Renders the tabbed navigation for switching between Spatial, Statistical, and Temporal views in the District Dashboard.
  * @responsibility Displays navigation tabs and conditionally renders appropriate export buttons depending on the active view and feature flags.
  */
-import React from "react";
+import React, { useState } from "react";
+import { Camera } from "lucide-react";
 import ExportButton from "../layout/ExportButton";
 import BlackspotExportButton from "../layout/BlackspotExportButton";
 import type { DashboardFilters } from "../../types/dashboard";
@@ -18,6 +19,7 @@ interface DistrictAnalysisTabsProps {
   isBlackspotDetection?: boolean;
   isDbscanBlackspot?: boolean;
   isPedestrianVariant?: boolean;
+  searchBar?: React.ReactNode;
 }
 
 const tabs: { id: AnalysisView; label: string; icon: string }[] = [
@@ -62,9 +64,126 @@ const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
   isBlackspotDetection,
   isDbscanBlackspot,
   // isPedestrianVariant,
+  searchBar,
 }) => {
   const showBlackspotExport =
     activeView === "spatial" && (isBlackspotDetection || isDbscanBlackspot);
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleMapScreenshot = () => {
+    const map = (window as any)._globalMaplibreMap;
+    if (!map) {
+      alert('Map is not currently visible or loaded.');
+      return;
+    }
+
+    if (isExporting) return;
+    setIsExporting(true);
+
+    const originalPixelRatio = window.devicePixelRatio;
+    // Render at a minimum of 3x resolution for high quality
+    const targetPixelRatio = Math.max(originalPixelRatio, 3);
+    
+    let spoofed = false;
+    try {
+      Object.defineProperty(window, 'devicePixelRatio', {
+        get: () => targetPixelRatio,
+        configurable: true
+      });
+      spoofed = true;
+    } catch (e) {
+      console.warn('Could not spoof devicePixelRatio for high-res export');
+    }
+
+    // Force map to re-allocate its WebGL buffers at the new high resolution
+    map.resize();
+
+    let finished = false;
+    const capture = () => {
+      if (finished) return;
+      finished = true;
+
+      try {
+        const canvas = map.getCanvas();
+        
+        // Calculate scaling factor for the header/footer to match the new high-res map
+        const scale = targetPixelRatio / originalPixelRatio;
+        
+        // We don't need to add header/footer height, we draw directly on the map
+        const offscreen = document.createElement('canvas');
+        offscreen.width = canvas.width;
+        offscreen.height = canvas.height;
+        const ctx = offscreen.getContext('2d');
+        
+        if (ctx) {
+          // Draw High-Res Map image as the base
+          ctx.drawImage(canvas, 0, 0);
+
+          const padding = 28 * scale;
+
+          // Helper to draw text with a readable white halo (standard GIS watermark style)
+          const drawHaloText = (text: string, x: number, y: number, font: string, color: string, align: CanvasTextAlign, baseline: CanvasTextBaseline) => {
+            ctx.font = font;
+            ctx.textAlign = align;
+            ctx.textBaseline = baseline;
+            
+            // Draw halo (white outline)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.lineWidth = 5 * scale;
+            ctx.lineJoin = 'round';
+            ctx.miterLimit = 2;
+            ctx.strokeText(text, x, y);
+            
+            // Draw text
+            ctx.fillStyle = color;
+            ctx.fillText(text, x, y);
+          };
+
+          // Top Left: Title & Subtitle
+          drawHaloText('G-TRISP DASHBOARD', padding, padding, `900 ${26 * scale}px sans-serif`, '#1e3a8a', 'left', 'top');
+          if (districtName) {
+            drawHaloText(`${districtName.toUpperCase()} DISTRICT`, padding, padding + 34 * scale, `700 ${16 * scale}px sans-serif`, '#334155', 'left', 'top');
+          }
+
+          // Bottom Left: Credits
+          drawHaloText('Data Analytics by SVNIT Surat', padding, canvas.height - padding, `600 ${14 * scale}px sans-serif`, '#334155', 'left', 'bottom');
+
+          // Bottom Right: Timestamp
+          const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+          drawHaloText(timestamp, canvas.width - padding, canvas.height - padding, `500 ${14 * scale}px sans-serif`, '#64748b', 'right', 'bottom');
+
+          // Export as High-Quality PNG
+          const dataURL = offscreen.toDataURL('image/png', 1.0);
+          const a = document.createElement('a');
+          a.href = dataURL;
+          a.download = `gtrisp-map-${districtName || 'export'}-${Date.now()}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+      } catch (err) {
+        console.error("Map Export Error:", err);
+        alert("An error occurred while generating the map screenshot. Please check the console for details.");
+      } finally {
+        // Revert devicePixelRatio and resize back to normal
+        if (spoofed) {
+          Object.defineProperty(window, 'devicePixelRatio', {
+            get: () => originalPixelRatio,
+            configurable: true
+          });
+        }
+        map.resize();
+        setIsExporting(false);
+      }
+    };
+
+    // Wait for the map to finish loading high-res tiles and become idle
+    map.once('idle', capture);
+    
+    // Fallback timeout in case 'idle' doesn't fire (e.g. if the map was already completely loaded)
+    setTimeout(capture, 2500);
+  };
 
   return (
     <div className="district-analysis-tabs">
@@ -89,20 +208,42 @@ const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
             {activeView === tab.id && <span className="tab-indicator" />}
           </button>
         ))}
+
+        {activeView === "spatial" && (
+          <button
+            className={`screenshot-btn ${isExporting ? 'opacity-70 cursor-not-allowed' : ''}`}
+            onClick={handleMapScreenshot}
+            title="Take High-Res Map Screenshot"
+            aria-label="Take High-Res Map Screenshot"
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <span className="animate-spin text-[#1e3a8a]" style={{ display: 'inline-block', lineHeight: 1 }}>⌛</span>
+            ) : (
+              <Camera size={16} />
+            )}
+          </button>
+        )}
       </div>
 
+      {searchBar && (
+        <div className="ml-auto max-w-[320px] w-full px-2 flex items-center">
+          {searchBar}
+        </div>
+      )}
+
       {activeView !== "spatial" && (
-        <div className="ml-auto h-full flex items-center py-1">
+        <div className={`${searchBar ? 'ml-2' : 'ml-auto'} h-full flex items-center py-1`}>
           <ExportButton filters={filters} districtName={districtName} />
         </div>
       )}
 
       {showBlackspotExport && (
-        <div className="ml-auto h-full flex items-center py-1">
+        <div className={`${searchBar ? 'ml-2' : 'ml-auto'} h-full flex items-center py-1`}>
           <BlackspotExportButton
             filters={filters}
             algorithm={isDbscanBlackspot ? "dbscan" : "greedy"}
-            isSurat={false}
+            
             districtName={districtName}
           />
         </div>
@@ -142,6 +283,27 @@ const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
           white-space: nowrap;
           outline: none;
           border-radius: 4px 4px 0 0;
+        }
+
+        .screenshot-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 14px;
+          margin-left: 4px;
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: #6b7299;
+          transition: all 0.2s ease;
+          border-radius: 4px;
+          height: 32px;
+          align-self: center;
+        }
+
+        .screenshot-btn:hover {
+          color: #1e3a8a;
+          background: #f1f4fb;
         }
 
         .tab-btn:hover:not(.tab-btn--active) {

@@ -7,7 +7,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Source, Layer, useMap, Popup } from "react-map-gl/maplibre";
 import { Loader2, AlertCircle } from "lucide-react";
-import { type BlackspotData } from "../../api/dashboardApi";
+import { type BlackspotData } from "../../api/gujaratDashboardApi";
 import type { DashboardFilters, HeatmapPoint } from "../../types/dashboard";
 import { toDataFilterKey } from "../../utils/dashboardFilters";
 import {
@@ -57,7 +57,7 @@ export default function IrcBlackspotDetectionLayers({
   filters,
   fetchFn,
   exportFn,
-  heatmapData,
+  
   analysisLabel = "IRC 131 Blackspot",
   crashLabel = "crashes",
 }: Props) {

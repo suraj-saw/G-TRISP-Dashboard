@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useMemo } from "react";
 import { AlertCircle, CalendarDays, Clock3, Loader2, Moon, Timer } from "lucide-react";
-import { fetchTemporalAnalysis } from "../../api/dashboardApi";
+import { fetchGujaratTemporalAnalysis } from "../../api/gujaratDashboardApi";
 import type { DashboardFilters, TemporalAnalysisData } from "../../types/dashboard";
 import HourDayHeatmap from "./HourDayHeatmap";
 import HourlyChart from "./HourlyChart";
@@ -189,9 +189,9 @@ export default function TemporalAnalysis({ filters, fetchFn, onDataLoaded, isExp
     setLoading(true);
     setError(null);
 
-    const loader = fetchFn ?? fetchTemporalAnalysis;
+    const loader = fetchFn ?? fetchGujaratTemporalAnalysis;
 
-    loader(filters)
+    loader(filters, filters.district?.[0] || "")
       .then((result) => {
         if (active) setData(result);
       })

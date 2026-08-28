@@ -24,7 +24,6 @@ import type { DashboardFilters } from "../../types/dashboard";
 interface Props {
   filters: DashboardFilters;
   algorithm: BlackspotAlgorithm;
-  isSurat?: boolean;
   districtName?: string;
 }
 
@@ -42,13 +41,11 @@ interface MenuPos {
  * @param {Object} props - Component properties.
  * @param {DashboardFilters} props.filters - Global dashboard filters applied to the export.
  * @param {BlackspotAlgorithm} props.algorithm - The blackspot detection algorithm used (e.g. 'dbscan', 'greedy').
- * @param {boolean} [props.isSurat=true] - Flag indicating if the current context is Surat.
  * @param {string} [props.districtName] - Optional district name.
  */
 export default function BlackspotExportButton({
   filters,
   algorithm,
-  isSurat = true,
   districtName,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -165,7 +162,6 @@ export default function BlackspotExportButton({
         filters,
         format,
         algorithm,
-        isSurat,
         districtName,
         bsIdsInput
       );

@@ -36,8 +36,8 @@ export interface DashboardFilters {
   taluka?: string[];
   /** Base map type (optional) */
   baseMap?: string;
-  /** Visualization type (optional) */
-  visualization_type?: string;
+  /** Visualization types (optional, multiple can be active) */
+  visualization_type?: string[];
   /** Visualization variant (optional) */
   visualization_variant?: string;
   /** Start date for the filter (optional) */

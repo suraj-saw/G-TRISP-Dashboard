@@ -229,6 +229,8 @@ def validate_observation_period(accidents: List, selected_years: Optional[List[i
             # Directly evaluate based on user input parameters
             num_years = len(set(selected_years))
         else:
+            if not accidents:
+                return None
             # Fallback: Extract years from the dataset itself if no explicit filter was provided
             distinct_years = set()
             for a in accidents:

@@ -224,7 +224,7 @@ function StepBasicInfo({
           <Input
             value={form.police_station}
             onChange={(v) => update("police_station", v)}
-            placeholder="e.g. Surat City"
+            placeholder="e.g. Ahmedabad City"
           />
         </div>
       </div>
@@ -254,7 +254,7 @@ function StepBasicInfo({
 
 /**
  * Renders Step 2: Location (Coordinates, Road Name, Classification).
- * @business_rule Coordinates are expected to be within the Surat district bounding box.
+ * @business_rule Coordinates are expected to be within the target district bounding box.
  * @param {Object} props - Component props.
  * @param {FormData} props.form - Current form state.
  * @param {function} props.update - Callback to update a specific form field.
@@ -312,7 +312,7 @@ function StepLocation({
       <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-xs text-blue-700 flex items-start gap-2.5">
         <MapPin size={14} className="mt-0.5 shrink-0 text-blue-500" />
         <span>
-          Coordinates should be within the Surat district boundary (approx. lat
+          Coordinates should be within the target district boundary (approx. lat
           20.9-21.4, lon 72.6-73.2).
         </span>
       </div>
@@ -722,7 +722,7 @@ export default function AccidentFormModal({ open, onClose, onSuccess, initialDat
                     {isEdit ? "Edit Accident Record" : "Add Accident Record"}
                   </h2>
                   <p className="text-xs text-indigo-300 mt-0.5">
-                    {isEdit ? `Modifying record ${initialData.accident_id}` : "Manually enter a Surat accident into the database"}
+                    {isEdit ? `Modifying record ${initialData.accident_id}` : "Manually enter an accident into the database"}
                   </p>
                 </div>
                 <button

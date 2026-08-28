@@ -10,7 +10,7 @@ from typing import List, Optional
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, Query
 # pyrefly: ignore [missing-import]
-from sqlalchemy import func
+from sqlalchemy import func, text, literal_column
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,7 @@ from app.core.dependencies import get_db
 from app.models.accident import Accident
 from app.models.snapped_accident import SnappedAccident
 from app.models.gujarat_road import GujaratRoad
+from app.models.gujarat_merged_road import GujaratMergedRoad
 from app.models.gujarat_district import GujaratDistrict
 from app.schemas.dashboard_schema import (
     HeatmapPoint,
@@ -378,6 +379,53 @@ def get_road_network(
                     "id": r.id,
                     "road_name": safe_text(r_name),
                     "road_classification": safe_text(r_class),
+                    "road_type": safe_text(r.road_type)
+                }
+            })
+            
+    return {
+        "type": "FeatureCollection",
+        "features": features
+    }
+
+
+@router.get("/merged-road-network")
+def get_merged_road_network(
+    district: List[str] = Query(None, description="Districts to fetch merged road network for"),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns the merged road network polygons for the specified district(s) as a GeoJSON FeatureCollection.
+    """
+    if not district:
+        return {"type": "FeatureCollection", "features": []}
+    
+    # We use a spatial intersection with districts just like the road network
+    query = db.query(
+        GujaratMergedRoad.id,
+        GujaratMergedRoad.road_name,
+        GujaratMergedRoad.road_classification,
+        GujaratMergedRoad.road_type,
+        literal_column("ST_AsGeoJSON(ST_Simplify(ST_Buffer(gujarat_merged_roads.geometry::geography, 12)::geometry, 0.00005))").label("geom_json")
+    ).join(
+        GujaratDistrict,
+        func.ST_Intersects(GujaratMergedRoad.geometry, GujaratDistrict.geometry)
+    ).filter(
+        GujaratDistrict.shape_name.in_(district)
+    )
+    
+    rows = query.distinct().all()
+    
+    features = []
+    for r in rows:
+        if r.geom_json:
+            features.append({
+                "type": "Feature",
+                "geometry": json.loads(r.geom_json),
+                "properties": {
+                    "id": r.id,
+                    "road_name": safe_text(r.road_name),
+                    "road_classification": safe_text(r.road_classification),
                     "road_type": safe_text(r.road_type)
                 }
             })
