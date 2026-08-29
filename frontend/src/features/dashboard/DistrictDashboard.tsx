@@ -1035,6 +1035,7 @@ export default function DistrictDashboard() {
                         <BlackspotDetectionLayers
                           key="pedestrian-blackspot"
                           filters={filters}
+                          districtName={districtName}
                           fetchFn={(f) =>
                             fetchGujaratPedestrianBlackspots(f, districtName)
                           }
@@ -1050,6 +1051,7 @@ export default function DistrictDashboard() {
                         <BlackspotDetectionLayers
                           key="blackspot"
                           filters={filters}
+                          districtName={districtName}
                           fetchFn={(f) =>
                             fetchGujaratBlackspots(f, districtName)
                           }
@@ -1061,6 +1063,7 @@ export default function DistrictDashboard() {
                         <DbscanBlackspotDetectionLayers
                           key="pedestrian-dbscan-blackspot"
                           filters={filters}
+                          districtName={districtName}
                           heatmapData={data.heatmap.filter(
                             isPedestrianAccident
                           )}
@@ -1079,6 +1082,7 @@ export default function DistrictDashboard() {
                         <DbscanBlackspotDetectionLayers
                           key="dbscan-blackspot"
                           filters={filters}
+                          districtName={districtName}
                           heatmapData={data.heatmap}
                           fetchFn={(f) =>
                             fetchGujaratDbscanBlackspots(f, districtName)
@@ -1090,6 +1094,7 @@ export default function DistrictDashboard() {
                         <IrcBlackspotDetectionLayers
                           key="pedestrian-irc-greedy-blackspot"
                           filters={filters}
+                          districtName={districtName}
                           heatmapData={data.heatmap.filter(isPedestrianAccident)}
                           fetchFn={(f) =>
                             fetchGujaratPedestrianIrcGreedyBlackspots(f, districtName)
@@ -1103,6 +1108,7 @@ export default function DistrictDashboard() {
                         <IrcBlackspotDetectionLayers
                           key="irc-greedy-blackspot"
                           filters={filters}
+                          districtName={districtName}
                           heatmapData={data.heatmap}
                           fetchFn={(f) =>
                             fetchGujaratIrcGreedyBlackspots(f, districtName)
@@ -1115,6 +1121,7 @@ export default function DistrictDashboard() {
                         <IrcBlackspotDetectionLayers
                           key="pedestrian-irc-grid-blackspot"
                           filters={filters}
+                          districtName={districtName}
                           heatmapData={data.heatmap.filter(isPedestrianAccident)}
                           fetchFn={(f) =>
                             fetchGujaratPedestrianIrcGridBlackspots(f, districtName)
@@ -1128,6 +1135,7 @@ export default function DistrictDashboard() {
                         <IrcBlackspotDetectionLayers
                           key="irc-grid-blackspot"
                           filters={filters}
+                          districtName={districtName}
                           heatmapData={data.heatmap}
                           fetchFn={(f) =>
                             fetchGujaratIrcGridBlackspots(f, districtName)

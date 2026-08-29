@@ -9,7 +9,6 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Source, Layer, Popup, useMap } from "react-map-gl/maplibre";
 import { Loader2, AlertCircle } from "lucide-react";
 import {
-  exportGujaratBlackspotCrashes,
   type BlackspotData,
 } from "../../api/gujaratDashboardApi";
 import { fetchGujaratDbscanBlackspots } from "../../api/gujaratDashboardApi";
@@ -23,6 +22,7 @@ import {
 import CompactBlackspotPopup, {
   type BlackspotPopupData,
 } from "./CompactBlackspotPopup";
+import { BlackspotPdfReport } from "../../features/export/BlackspotPdfReport";
 
 interface Props {
   filters: DashboardFilters;
@@ -31,6 +31,7 @@ interface Props {
   heatmapData?: HeatmapPoint[];
   analysisLabel?: string;
   crashLabel?: string;
+  districtName?: string;
 }
 
 
@@ -70,6 +71,7 @@ export default function DbscanBlackspotDetectionLayers({
   exportFn,
   analysisLabel = "MoRTH Blackspot (DBSCAN)",
   crashLabel = "crashes",
+  districtName,
 }: Props) {
   const { current: mapRef } = useMap();
   const [data, setData] = useState<BlackspotData | null>(null);
@@ -79,6 +81,13 @@ export default function DbscanBlackspotDetectionLayers({
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isOverPopupRef = useRef(false);
   const hoveredBsIdRef = useRef<string | number | null>(null);
+
+  // PDF report state
+  const [pdfExport, setPdfExport] = useState<{
+    crashIds: string[];
+    bsId: number | string;
+    priorityLabel?: string;
+  } | null>(null);
 
   // Cancel any pending dismiss when component unmounts
   useEffect(() => {
@@ -218,35 +227,18 @@ export default function DbscanBlackspotDetectionLayers({
   const handleExportData = async (
     cluster?: BlackspotPopupData | HoveredBlackspot | null
   ) => {
-    console.log("[DbscanBlackspotDetectionLayers] handleExportData called");
-    console.log("[DbscanBlackspotDetectionLayers] cluster:", cluster);
     if (!cluster || !cluster.crash_ids) return;
     const ids = String(cluster.crash_ids)
       .split(",")
       .map((id) => id.trim())
       .filter(Boolean);
-    console.log("[DbscanBlackspotDetectionLayers] ids to export:", ids);
     if (ids.length === 0) return;
 
-    try {
-      const filename = `blackspot_cluster_${cluster.bs_id}_data.csv`;
-      console.log(
-        "[DbscanBlackspotDetectionLayers] Using exportFn?",
-        !!exportFn,
-        "filename:",
-        filename
-      );
-      if (exportFn) {
-        await exportFn(ids, filename);
-      } else {
-        await exportGujaratBlackspotCrashes(ids, filename);
-      }
-    } catch (err) {
-      console.error(
-        "[DbscanBlackspotDetectionLayers] Failed to export cluster data:",
-        err
-      );
-    }
+    setPdfExport({
+      crashIds: ids,
+      bsId: cluster.bs_id ?? 0,
+      priorityLabel: cluster.priority_label,
+    });
   };
 
   const StatusBadge = ({ children }: { children: React.ReactNode }) => (
@@ -515,6 +507,23 @@ export default function DbscanBlackspotDetectionLayers({
             radiusM={data?.radius_m ?? SEARCH_RADIUS_M}
           />
         </Popup>
+      )}
+
+      {/* PDF Report Generator */}
+      {pdfExport && (
+        <BlackspotPdfReport
+          crashIds={pdfExport.crashIds}
+          bsId={pdfExport.bsId}
+          priorityLabel={pdfExport.priorityLabel}
+          detectionMethod={analysisLabel}
+          districtName={districtName || filters.district?.[0]}
+          filters={filters}
+          onComplete={() => setPdfExport(null)}
+          onError={(msg) => {
+            console.error("[BlackspotPdfReport] Error:", msg);
+            setPdfExport(null);
+          }}
+        />
       )}
     </>
   );

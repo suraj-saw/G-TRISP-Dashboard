@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { Download, MapPin } from "lucide-react";
+import { FileText, MapPin } from "lucide-react";
 import { getPriorityColor, getPriorityLabel } from "../../config/blackspotConfig";
 import { reverseGeocode } from "../../api/geocodingApi";
 
@@ -101,10 +101,10 @@ export default function CompactBlackspotPopup({
               onExport(data);
             }}
             className="pointer-events-auto p-0.5 rounded hover:bg-white/20 text-white transition-colors ml-1 shrink-0 cursor-pointer"
-            title="Export Accident Data"
+            title="Generate PDF Report"
             type="button"
           >
-            <Download size={12} />
+            <FileText size={12} />
           </button>
         )}
       </div>

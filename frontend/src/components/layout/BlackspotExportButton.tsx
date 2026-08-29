@@ -15,11 +15,11 @@ import {
   MapPin,
 } from "lucide-react";
 import {
-  downloadBlackspotExport,
-  type BlackspotExportFormat,
+  fetchBlackspotCrashIdsByBsIds,
   type BlackspotAlgorithm,
 } from "../../api/blackspotExportApi";
 import type { DashboardFilters } from "../../types/dashboard";
+import { BlackspotPdfReport } from "../../features/export/BlackspotPdfReport";
 
 interface Props {
   filters: DashboardFilters;
@@ -53,6 +53,8 @@ export default function BlackspotExportButton({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [pos, setPos] = useState<MenuPos | null>(null);
   const [bsIdsInput, setBsIdsInput] = useState("");
+  
+  const [pdfExport, setPdfExport] = useState<{ crashIds: string[]; bsIdsStr: string } | null>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -149,24 +151,25 @@ export default function BlackspotExportButton({
   const validation = validateInput(bsIdsInput);
 
   /**
-   * Initiates the export process for the specified format.
-   * @param {BlackspotExportFormat} format - Target export format ("csv" or "excel").
+   * Initiates the PDF export process.
    */
-  const handleExport = async (format: BlackspotExportFormat) => {
+  const handleExportPdf = async () => {
     if (!validation.valid) return;
-    setOpen(false);
     setStatus("loading");
     setErrorMsg(null);
     try {
-      await downloadBlackspotExport(
+      const crashIds = await fetchBlackspotCrashIdsByBsIds(
         filters,
-        format,
         algorithm,
         districtName,
         bsIdsInput
       );
+      if (crashIds.length === 0) {
+        throw new Error("No crashes found for the specified blackspots.");
+      }
+      setPdfExport({ crashIds, bsIdsStr: bsIdsInput.trim() });
+      setOpen(false); // Close dropdown
       setStatus("success");
-      setBsIdsInput("");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Export failed.";
       setErrorMsg(msg);
@@ -308,33 +311,16 @@ export default function BlackspotExportButton({
               <button
                 type="button"
                 disabled={!validation.valid}
-                onClick={() => handleExport("csv")}
+                onClick={handleExportPdf}
                 className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-left text-[13px] font-medium text-[#1A1D2E] hover:bg-[#EEF2FB] hover:text-[#1e3a8a] transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-orange-50 shrink-0">
                   <FileText size={16} className="text-orange-500" />
                 </div>
                 <div>
-                  <p className="font-semibold text-[12px]">CSV File</p>
+                  <p className="font-semibold text-[12px]">PDF Report</p>
                   <p className="text-[10px] text-[#9BA3C2]">
-                    Accident details with all columns
-                  </p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                disabled={!validation.valid}
-                onClick={() => handleExport("excel")}
-                className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-left text-[13px] font-medium text-[#1A1D2E] hover:bg-[#EEF2FB] hover:text-[#1e3a8a] transition disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-green-50 shrink-0">
-                  <FileSpreadsheet size={16} className="text-green-600" />
-                </div>
-                <div>
-                  <p className="font-semibold text-[12px]">Excel (.xlsx)</p>
-                  <p className="text-[10px] text-[#9BA3C2]">
-                    Styled with summary sheet
+                    Dashboard style analysis report
                   </p>
                 </div>
               </button>
@@ -351,6 +337,23 @@ export default function BlackspotExportButton({
           </div>,
           document.body
         )}
+      {pdfExport && (
+        <BlackspotPdfReport
+          crashIds={pdfExport.crashIds}
+          bsId={pdfExport.bsIdsStr}
+          priorityLabel={`Multiple Blackspots (${pdfExport.bsIdsStr})`}
+          detectionMethod={algorithm === "dbscan" ? "MoRTH Blackspot (DBSCAN)" : "MoRTH Blackspot (Greedy)"}
+          districtName={districtName}
+          filters={filters}
+          onComplete={() => setPdfExport(null)}
+          onError={(msg) => {
+            console.error("[BlackspotExportButton PDF] Error:", msg);
+            setPdfExport(null);
+            setErrorMsg(msg);
+            setStatus("error");
+          }}
+        />
+      )}
     </div>
   );
 }

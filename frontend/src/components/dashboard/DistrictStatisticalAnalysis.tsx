@@ -116,6 +116,8 @@ interface DistrictStatisticalAnalysisProps {
   onDataLoaded?: () => void;
   disableAnimations?: boolean;
   fullLabels?: boolean;
+  /** Optional override for the data fetching function (e.g., for blackspot-scoped stats) */
+  fetchStatsFn?: () => Promise<DistrictStats>;
 }
 
 const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = ({
@@ -123,6 +125,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
   onDataLoaded,
   disableAnimations = false,
   fullLabels = false,
+  fetchStatsFn,
 }) => {
   const [stats, setStats] = useState<DistrictStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -132,7 +135,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
     setLoading(true);
     setError(null);
     try {
-      const data = await getDistrictStats(filters);
+      const data = fetchStatsFn ? await fetchStatsFn() : await getDistrictStats(filters);
       setStats(data);
     } catch {
       setError("Failed to load statistical data. Please try again.");
@@ -175,6 +178,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
       month: [],
       day: [],
       time_period: [],
+      number_of_vehicles: [],
     };
 
     registerExportHandler({

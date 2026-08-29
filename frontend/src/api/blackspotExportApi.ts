@@ -5,15 +5,13 @@ import { GUJARAT_API_BASE } from "../config/constants";
 export type BlackspotExportFormat = "csv" | "excel";
 export type BlackspotAlgorithm = "greedy" | "dbscan" | "irc_greedy" | "irc_grid";
 
-function buildBlackspotExportParams(
+function buildBlackspotQueryParams(
   filters: DashboardFilters,
-  format: BlackspotExportFormat,
   algorithm: BlackspotAlgorithm,
   districtName?: string,
   bsIds?: string
 ): URLSearchParams {
   const params = new URLSearchParams();
-  params.set("format", format);
   params.set("algorithm", algorithm);
 
   if (bsIds !== undefined && bsIds.trim()) {
@@ -49,13 +47,13 @@ export async function downloadBlackspotExport(
   districtName?: string,
   bsIds?: string
 ): Promise<void> {
-  const params = buildBlackspotExportParams(
+  const params = buildBlackspotQueryParams(
     filters,
-    format,
     algorithm,
     districtName,
     bsIds
   );
+  params.set("format", format);
   const url = `/api${GUJARAT_API_BASE}/blackspot-export?${params.toString()}`;
 
   const response = await fetch(url, {
@@ -85,4 +83,21 @@ export async function downloadBlackspotExport(
   link.click();
   document.body.removeChild(link);
   setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
+}
+
+export async function fetchBlackspotCrashIdsByBsIds(
+  filters: DashboardFilters,
+  algorithm: BlackspotAlgorithm,
+  districtName?: string,
+  bsIds?: string
+): Promise<string[]> {
+  const params = buildBlackspotQueryParams(filters, algorithm, districtName, bsIds);
+  const url = `${GUJARAT_API_BASE}/blackspots/crash-ids-by-bs-ids?${params.toString()}`;
+  
+  const response = await fetch(`/api${url}`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch crash IDs");
+  }
+  const data = await response.json();
+  return data.crash_ids;
 }

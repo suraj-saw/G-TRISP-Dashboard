@@ -16,7 +16,7 @@ import {
 import CompactBlackspotPopup, {
   type BlackspotPopupData,
 } from "./CompactBlackspotPopup";
-// import { SEARCH_RADIUS_M } from "../../config/blackspotConfig";
+import { BlackspotPdfReport } from "../../features/export/BlackspotPdfReport";
 
 interface Props {
   filters: DashboardFilters;
@@ -25,6 +25,7 @@ interface Props {
   heatmapData?: HeatmapPoint[];
   analysisLabel?: string;
   crashLabel?: string;
+  districtName?: string;
 }
 
 /**
@@ -57,9 +58,9 @@ export default function IrcBlackspotDetectionLayers({
   filters,
   fetchFn,
   exportFn,
-  
   analysisLabel = "IRC 131 Blackspot",
   crashLabel = "crashes",
+  districtName,
 }: Props) {
   const { current: mapRef } = useMap();
   const [data, setData] = useState<BlackspotData | null>(null);
@@ -71,6 +72,13 @@ export default function IrcBlackspotDetectionLayers({
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isOverPopupRef = useRef(false);
   const hoveredBsIdRef = useRef<string | number | null>(null);
+
+  // PDF report state
+  const [pdfExport, setPdfExport] = useState<{
+    crashIds: string[];
+    bsId: number | string;
+    priorityLabel?: string;
+  } | null>(null);
 
   const filterKey = toDataFilterKey(filters);
 
@@ -99,9 +107,16 @@ export default function IrcBlackspotDetectionLayers({
   }, []);
 
   const handleExportData = async (info: BlackspotPopupData | HoveredIrcBlackspot) => {
-    if (!exportFn || !info.crash_ids) return;
-    const ids = info.crash_ids.split(",").map((id) => id.trim());
-    await exportFn(ids, `irc-blackspot-${info.bs_id}-crashes.csv`);
+    if (!info.crash_ids) return;
+    const ids = info.crash_ids.split(",").map((id) => id.trim()).filter(Boolean);
+    if (ids.length === 0) return;
+
+    setPdfExport({
+      crashIds: ids,
+      bsId: info.bs_id ?? 0,
+      priorityLabel: (info as HoveredIrcBlackspot).category_label || 
+                     ((info as HoveredIrcBlackspot).category !== undefined ? `Category ${(info as HoveredIrcBlackspot).category}` : undefined),
+    });
   };
 
   useEffect(() => {
@@ -367,6 +382,23 @@ export default function IrcBlackspotDetectionLayers({
             }}
           />
         </Popup>
+      )}
+
+      {/* PDF Report Generator */}
+      {pdfExport && (
+        <BlackspotPdfReport
+          crashIds={pdfExport.crashIds}
+          bsId={pdfExport.bsId}
+          priorityLabel={pdfExport.priorityLabel}
+          detectionMethod={analysisLabel}
+          districtName={districtName || filters.district?.[0]}
+          filters={filters}
+          onComplete={() => setPdfExport(null)}
+          onError={(msg) => {
+            console.error("[BlackspotPdfReport] Error:", msg);
+            setPdfExport(null);
+          }}
+        />
       )}
     </>
   );
