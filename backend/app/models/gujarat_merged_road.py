@@ -23,10 +23,10 @@ class GujaratMergedRoad(Base):
     road_type = Column(String, nullable=True)
 
     # ── Geometry ──────────────────────────────────────────────────────────────
-    # Stored as MULTIPOLYGON (the merged buffers acting as thick lines)
+    # Stored as MULTILINESTRING (the merged linework acting as clean OSM lines)
     geometry = Column(
         Geometry(
-            geometry_type="MULTIPOLYGON",
+            geometry_type="MULTILINESTRING",
             srid=POSTGIS_SRID,
             spatial_index=True,
         ),

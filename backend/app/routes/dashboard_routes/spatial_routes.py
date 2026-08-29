@@ -417,7 +417,7 @@ def get_merged_road_network(
         GujaratMergedRoad.road_name,
         GujaratMergedRoad.road_classification,
         GujaratMergedRoad.road_type,
-        literal_column("ST_AsGeoJSON(ST_Simplify(ST_Buffer(gujarat_merged_roads.geometry::geography, 12)::geometry, 0.00005))").label("geom_json")
+        func.ST_AsGeoJSON(func.ST_Simplify(GujaratMergedRoad.geometry, 0.0005)).label("geom_json")
     ).join(
         GujaratDistrict,
         func.ST_Intersects(GujaratMergedRoad.geometry, GujaratDistrict.geometry)

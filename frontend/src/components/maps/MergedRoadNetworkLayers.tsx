@@ -33,25 +33,29 @@ export default function MergedRoadNetworkLayers({ geojsonData }: Props) {
     ];
   }, []);
 
+  // Define a line width expression that gets slightly thicker as we zoom in
+  const lineWidthExpr = useMemo(() => [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    9, 1.5,
+    14, 3,
+    18, 6
+  ], []);
+
   return (
     <Source id="merged-road-network-source" type="geojson" data={geojsonData}>
-      {/* ── Merged Road Buffers (Fill) ────────────────────────────────────── */}
+      {/* ── Merged Road Lines ─────────────────────────────────────────────── */}
       <Layer
-        id="merged-road-network-fill"
-        type="fill"
-        paint={{
-          "fill-color": classificationColorExpr as any,
-          "fill-opacity": 1.0
-        }}
-      />
-      
-      {/* ── Merged Road Buffers (Outline) ─────────────────────────────────── */}
-      <Layer
-        id="merged-road-network-outline"
+        id="merged-road-network-lines"
         type="line"
+        layout={{
+          "line-join": "round",
+          "line-cap": "round"
+        }}
         paint={{
           "line-color": classificationColorExpr as any,
-          "line-width": 1.5,
+          "line-width": lineWidthExpr as any,
           "line-opacity": 0.8
         }}
       />
@@ -59,14 +63,14 @@ export default function MergedRoadNetworkLayers({ geojsonData }: Props) {
       {/* ── Road Names ────────────────────────────────────────────────────── */}
       {/* 
         Hide labels at low zoom levels. They fade in from zoom 12 to 13.
-        Note: symbol-placement: "point" is preferred for polygons.
+        symbol-placement: "line" makes the text follow the curve of the road.
       */}
       <Layer
         id="merged-road-network-labels"
         type="symbol"
         minzoom={12}
         layout={{
-          "symbol-placement": "point",
+          "symbol-placement": "line",
           "text-field": [
             "case",
             ["==", ["get", "road_name"], "Unknown"], "",
