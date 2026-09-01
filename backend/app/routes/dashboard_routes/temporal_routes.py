@@ -66,7 +66,12 @@ def get_temporal_analysis(
             query = query.filter(Accident.severity == severity)
 
     accidents_with_dt = []
-    for accident in query.all():
+    rows = (
+        query.filter(Accident.accident_date_time.isnot(None))
+        .with_entities(Accident.accident_date_time, Accident.severity)
+        .all()
+    )
+    for accident in rows:
         dt = accident.accident_date_time
         if not dt:
             continue

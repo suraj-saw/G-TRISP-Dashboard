@@ -205,9 +205,12 @@ export const defaultFilters: DashboardFilters = {
   weather_condition: [],
   light_condition: [],
   collision_type: [],
+  number_of_vehicles: [],
+  police_station: [],
+  taluka: [],
   date_from: "",
   date_to: "",
   baseMap: DEFAULT_BASE_MAP,
-  visualization_type: ["density_heatmap"],
+  visualization_type: [],
   visualization_variant: "accident",
 };

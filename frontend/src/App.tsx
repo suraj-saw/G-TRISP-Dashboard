@@ -27,10 +27,12 @@ import ResetPassword from "./features/auth/ResetPassword";
 import Profile from "./features/auth/Profile";
 import GujaratOverview from "./features/dashboard/GujaratOverview";
 import DistrictDashboard from "./features/dashboard/DistrictDashboard";
+import StateDashboard from "./features/dashboard/StateDashboard";
 import AdminDashboard from "./features/dashboard/AdminDashboard";
 import AdminPanel from "./features/dashboard/AdminPanel";
 import AccidentsPage from "./features/dashboard/AccidentsPage";
 import AboutPage from "./features/about/AboutPage";
+import HomePage from "./features/home/HomePage";
 
 /**
  * RootHandler Component
@@ -55,9 +57,8 @@ function RootHandler() {
 
         // Prevent state modifications or navigation loops if effect was destroyed
         if (!cancelled) {
-          // Dynamic authorization determination logic
-          const destination =
-            (res.data.role === "admin" || res.data.role === "superadmin") ? ROUTES.ADMIN : ROUTES.DASHBOARD;
+          // Always route to the common home page
+          const destination = ROUTES.HOME_PAGE;
 
           // Use replace:true to pop the loading gate out of the browser history stack,
           // preventing users from hitting the "back" button directly into a re-evaluation block.
@@ -110,7 +111,9 @@ function App() {
         <Route path={ROUTES.RESET_PASSWORD} element={<ResetPassword />} />
 
         {/* Core User Metrics Segment */}
+        <Route path={ROUTES.HOME_PAGE} element={<HomePage />} />
         <Route path={ROUTES.DASHBOARD} element={<GujaratOverview />} />
+        <Route path={ROUTES.STATE_DASHBOARD} element={<StateDashboard />} />
         <Route path={ROUTES.ABOUT} element={<AboutPage />} />
         <Route path={ROUTES.PROFILE} element={<Profile />} />
         <Route

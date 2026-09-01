@@ -21,7 +21,9 @@ DISTRICT_ROAD_NETWORK_KM = {
     "Rajkot": 1600.0,
 }
 
-# Fallback road network length if the district is not specifically listed above
+# Fallback road network lengths
+DEFAULT_DISTRICT_ROAD_NETWORK_KM = 1900.0
+DEFAULT_STATE_ROAD_NETWORK_KM = 75000.0
 DEFAULT_ROAD_NETWORK_KM = 1900.0
 
 
@@ -41,7 +43,7 @@ class IrcBlackspot:
     crash_ids: List[str] = field(default_factory=list)
     vehicle_count: int = 0
 
-def compute_M(total_crashes: int, road_network_km: float = 1900.0, years_of_data: float = 3.0) -> float:
+def compute_M(total_crashes: int, road_network_km: float = 75000.0, years_of_data: float = 3.0) -> float:
     if road_network_km <= 0 or years_of_data <= 0:
         return 0.0
     return total_crashes / road_network_km / 2.0 / years_of_data
@@ -69,7 +71,7 @@ def assign_category(aatc: float, M: float) -> Optional[int]:
 def irc_greedy_blackspots(
     points: List[CrashPoint],
     radius_m: float = 250.0,
-    road_network_km: float = 1900.0,
+    road_network_km: float = 75000.0,
     years_of_data: float = 3.0,
     total_network_crashes: Optional[int] = None,
 ) -> List[IrcBlackspot]:
@@ -89,10 +91,21 @@ def irc_greedy_blackspots(
     pool = set(range(n))
     raw_clusters = []
 
-    while pool:
-        best = max(pool, key=lambda i: density[i])
-        if density[best] < min_crashes:
-            break
+    # Bucket queue for O(1) density lookup
+    max_d = max(density) if density else 0
+    buckets = [set() for _ in range(max_d + 1)]
+    for i in range(n):
+        buckets[density[i]].add(i)
+
+    current_max_d = max_d
+    while current_max_d >= min_crashes:
+        if not buckets[current_max_d]:
+            current_max_d -= 1
+            continue
+
+        best = buckets[current_max_d].pop()
+        if best not in pool:
+            continue
 
         circle_set = (neighbours[best] & pool) | {best}
         circle = list(circle_set)
@@ -107,9 +120,20 @@ def irc_greedy_blackspots(
                 "category": cat
             })
             pool -= circle_set
-            for i in pool:
+            
+            # Localized neighbor update
+            affected = set()
+            for c in circle_set:
+                affected.update(neighbours[c])
+            
+            for i in (affected & pool):
+                old_d = density[i]
                 neighbours[i] -= circle_set
-                density[i] = len(neighbours[i]) + 1
+                new_d = len(neighbours[i]) + 1
+                if new_d != old_d:
+                    buckets[old_d].discard(i)
+                    density[i] = new_d
+                    buckets[new_d].add(i)
         else:
             pool.discard(best)
             density[best] = 0
@@ -117,24 +141,34 @@ def irc_greedy_blackspots(
     # Sort raw clusters by AATC descending (Category 1 before 4)
     raw_clusters.sort(key=lambda c: c["aatc"], reverse=True)
 
-    # Suppress overlapping circles (2 * radius_m)
+    # Suppress overlapping circles using 2D spatial grid (2 * radius_m)
     suppress_m = 2 * radius_m
+    ref_lat_rad = math.radians(sum(p.lat for p in points) / n) if points else math.radians(22.5)
+    
+    grid_cell = max(suppress_m, 100.0)
+    suppress_grid = defaultdict(list)
     kept_clusters = []
-    kept_xy = []
 
     for c in raw_clusters:
         p = points[c["anchor"]]
-        px, py = _project_xy(p.lat, p.lon, 0.0) # Using simple projection for distance check
+        px, py = _project_xy(p.lat, p.lon, ref_lat_rad)
+        gx, gy = int(math.floor(px / grid_cell)), int(math.floor(py / grid_cell))
         
         ok = True
-        for (kx, ky) in kept_xy:
-            if math.hypot(px - kx, py - ky) < suppress_m:
-                ok = False
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for (kx, ky) in suppress_grid.get((gx + dx, gy + dy), []):
+                    if (px - kx) ** 2 + (py - ky) ** 2 < suppress_m * suppress_m:
+                        ok = False
+                        break
+                if not ok:
+                    break
+            if not ok:
                 break
         
         if ok:
             kept_clusters.append(c)
-            kept_xy.append((px, py))
+            suppress_grid[(gx, gy)].append((px, py))
 
     # Build final list
     blackspots = []
@@ -168,7 +202,7 @@ def irc_grid_blackspots(
     points: List[CrashPoint],
     radius_m: float = 250.0,
     spacing_m: float = 50.0,
-    road_network_km: float = 1900.0,
+    road_network_km: float = 75000.0,
     years_of_data: float = 3.0,
     total_network_crashes: Optional[int] = None,
 ) -> List[IrcBlackspot]:
@@ -182,29 +216,30 @@ def irc_grid_blackspots(
     if min_crashes < 1:
         min_crashes = 1
 
-    ref_lat_rad = math.radians(sum(p.lat for p in points) / n)
+    ref_lat_rad = math.radians(sum(p.lat for p in points) / n) if points else math.radians(22.5)
     xs = [0.0] * n
     ys = [0.0] * n
     for i, p in enumerate(points):
         xs[i], ys[i] = _project_xy(p.lat, p.lon, ref_lat_rad)
 
+    eff_spacing = max(spacing_m, 100.0) if n > 10000 else spacing_m
+
     x0, x1 = min(xs) - radius_m, max(xs) + radius_m
     y0, y1 = min(ys) - radius_m, max(ys) + radius_m
 
     # Create grid points only around actual crash locations
-    # to avoid scanning massive empty areas of the bounding box.
     valid_grid_indices = set()
     for x, y in zip(xs, ys):
-        min_i = int(math.floor((x - radius_m - x0) / spacing_m))
-        max_i = int(math.ceil((x + radius_m - x0) / spacing_m))
-        min_j = int(math.floor((y - radius_m - y0) / spacing_m))
-        max_j = int(math.ceil((y + radius_m - y0) / spacing_m))
+        min_i = int(math.floor((x - radius_m - x0) / eff_spacing))
+        max_i = int(math.ceil((x + radius_m - x0) / eff_spacing))
+        min_j = int(math.floor((y - radius_m - y0) / eff_spacing))
+        max_j = int(math.ceil((y + radius_m - y0) / eff_spacing))
         
         for i in range(min_i, max_i + 1):
             for j in range(min_j, max_j + 1):
                 valid_grid_indices.add((i, j))
                 
-    grid_pts = [(x0 + i * spacing_m, y0 + j * spacing_m) for (i, j) in valid_grid_indices]
+    grid_pts = [(x0 + i * eff_spacing, y0 + j * eff_spacing) for (i, j) in valid_grid_indices]
 
     # Bucket crashes into spatial grid for fast radius lookup
     cell_size = max(radius_m, 1.0)
@@ -242,19 +277,29 @@ def irc_grid_blackspots(
     raw_clusters.sort(key=lambda c: c["aatc"], reverse=True)
 
     suppress_m = 2 * radius_m
+    grid_cell = max(suppress_m, 100.0)
+    suppress_grid = defaultdict(list)
     kept_clusters = []
-    kept_xy = []
 
     for c in raw_clusters:
         px, py = c["gx"], c["gy"]
+        gx, gy = int(math.floor(px / grid_cell)), int(math.floor(py / grid_cell))
+        
         ok = True
-        for (kx, ky) in kept_xy:
-            if math.hypot(px - kx, py - ky) < suppress_m:
-                ok = False
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for (kx, ky) in suppress_grid.get((gx + dx, gy + dy), []):
+                    if (px - kx) ** 2 + (py - ky) ** 2 < suppress_m * suppress_m:
+                        ok = False
+                        break
+                if not ok:
+                    break
+            if not ok:
                 break
+                
         if ok:
             kept_clusters.append(c)
-            kept_xy.append((px, py))
+            suppress_grid[(gx, gy)].append((px, py))
 
     # Convert back from projection to lat/lon for centroids
     def inv_project(gx, gy, ref_lat):

@@ -1,11 +1,11 @@
 /**
  * @file DistrictDashboard.tsx
- * @description Dashboard view tailored for a specific district in Gujarat.
- * @responsibility Fetches district boundaries, local filters, and scoped dashboard data to present spatial, temporal, and statistical analysis for a single district.
+ * @description Dashboard view tailored for the entire state of Gujarat.
+ * @responsibility Fetches all district boundaries and merges them, provides state-wide local filters, and scoped dashboard data.
  * @dependencies framer-motion, react-router-dom, react
  */
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import API from "../../api/axios";
 import type { User } from "../../types/user";
@@ -35,8 +35,8 @@ import SeverityLegend from "../../components/maps/SeverityLegend";
 import RiskCorridorLegend from "../../components/maps/RiskCorridorLegend";
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
-import DistrictBaseMap from "../../components/maps/DistrictBaseMap";
-import type { DistrictBaseMapHandle } from "../../components/maps/DistrictBaseMap";
+import StateBaseMap from "../../components/maps/StateBaseMap";
+import type { StateBaseMapHandle } from "../../components/maps/StateBaseMap";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
 import DistrictAnalysisTabs, {
   type AnalysisView,
@@ -60,8 +60,7 @@ import {
 } from "lucide-react";
 
 import {
-  fetchDistrictBoundaryBySlug,
-  fetchTalukasForDistrict,
+  fetchStateBoundary,
 } from "../../api/geoApi";
 import {
   fetchGujaratFilterOptions,
@@ -255,11 +254,10 @@ const emptyDashboardData: DashboardData = {
  * @hooks_usage Heavily utilizes `useEffect` for boundary resolution, option loading, and data fetching, along with `useParams` for route integration.
  * @returns {JSX.Element} The rendered district dashboard.
  */
-export default function DistrictDashboard() {
+export default function StateDashboard() {
   const [analysisView, setAnalysisView] = useState<AnalysisView>("spatial");
   const navigate = useNavigate();
-  const mapRef = useRef<DistrictBaseMapHandle>(null);
-  const { districtSlug = "" } = useParams<{ districtSlug: string }>();
+  const mapRef = useRef<StateBaseMapHandle>(null);
 
   const [user, setUser] = useState<User | null>(null);
   const [sessionChecking, setSessionChecking] = useState(true);
@@ -317,7 +315,6 @@ export default function DistrictDashboard() {
   const [openPanels, setOpenPanels] = useState({ 
     map: true, 
     time: true, 
-    location: true, 
     incident: false, 
     environment: false 
   });
@@ -375,22 +372,20 @@ export default function DistrictDashboard() {
     };
   }, [navigate]);
 
-  // ── Resolve district boundary + display name from the URL slug ──────────
+  // ── Resolve state boundary ──────────
   useEffect(() => {
-    if (!districtSlug) return;
     let active = true;
     setBoundaryLoading(true);
     setBoundaryError(null);
     setDistrictName("");
 
-    fetchDistrictBoundaryBySlug(districtSlug)
+    fetchStateBoundary()
       .then((fc) => {
         if (!active) return;
         setBoundary(fc);
-        setDistrictName(String(fc.features?.[0]?.properties?.name ?? ""));
       })
       .catch(() => {
-        if (active) setBoundaryError("Could not load district boundary.");
+        if (active) setBoundaryError("Could not load state boundary.");
       })
       .finally(() => {
         if (active) setBoundaryLoading(false);
@@ -399,24 +394,18 @@ export default function DistrictDashboard() {
     return () => {
       active = false;
     };
-  }, [districtSlug]);
+  }, []);
 
-  // ── Filter dropdown options for this district ───────────────────────────
+  // ── Filter dropdown options for state ───────────────────────────
   useEffect(() => {
-    if (!districtName) return;
-    fetchGujaratFilterOptions(districtName, filters.taluka)
+    fetchGujaratFilterOptions(districtName || "", filters.taluka)
       .then(setFilterOptions)
       .catch(() => {});
   }, [districtName, filters.taluka?.join(',')]);
 
   useEffect(() => {
-    if (!districtSlug) return;
-    fetchTalukasForDistrict(districtSlug)
-      .then((rows) =>
-        setTalukaOptions(rows.map((r) => ({ value: r.name, label: r.name })))
-      )
-      .catch(() => setTalukaOptions([]));
-  }, [districtSlug]);
+    setTalukaOptions([]);
+  }, []);
 
   // ── Filtered data ─────────────────────────────────────────────────────────
   // Use a ref-based generation counter to cancel stale in-flight requests.
@@ -425,15 +414,15 @@ export default function DistrictDashboard() {
   const filterKey = toDataFilterKey(filters);
 
   useEffect(() => {
-    if (!districtName) return;
     const generation = ++fetchGenRef.current;
     setLoading(true);
     setError(null);
-    fetchGujaratDashboardData(filters, districtName)
+    fetchGujaratDashboardData(filters, "")
       .then((result) => {
         // Discard result if a newer request has been started
         if (generation !== fetchGenRef.current) return;
         setData(result);
+        setAllData((prev) => (prev.timeSeries.length === 0 ? result : prev));
       })
       .catch((err) => {
         if (generation !== fetchGenRef.current) return;
@@ -445,11 +434,10 @@ export default function DistrictDashboard() {
   }, [districtName, filterKey]);
 
   useEffect(() => {
-    if (!districtName) return;
     const isNetwork = filters.visualization_type?.some(t => ["network_blackspot", "network_blackspot_merged", "risk_corridors"].includes(t));
     if (isNetwork) {
       let active = true;
-      fetchGujaratSnappedAccidents(filters, districtName)
+      fetchGujaratSnappedAccidents(filters, "")
         .then((res) => {
           if (active && res && res.data) setSnappedData(res.data);
         })
@@ -461,20 +449,6 @@ export default function DistrictDashboard() {
       setSnappedData(null);
     }
   }, [districtName, filterKey, filters.visualization_type]);
-
-  // Fetch unfiltered data for this district to populate the year and severity dropdowns
-  useEffect(() => {
-    if (!districtName) return;
-    let active = true;
-    fetchGujaratDashboardData(defaultDistrictFilters, districtName)
-      .then((res) => {
-        if (active) setAllData(res);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [districtName]);
 
   const logout = async () => {
     try {
@@ -491,15 +465,24 @@ export default function DistrictDashboard() {
   });
 
   const years = useMemo(
-    () =>
-      Array.from(new Set(allData.timeSeries.map((t) => t.year))).sort(
-        (a, b) => b - a
-      ),
-    [allData]
+    () => {
+      const source = (allData.timeSeries.length ? allData.timeSeries : data.timeSeries);
+      if (source.length) {
+        return Array.from(new Set(source.map((t) => t.year))).sort((a, b) => b - a);
+      }
+      return filterOptions?.years || [];
+    },
+    [allData, data, filterOptions]
   );
   const severities = useMemo(
-    () => allData.severity.map((s) => s.severity),
-    [allData]
+    () => {
+      const source = (allData.severity.length ? allData.severity : data.severity);
+      if (source.length) {
+        return source.map((s) => s.severity);
+      }
+      return filterOptions?.severities || [];
+    },
+    [allData, data, filterOptions]
   );
 
   const datasetDateBounds = useMemo(() => {
@@ -799,7 +782,7 @@ export default function DistrictDashboard() {
       <div className="fixed inset-0 bg-[#F1F4FB] overflow-hidden">
         <div className={`fixed left-0 right-0 top-0 ${TOPBAR_Z_INDEX}`}>
           <TopBar
-            appName={`G-TRISP · ${districtName || "District"}`}
+            appName="G-TRISP · State"
             user={user}
             showNotificationBell={false}
             onLogout={logout}
@@ -841,13 +824,11 @@ export default function DistrictDashboard() {
             {(() => {
               const MAP_FILTER_IDS = ["baseMap", "visualization_type", "visualization_variant"];
               const TIME_FILTER_IDS = ["date_from", "date_to", "year", "year_range", "month", "day", "time_period"];
-              const LOCATION_FILTER_IDS = ["taluka", "police_station"];
               const INCIDENT_FILTER_IDS = ["severity", "collision_type", "number_of_vehicles"];
               const ENVIRONMENT_FILTER_IDS = ["road_classification", "weather_condition", "light_condition", "visibility"];
 
               const mapFilters = activeFilterConfig.filter((f) => MAP_FILTER_IDS.includes(f.id));
               const timeFilters = activeFilterConfig.filter((f) => TIME_FILTER_IDS.includes(f.id));
-              const locationFilters = activeFilterConfig.filter((f) => LOCATION_FILTER_IDS.includes(f.id));
               const incidentFilters = activeFilterConfig.filter((f) => INCIDENT_FILTER_IDS.includes(f.id));
               const environmentFilters = activeFilterConfig.filter((f) => ENVIRONMENT_FILTER_IDS.includes(f.id));
 
@@ -915,7 +896,6 @@ export default function DistrictDashboard() {
                 <div className="flex flex-col gap-3">
                   {analysisView === "spatial" && renderAccordion("map", "Map Settings", mapFilters, Layers)}
                   {renderAccordion("time", "Time Period", timeFilters, Calendar)}
-                  {renderAccordion("location", "Location & Admin", locationFilters, MapPin)}
                   {renderAccordion("incident", "Incident Details", incidentFilters, AlertCircle)}
                   {renderAccordion("environment", "Environment", environmentFilters, Cloud)}
                 </div>
@@ -1007,7 +987,7 @@ export default function DistrictDashboard() {
                   />
                 ) : (
                   <div className="h-full w-full overflow-hidden relative">
-                    <DistrictBaseMap
+                    <StateBaseMap
                       ref={mapRef}
                       height="100%"
                       sidebarOpen={sidebarOpen}
@@ -1016,7 +996,7 @@ export default function DistrictDashboard() {
                       boundary={boundary}
                       boundaryLoading={boundaryLoading}
                       boundaryError={boundaryError}
-                      loadingLabel={`Loading ${districtName || "district"}…`}
+                      loadingLabel="Loading state…"
                       overlays={undefined}
                     >
                       {/* The red marker for searched locations */}
@@ -1239,7 +1219,7 @@ export default function DistrictDashboard() {
                         />
                       )}
                       <RoadNetworkLegend isVisible={isRoadNetwork || isMergedRoadNetwork} />
-                    </DistrictBaseMap>
+                    </StateBaseMap>
                     {!loading &&
                       !error &&
                       !boundaryLoading &&

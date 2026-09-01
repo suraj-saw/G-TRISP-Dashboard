@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
+    "@turf/turf": "^7.4.0",
     "@types/html2canvas": "^0.5.35",
     "alembic": "^0.0.3",
     "axios": "^1.18.0",

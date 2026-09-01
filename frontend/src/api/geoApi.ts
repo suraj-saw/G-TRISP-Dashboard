@@ -14,6 +14,14 @@ export async function fetchAllGujaratDistricts(): Promise<GeoJSON.FeatureCollect
   return res.data;
 }
 
+export async function fetchStateBoundary(): Promise<GeoJSON.FeatureCollection> {
+  const res = await API.get<GeoJSON.FeatureCollection>(
+    `${GEO_API_BASE}/state-boundary?_cb=${new Date().getTime()}`,
+    GEO_REQUEST_CONFIG
+  );
+  return res.data;
+}
+
 export async function fetchDistrictBoundaryBySlug(
   slug: string
 ): Promise<GeoJSON.FeatureCollection> {

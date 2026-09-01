@@ -42,6 +42,8 @@ from app.utils.irc_blackspot_utils import (
     irc_grid_blackspots,
     irc_blackspots_to_geojson,
     DISTRICT_ROAD_NETWORK_KM,
+    DEFAULT_DISTRICT_ROAD_NETWORK_KM,
+    DEFAULT_STATE_ROAD_NETWORK_KM,
     DEFAULT_ROAD_NETWORK_KM,
 )
 from app.utils.network_blackspot_utils import network_sliding_window
@@ -58,6 +60,15 @@ from app.core.constants import (
     HOURS_IN_DAY,
     UNKNOWN_LABEL,
 )
+
+def _resolve_road_network_km(district: Optional[List[str]], explicit_km: Optional[float]) -> float:
+    if explicit_km is not None:
+        return explicit_km
+    if district and len(district) == 1:
+        return DISTRICT_ROAD_NETWORK_KM.get(district[0], DEFAULT_DISTRICT_ROAD_NETWORK_KM)
+    if district and len(district) > 1:
+        return sum(DISTRICT_ROAD_NETWORK_KM.get(d, DEFAULT_DISTRICT_ROAD_NETWORK_KM) for d in district)
+    return DEFAULT_STATE_ROAD_NETWORK_KM
 from app.routes.dashboard_routes.common import (
     time_period_for_hour,
     format_hour_label,
@@ -97,7 +108,7 @@ def get_blackspots(
     if severity:
         query = query.filter(Accident.severity.in_(severity))
 
-    accidents = query.all()
+    accidents = query.with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
 
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
@@ -170,7 +181,7 @@ def get_pedestrian_blackspots(
             func.coalesce(Accident.pedestrian_grievous_injury, 0) +
             func.coalesce(Accident.pedestrian_minor_injury, 0)
         ) > 0
-    ).all()
+    ).with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
 
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
@@ -237,7 +248,7 @@ def get_dbscan_blackspots(
     if severity:
         query = query.filter(Accident.severity.in_(severity))
 
-    accidents = query.all()
+    accidents = query.with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
 
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
@@ -310,7 +321,7 @@ def get_pedestrian_dbscan_blackspots(
             func.coalesce(Accident.pedestrian_grievous_injury, 0) +
             func.coalesce(Accident.pedestrian_minor_injury, 0)
         ) > 0
-    ).all()
+    ).with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
 
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
@@ -365,11 +376,7 @@ def get_irc_greedy_blackspots(
     road_network_km: Optional[float] = Query(None, ge=1.0),
     db: Session = Depends(get_db),
 ):
-    if road_network_km is None:
-        if district and len(district) == 1:
-            road_network_km = DISTRICT_ROAD_NETWORK_KM.get(district[0], DEFAULT_ROAD_NETWORK_KM)
-        else:
-            road_network_km = DEFAULT_ROAD_NETWORK_KM
+    road_network_km = _resolve_road_network_km(district, road_network_km)
     
     base_query = apply_filters(
         db.query(Accident),
@@ -393,7 +400,7 @@ def get_irc_greedy_blackspots(
         else:
             query = query.filter(Accident.severity == severity)
 
-    accidents = query.all()
+    accidents = query.with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
 
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
@@ -456,11 +463,7 @@ def get_irc_grid_blackspots(
     spacing_m: float = Query(50.0, ge=10.0),
     db: Session = Depends(get_db),
 ):
-    if road_network_km is None:
-        if district and len(district) == 1:
-            road_network_km = DISTRICT_ROAD_NETWORK_KM.get(district[0], DEFAULT_ROAD_NETWORK_KM)
-        else:
-            road_network_km = DEFAULT_ROAD_NETWORK_KM
+    road_network_km = _resolve_road_network_km(district, road_network_km)
     
     base_query = apply_filters(
         db.query(Accident),
@@ -484,7 +487,7 @@ def get_irc_grid_blackspots(
         else:
             query = query.filter(Accident.severity == severity)
 
-    accidents = query.all()
+    accidents = query.with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
 
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
@@ -546,11 +549,7 @@ def get_pedestrian_irc_greedy_blackspots(
     road_network_km: Optional[float] = Query(None, ge=1.0),
     db: Session = Depends(get_db),
 ):
-    if road_network_km is None:
-        if district and len(district) == 1:
-            road_network_km = DISTRICT_ROAD_NETWORK_KM.get(district[0], DEFAULT_ROAD_NETWORK_KM)
-        else:
-            road_network_km = DEFAULT_ROAD_NETWORK_KM
+    road_network_km = _resolve_road_network_km(district, road_network_km)
     
     base_query = apply_filters(
         db.query(Accident),
@@ -582,7 +581,7 @@ def get_pedestrian_irc_greedy_blackspots(
         ) > 0
     )
 
-    accidents = query.all()
+    accidents = query.with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
 
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
@@ -645,11 +644,7 @@ def get_pedestrian_irc_grid_blackspots(
     spacing_m: float = Query(50.0, ge=10.0),
     db: Session = Depends(get_db),
 ):
-    if road_network_km is None:
-        if district and len(district) == 1:
-            road_network_km = DISTRICT_ROAD_NETWORK_KM.get(district[0], DEFAULT_ROAD_NETWORK_KM)
-        else:
-            road_network_km = DEFAULT_ROAD_NETWORK_KM
+    road_network_km = _resolve_road_network_km(district, road_network_km)
     
     base_query = apply_filters(
         db.query(Accident),
@@ -681,7 +676,7 @@ def get_pedestrian_irc_grid_blackspots(
         ) > 0
     )
 
-    accidents = query.all()
+    accidents = query.with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
 
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
@@ -982,7 +977,7 @@ def export_blackspots(
     if severity and "all" not in severity:
         query = query.filter(Accident.severity.in_(severity))
 
-    accidents = query.all()
+    accidents = query.with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
 
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
@@ -1122,7 +1117,7 @@ def get_crash_ids_by_bs_ids(
     if severity and "all" not in severity:
         query = query.filter(Accident.severity.in_(severity))
 
-    accidents = query.all()
+    accidents = query.with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
     points = []
     for a in accidents:
         if a.latitude is not None and a.longitude is not None:

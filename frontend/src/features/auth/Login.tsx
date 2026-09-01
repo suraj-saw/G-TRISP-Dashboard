@@ -58,7 +58,7 @@ function sleep(ms: number) {
  * @returns {string} The target route.
  */
 function destinationFor(user: User): string {
-  return user.role === "admin" ? ROUTES.ADMIN : ROUTES.DASHBOARD;
+  return ROUTES.HOME_PAGE;
 }
 
 /**

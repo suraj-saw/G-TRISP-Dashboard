@@ -462,13 +462,21 @@ def greedy_blackspots(
     blackspots: list[Blackspot] = []
     bs_id = 0
 
-    while pool:
-        best = max(pool, key=lambda i: density[i])
+    # Bucket queue for O(1) max lookup
+    max_d = max(density) if density else 0
+    buckets = [set() for _ in range(max_d + 1)]
+    for i in range(n):
+        buckets[density[i]].add(i)
 
-        # Pre-filter: skip if density is below the minimum threshold to
-        # avoid calling _make_blackspot() on trivially small clusters.
-        if density[best] < min_crashes:
-            break
+    current_max_d = max_d
+    while current_max_d >= min_crashes:
+        if not buckets[current_max_d]:
+            current_max_d -= 1
+            continue
+            
+        best = buckets[current_max_d].pop()
+        if best not in pool:
+            continue
 
         circle_set = (neighbours[best] & pool) | {best}
         circle = list(circle_set)
@@ -478,9 +486,20 @@ def greedy_blackspots(
             bs_id += 1
             blackspots.append(bs)
             pool -= circle_set
-            for i in pool:
+            
+            # Only update points that actually lost a neighbour
+            affected = set()
+            for c in circle_set:
+                affected.update(neighbours[c])
+            
+            for i in (affected & pool):
+                old_d = density[i]
                 neighbours[i] -= circle_set
-                density[i] = len(neighbours[i]) + 1
+                new_d = len(neighbours[i]) + 1
+                if new_d != old_d:
+                    buckets[old_d].discard(i)
+                    density[i] = new_d
+                    buckets[new_d].add(i)
         else:
             # This centre doesn't qualify; remove it from the pool so we don't
             # keep re-evaluating it.

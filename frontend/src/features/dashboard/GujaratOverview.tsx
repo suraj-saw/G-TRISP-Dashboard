@@ -36,6 +36,7 @@ const defaultFilters: DashboardFilters = {
   weather_condition: [],
   light_condition: [],
   collision_type: [],
+  number_of_vehicles: [],
   police_station: [],
   taluka: [],
   date_from: "",

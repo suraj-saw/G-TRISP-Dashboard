@@ -55,8 +55,7 @@ function Register() {
     API.get("/auth/me")
       .then((res) => {
         if (!cancelled) {
-          const destination =
-            res.data.role === "admin" ? ROUTES.ADMIN : ROUTES.DASHBOARD;
+          const destination = ROUTES.HOME_PAGE;
           navigate(destination, { replace: true });
         }
       })

@@ -73,11 +73,13 @@ export const SESSION_POLL_INTERVAL_MS = 5_000;
 
 export const ROUTES = {
   HOME: "/",
+  HOME_PAGE: "/home",
   LOGIN: "/login",
   SIGNUP: "/signup",
   FORGOT_PASSWORD: "/forgot-password",
   RESET_PASSWORD: "/reset-password",
   DASHBOARD: "/dashboard",
+  STATE_DASHBOARD: "/dashboard/state",
   PROFILE: "/profile",
   ABOUT: "/about",
   DISTRICT_DASHBOARD: "/dashboard/district/:districtSlug",

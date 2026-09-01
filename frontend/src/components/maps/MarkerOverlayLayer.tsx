@@ -190,33 +190,41 @@ interface MarkerOverlayLayerProps {
 // ---------------------------------------------------------------------------
 
 function buildOverlayGeojson(data?: HeatmapPoint[]): GeoJSON.FeatureCollection {
+  if (!data || data.length === 0) {
+    return { type: "FeatureCollection", features: [] };
+  }
+  const features: GeoJSON.Feature[] = [];
+  const len = data.length;
+  for (let i = 0; i < len; i++) {
+    const p = data[i];
+    const lon = p.longitude;
+    const lat = p.latitude;
+    if (lon !== null && lon !== undefined && lat !== null && lat !== undefined && !Number.isNaN(lon) && !Number.isNaN(lat)) {
+      features.push({
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [lon, lat],
+        },
+        properties: {
+          accident_id: p.accident_id,
+          severity: p.severity,
+          severity_weight: getSeverityMarkerWeight(p.severity),
+          police_station: p.police_station ?? p.district,
+          road_name: p.road_name,
+          road_classification: p.road_classification,
+          weather_condition: p.weather_condition,
+          light_condition: p.light_condition,
+          collision_type: p.collision_type,
+          collision_nature: p.collision_nature,
+          accident_date_time: p.accident_date_time,
+        },
+      });
+    }
+  }
   return {
     type: "FeatureCollection",
-    features:
-      data
-        ?.filter(
-          (p) => Number.isFinite(p.longitude) && Number.isFinite(p.latitude)
-        )
-        .map((p) => ({
-          type: "Feature" as const,
-          geometry: {
-            type: "Point" as const,
-            coordinates: [p.longitude, p.latitude],
-          },
-          properties: {
-            accident_id: p.accident_id,
-            severity: p.severity,
-            severity_weight: getSeverityMarkerWeight(p.severity),
-            police_station: p.police_station ?? p.district,
-            road_name: p.road_name,
-            road_classification: p.road_classification,
-            weather_condition: p.weather_condition,
-            light_condition: p.light_condition,
-            collision_type: p.collision_type,
-            collision_nature: p.collision_nature,
-            accident_date_time: p.accident_date_time,
-          },
-        })) || [],
+    features,
   };
 }
 

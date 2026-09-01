@@ -108,24 +108,30 @@ def get_by_road(
         police_station=police_station
     )
 
-    road_map: dict = defaultdict(lambda: {"accident_count": 0, "fatalities": 0})
-    for a in query.all():
-        key = safe_text(a.road_classification)
-        road_map[key]["accident_count"] += 1
-        road_map[key]["fatalities"]     += total_fatalities(a)
+    fatality_expr = func.sum(
+        func.coalesce(Accident.driver_killed, 0) +
+        func.coalesce(Accident.passenger_killed, 0) +
+        func.coalesce(Accident.pedestrian_killed, 0)
+    )
+    rows = (
+        query.with_entities(
+            Accident.road_classification,
+            func.count(Accident.id).label("accident_count"),
+            fatality_expr.label("fatalities"),
+        )
+        .group_by(Accident.road_classification)
+        .order_by(func.count(Accident.id).desc())
+        .all()
+    )
 
     return RoadClassResponse(
         data=[
             RoadClassCount(
-                road_classification=safe_text(name),
-                accident_count=v["accident_count"],
-                fatalities=v["fatalities"],
+                road_classification=safe_text(r.road_classification),
+                accident_count=r.accident_count or 0,
+                fatalities=r.fatalities or 0,
             )
-            for name, v in sorted(
-                road_map.items(),
-                key=lambda x: x[1]["accident_count"],
-                reverse=True,
-            )
+            for r in rows
         ]
     )
 
@@ -243,24 +249,32 @@ def get_by_police_station(
         number_of_vehicles=number_of_vehicles,
     )
 
-    stations: dict = defaultdict(
-        lambda: {"district": "", "accident_count": 0, "fatalities": 0}
+    fatality_expr = func.sum(
+        func.coalesce(Accident.driver_killed, 0) +
+        func.coalesce(Accident.passenger_killed, 0) +
+        func.coalesce(Accident.pedestrian_killed, 0)
     )
-    for a in query.all():
-        key = safe_text(a.police_station)
-        stations[key]["district"]       = safe_text(a.district)
-        stations[key]["accident_count"] += 1
-        stations[key]["fatalities"]     += total_fatalities(a)
+    rows = (
+        query.with_entities(
+            Accident.police_station,
+            Accident.district,
+            func.count(Accident.id).label("accident_count"),
+            fatality_expr.label("fatalities"),
+        )
+        .group_by(Accident.police_station, Accident.district)
+        .order_by(func.count(Accident.id).desc())
+        .all()
+    )
 
     return PoliceStationResponse(
         data=[
             PoliceStationCount(
-                police_station=safe_text(name),
-                district=safe_text(v["district"]),
-                accident_count=v["accident_count"],
-                fatalities=v["fatalities"],
+                police_station=safe_text(r.police_station),
+                district=safe_text(r.district),
+                accident_count=r.accident_count or 0,
+                fatalities=r.fatalities or 0,
             )
-            for name, v in stations.items()
+            for r in rows
         ]
     )
 
@@ -280,7 +294,7 @@ def get_casualty_breakdown(
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
 ):
-    accidents = apply_filters(
+    query = apply_filters(
         db.query(Accident),
         district, year, road_classification,
         weather_condition, light_condition, collision_type,
@@ -288,21 +302,39 @@ def get_casualty_breakdown(
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
         police_station=police_station
-    ).all()
+    )
 
-    totals = {
-        name: {"killed": 0, "grievous": 0, "minor": 0}
-        for name in CASUALTY_TYPES
-    }
-
-    for a in accidents:
-        for category, fields in CASUALTY_TYPES.items():
-            for key, col_name in fields.items():
-                totals[category][key] += getattr(a, col_name) or 0
+    row = query.with_entities(
+        func.sum(func.coalesce(Accident.driver_killed, 0)).label("dk"),
+        func.sum(func.coalesce(Accident.driver_grievous_injury, 0)).label("dg"),
+        func.sum(func.coalesce(Accident.driver_minor_injury, 0)).label("dm"),
+        func.sum(func.coalesce(Accident.passenger_killed, 0)).label("pk"),
+        func.sum(func.coalesce(Accident.passenger_grievous_injury, 0)).label("pg"),
+        func.sum(func.coalesce(Accident.passenger_minor_injury, 0)).label("pm"),
+        func.sum(func.coalesce(Accident.pedestrian_killed, 0)).label("pdk"),
+        func.sum(func.coalesce(Accident.pedestrian_grievous_injury, 0)).label("pdg"),
+        func.sum(func.coalesce(Accident.pedestrian_minor_injury, 0)).label("pdm"),
+    ).first()
 
     return CasualtyResponse(
         data=[
-            CasualtyBreakdown(category=name, **vals)
-            for name, vals in totals.items()
+            CasualtyBreakdown(
+                category="Drivers",
+                killed=int(row.dk or 0) if row else 0,
+                grievous=int(row.dg or 0) if row else 0,
+                minor=int(row.dm or 0) if row else 0,
+            ),
+            CasualtyBreakdown(
+                category="Passengers",
+                killed=int(row.pk or 0) if row else 0,
+                grievous=int(row.pg or 0) if row else 0,
+                minor=int(row.pm or 0) if row else 0,
+            ),
+            CasualtyBreakdown(
+                category="Pedestrians",
+                killed=int(row.pdk or 0) if row else 0,
+                grievous=int(row.pdg or 0) if row else 0,
+                minor=int(row.pdm or 0) if row else 0,
+            ),
         ]
     )

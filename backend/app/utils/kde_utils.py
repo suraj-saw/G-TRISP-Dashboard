@@ -211,6 +211,13 @@ def _compute_kde_grid(
     ncols = max(4, int(math.ceil((x1 - x0) / pixel_m)))
     nrows = max(4, int(math.ceil((y1 - y0) / pixel_m)))
     
+    # Enforce maximum grid size to prevent OutOfMemory and massive compute overhead on state-wide queries
+    MAX_DIM = 1000
+    if ncols > MAX_DIM or nrows > MAX_DIM:
+        pixel_m = max((x1 - x0) / MAX_DIM, (y1 - y0) / MAX_DIM)
+        ncols = max(4, int(math.ceil((x1 - x0) / pixel_m)))
+        nrows = max(4, int(math.ceil((y1 - y0) / pixel_m)))
+    
     # Generate arrays holding the exact geographic center point of every grid cell
     grid_x = x0 + (np.arange(ncols) + 0.5) * pixel_m
     grid_y = y1 - (np.arange(nrows) + 0.5) * pixel_m

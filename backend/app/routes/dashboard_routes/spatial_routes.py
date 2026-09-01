@@ -71,10 +71,39 @@ def get_heatmap(
         else:
             query = query.filter(Accident.severity == severity)
 
-    accidents = query.all()
+    rows = query.filter(
+        Accident.latitude.isnot(None),
+        Accident.longitude.isnot(None),
+    ).with_entities(
+        Accident.accident_id,
+        Accident.latitude,
+        Accident.longitude,
+        Accident.severity,
+        Accident.district,
+        Accident.police_station,
+        Accident.road_name,
+        Accident.road_classification,
+        Accident.weather_condition,
+        Accident.light_condition,
+        Accident.type_of_collision,
+        Accident.collision_feature,
+        Accident.accident_date_time,
+        Accident.pedestrian_killed,
+        Accident.pedestrian_grievous_injury,
+        Accident.pedestrian_minor_injury,
+    ).all()
+
+    total_count = len(rows)
+    # For state-wide queries without district filter, if total points exceed 25,000,
+    # sample uniformly so the browser receives an instant <2MB payload and renders smoothly.
+    if not district and total_count > 25000:
+        stride = max(1, total_count // 25000)
+        sampled_rows = rows[::stride]
+    else:
+        sampled_rows = rows
 
     return HeatmapResponse(
-        total=len(accidents),
+        total=total_count,
         data=[
             HeatmapPoint(
                 accident_id=a.accident_id,
@@ -94,8 +123,7 @@ def get_heatmap(
                 pedestrian_grievous_injury=a.pedestrian_grievous_injury or 0,
                 pedestrian_minor_injury=a.pedestrian_minor_injury or 0,
             )
-            for a in accidents
-            if a.latitude is not None and a.longitude is not None
+            for a in sampled_rows
         ],
     )
 
@@ -140,7 +168,7 @@ def get_kde_heatmap(
             ) > 0
         )
 
-    accidents = query.all()
+    accidents = query.with_entities(Accident.latitude, Accident.longitude).all()
     lats = [a.latitude for a in accidents if a.latitude is not None and a.longitude is not None]
     lons = [a.longitude for a in accidents if a.latitude is not None and a.longitude is not None]
 
@@ -209,7 +237,7 @@ def get_weighted_kde_heatmap(
         )
 
     points = [
-        accident for accident in query.all()
+        accident for accident in query.with_entities(Accident.latitude, Accident.longitude, Accident.severity).all()
         if accident.latitude is not None and accident.longitude is not None
     ]
     lats = [accident.latitude for accident in points]

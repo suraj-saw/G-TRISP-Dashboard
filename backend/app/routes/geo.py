@@ -42,6 +42,51 @@ router = APIRouter(prefix=GEO_PREFIX, tags=["Geo"])
 
 
 # ---------------------------------------------------------------------------
+# Gujarat State Boundary (Outer Shell)
+# ---------------------------------------------------------------------------
+
+@router.get("/state-boundary", summary="Get Gujarat State Boundary")
+def get_state_boundary(db: Session = Depends(get_db)):
+    """
+    Returns the outer boundary polygon for the entire state of Gujarat.
+    """
+    state_union_row = (
+        db.query(
+            func.ST_AsGeoJSON(
+                func.ST_Multi(
+                    func.ST_CollectionExtract(
+                        func.ST_Union(func.ST_MakeValid(GujaratDistrict.geometry)),
+                        3
+                    )
+                )
+            ).label("geojson")
+        ).scalar()
+    )
+    
+    if not state_union_row:
+        raise HTTPException(status_code=404, detail="No state boundary found")
+
+    feature = {
+        "type": "Feature",
+        "id": "gujarat",
+        "geometry": json.loads(state_union_row),
+        "properties": {
+            "name": "Gujarat",
+            "slug": "gujarat",
+        },
+    }
+
+    return JSONResponse(
+        content={
+            "type": "FeatureCollection",
+            "features": [feature],
+        },
+        headers={
+            "Cache-Control": f"public, max-age={GEO_CACHE_MAX_AGE_SECONDS}",
+        },
+    )
+
+# ---------------------------------------------------------------------------
 # ALL Gujarat district boundaries in one request — used by the Gujarat
 # overview map so we don't do 33 separate fetches.
 # ---------------------------------------------------------------------------

@@ -12,7 +12,7 @@ from typing import List, Optional
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, Query
 # pyrefly: ignore [missing-import]
-from sqlalchemy import func, case, extract, text
+from sqlalchemy import func, case, extract, text, literal_column
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
@@ -212,29 +212,41 @@ def get_time_series(
         police_station=police_station
     )
 
-    buckets: dict = defaultdict(lambda: {"count": 0, "fatalities": 0})
-    for a in query.all():
-        dt = a.accident_date_time
-        if not dt:
-            continue
-        key = (dt.year, dt.month if granularity == "month" else 1)
-        buckets[key]["count"]      += 1
-        buckets[key]["fatalities"] += total_fatalities(a)
+    year_expr = extract("year", Accident.accident_date_time)
+    month_expr = extract("month", Accident.accident_date_time) if granularity == "month" else literal_column("1")
+    fatality_expr = func.sum(
+        func.coalesce(Accident.driver_killed, 0) +
+        func.coalesce(Accident.passenger_killed, 0) +
+        func.coalesce(Accident.pedestrian_killed, 0)
+    )
+
+    rows = (
+        query.filter(Accident.accident_date_time.isnot(None))
+        .with_entities(
+            year_expr.label("year"),
+            month_expr.label("month"),
+            func.count(Accident.id).label("count"),
+            fatality_expr.label("fatalities"),
+        )
+        .group_by(year_expr, month_expr)
+        .order_by(year_expr, month_expr)
+        .all()
+    )
 
     return TimeSeriesResponse(
         data=[
             TimeSeriesPoint(
-                year=y,
-                month=m,
+                year=int(r.year),
+                month=int(r.month),
                 month_label=(
-                    f"{calendar.month_abbr[m]} {y}"
+                    f"{calendar.month_abbr[int(r.month)]} {int(r.year)}"
                     if granularity == "month"
-                    else str(y)
+                    else str(int(r.year))
                 ),
-                accident_count=v["count"],
-                fatalities=v["fatalities"],
+                accident_count=r.count or 0,
+                fatalities=r.fatalities or 0,
             )
-            for (y, m), v in sorted(buckets.items())
+            for r in rows
         ]
     )
 
@@ -311,26 +323,40 @@ def get_yearly_comparison(
         police_station=police_station
     )
 
-    years: dict = defaultdict(
-        lambda: {"total_accidents": 0, "fatalities": 0, "grievous": 0}
+    year_expr = extract("year", Accident.accident_date_time)
+    fatality_expr = func.sum(
+        func.coalesce(Accident.driver_killed, 0) +
+        func.coalesce(Accident.passenger_killed, 0) +
+        func.coalesce(Accident.pedestrian_killed, 0)
     )
-    for a in query.all():
-        if not a.accident_date_time:
-            continue
-        yr = a.accident_date_time.year
-        years[yr]["total_accidents"] += 1
-        years[yr]["fatalities"] += total_fatalities(a)
-        years[yr]["grievous"] += total_grievous(a)
+    grievous_expr = func.sum(
+        func.coalesce(Accident.driver_grievous_injury, 0) +
+        func.coalesce(Accident.passenger_grievous_injury, 0) +
+        func.coalesce(Accident.pedestrian_grievous_injury, 0)
+    )
+
+    rows = (
+        query.filter(Accident.accident_date_time.isnot(None))
+        .with_entities(
+            year_expr.label("year"),
+            func.count(Accident.id).label("total_accidents"),
+            fatality_expr.label("fatalities"),
+            grievous_expr.label("grievous"),
+        )
+        .group_by(year_expr)
+        .order_by(year_expr)
+        .all()
+    )
 
     return YearlyResponse(
         data=[
             YearlyStats(
-                year=yr,
-                total_accidents=v["total_accidents"],
-                fatalities=v["fatalities"],
-                grievous=v["grievous"],
+                year=int(r.year),
+                total_accidents=r.total_accidents or 0,
+                fatalities=r.fatalities or 0,
+                grievous=r.grievous or 0,
             )
-            for yr, v in sorted(years.items())
+            for r in rows
         ]
     )
 
@@ -624,7 +650,27 @@ def get_district_stats(
     if severity:
         query = query.filter(Accident.severity.in_(severity))
 
-    accidents = query.all()
+    accidents = query.with_entities(
+        Accident.severity,
+        Accident.road_classification,
+        Accident.type_of_collision,
+        Accident.collision_feature,
+        Accident.weather_condition,
+        Accident.light_condition,
+        Accident.visibility,
+        Accident.police_station,
+        Accident.number_of_vehicles,
+        Accident.driver_killed,
+        Accident.driver_grievous_injury,
+        Accident.driver_minor_injury,
+        Accident.passenger_killed,
+        Accident.passenger_grievous_injury,
+        Accident.passenger_minor_injury,
+        Accident.pedestrian_killed,
+        Accident.pedestrian_grievous_injury,
+        Accident.pedestrian_minor_injury,
+        Accident.accident_date_time,
+    ).all()
     total = len(accidents)
 
     severity_counts = defaultdict(int)
