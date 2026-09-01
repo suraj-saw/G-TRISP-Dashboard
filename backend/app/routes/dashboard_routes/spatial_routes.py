@@ -94,13 +94,7 @@ def get_heatmap(
     ).all()
 
     total_count = len(rows)
-    # For state-wide queries without district filter, if total points exceed 25,000,
-    # sample uniformly so the browser receives an instant <2MB payload and renders smoothly.
-    if not district and total_count > 25000:
-        stride = max(1, total_count // 25000)
-        sampled_rows = rows[::stride]
-    else:
-        sampled_rows = rows
+    sampled_rows = rows
 
     return HeatmapResponse(
         total=total_count,
