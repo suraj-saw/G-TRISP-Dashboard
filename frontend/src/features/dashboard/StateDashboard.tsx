@@ -807,11 +807,11 @@ export default function StateDashboard() {
         >
           <div className="flex-1 px-3 py-4 flex flex-col gap-3">
             <button
-              onClick={() => navigate(ROUTES.DASHBOARD)}
+              onClick={() => navigate(ROUTES.HOME_PAGE)}
               className="flex items-center gap-2 rounded-lg border border-[#E4E8F4] bg-white px-3 py-2 text-[12px] font-semibold text-[#1e3a8a] shadow-sm hover:bg-[#EEF2FB] transition"
             >
               <ArrowLeft size={13} />
-              Back to Gujarat map
+              Back to Home Page
             </button>
 
             <div className="flex items-center gap-2 px-1 mt-2">
@@ -1251,7 +1251,7 @@ export default function StateDashboard() {
                               </p>
                             </div>
                             <button
-                              onClick={() => navigate(ROUTES.DASHBOARD)}
+                              onClick={() => navigate(ROUTES.HOME_PAGE)}
                               className="mt-1 rounded-lg bg-[#1e3a8a] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#17337b]"
                             >
                               Back to Gujarat map

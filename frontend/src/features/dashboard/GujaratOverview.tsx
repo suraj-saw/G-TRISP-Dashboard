@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapPin } from "lucide-react";
+import { MapPin, ArrowLeft } from "lucide-react";
 import API from "../../api/axios";
 import type { User } from "../../types/user";
 import type { Notification } from "../../types/notification";
@@ -173,7 +173,7 @@ export default function GujaratOverview({
             >
               <MapPin size={18} className="text-white" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h1 className="text-base font-bold text-white leading-tight">
                 Gujarat Road Accident Overview
               </h1>
@@ -182,6 +182,13 @@ export default function GujaratOverview({
                 analytics
               </p>
             </div>
+            <button
+              onClick={() => navigate(ROUTES.HOME_PAGE)}
+              className="flex items-center gap-2 rounded-lg bg-white/20 px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm hover:bg-white/30 transition backdrop-blur-sm border border-white/10"
+            >
+              <ArrowLeft size={13} />
+              Back to Home Page
+            </button>
           </div>
 
           {/* Main content grid: map + insights */}
