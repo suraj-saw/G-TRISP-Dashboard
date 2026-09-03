@@ -11,7 +11,7 @@ import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Check, CalendarRange } from "lucide-react";
 
-const MIN_YEAR_SPAN = 3; // Minimum number of years in the range (inclusive)
+const EXACT_YEAR_SPAN = 3; // Fixed number of years in the range
 
 interface YearRangeFilterProps {
   /** All available year values, e.g. [2019, 2020, 2021, 2022, 2023, 2024] */
@@ -32,16 +32,14 @@ type MenuPos =
   | { openUp: false; top: number; left: number; width: number; maxHeight: number }
   | { openUp: true; bottom: number; left: number; width: number; maxHeight: number };
 
-function YearDropdown({
-  label,
+function RangeDropdown({
   value,
   options,
   onChange,
 }: {
-  label: string;
-  value: number | null;
-  options: number[];
-  onChange: (year: number) => void;
+  value: string | null;
+  options: { value: string; label: string; start: number; end: number }[];
+  onChange: (val: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<MenuPos | null>(null);
@@ -99,11 +97,10 @@ function YearDropdown({
     };
   }, [open]);
 
+  const selectedOption = options.find((o) => o.value === value);
+
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7299]">
-        {label}
-      </span>
+    <div className="flex flex-col gap-1 w-full">
       <button
         ref={triggerRef}
         type="button"
@@ -116,7 +113,7 @@ function YearDropdown({
             : "border-[#E4E8F4] bg-[#F7F9FD] hover:border-[#C9CEDF]"
         }`}
       >
-        <span className="truncate">{value ?? "Select"}</span>
+        <span className="truncate">{selectedOption ? selectedOption.label : "Select Range"}</span>
         <ChevronDown
           size={14}
           className={`shrink-0 text-[#9BA3C2] transition-transform duration-200 ${
@@ -141,14 +138,14 @@ function YearDropdown({
             }}
             className="overflow-y-auto no-scrollbar rounded-xl border border-[#E4E8F4] bg-white p-1.5 shadow-[0_12px_32px_rgba(15,23,42,0.18)]"
           >
-            {options.map((year) => {
-              const isSelected = year === value;
+            {options.map((opt) => {
+              const isSelected = opt.value === value;
               return (
-                <li key={year} role="option" aria-selected={isSelected}>
+                <li key={opt.value} role="option" aria-selected={isSelected}>
                   <button
                     type="button"
                     onClick={() => {
-                      onChange(year);
+                      onChange(opt.value);
                       setOpen(false);
                     }}
                     className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition ${
@@ -157,7 +154,7 @@ function YearDropdown({
                         : "font-medium text-[#3A4060] hover:bg-[#EEF2FB] hover:text-[#1e3a8a]"
                     }`}
                   >
-                    <span className="truncate">{year}</span>
+                    <span className="truncate">{opt.label}</span>
                     {isSelected && <Check size={14} className="ml-auto shrink-0" />}
                   </button>
                 </li>
@@ -204,42 +201,29 @@ export default function YearRangeFilter({
     return Math.max(...selectedYears.map(Number));
   }, [selectedYears]);
 
-  // Valid start years: any year where start + MIN_YEAR_SPAN - 1 <= max available year
-  const startYearOptions = useMemo(() => {
-    if (sortedYears.length < MIN_YEAR_SPAN) return sortedYears;
+  // Valid start years: any year where start + EXACT_YEAR_SPAN - 1 <= max available year
+  const rangeOptions = useMemo(() => {
+    if (sortedYears.length < EXACT_YEAR_SPAN) return [];
     const maxYear = sortedYears[sortedYears.length - 1];
-    return sortedYears.filter((y) => y + MIN_YEAR_SPAN - 1 <= maxYear);
+    const starts = sortedYears.filter((y) => y + EXACT_YEAR_SPAN - 1 <= maxYear);
+    return starts.map(start => {
+      const end = start + EXACT_YEAR_SPAN - 1;
+      return {
+        value: `${start}-${end}`,
+        label: `${start}–${end}`,
+        start,
+        end
+      };
+    });
   }, [sortedYears]);
 
-  // Valid end years: must be >= start + MIN_YEAR_SPAN - 1
-  const endYearOptions = useMemo(() => {
-    if (sortedYears.length < MIN_YEAR_SPAN) return sortedYears;
-    const minStart = currentStart !== null ? currentStart : sortedYears[0];
-    return sortedYears.filter((y) => y >= minStart + MIN_YEAR_SPAN - 1);
-  }, [sortedYears, currentStart]);
+  const currentValue = currentStart && currentEnd ? `${currentStart}-${currentEnd}` : null;
 
-  const handleStartChange = (year: number) => {
-    let endYear = currentEnd;
-    // If no end selected, or if current end is too close, auto-adjust
-    if (endYear === null || endYear - year < MIN_YEAR_SPAN - 1) {
-      endYear = year + MIN_YEAR_SPAN - 1;
-      // Clamp to max available year
-      const maxAvailable = sortedYears[sortedYears.length - 1];
-      if (endYear > maxAvailable) endYear = maxAvailable;
+  const handleChange = (val: string) => {
+    const option = rangeOptions.find(o => o.value === val);
+    if (option) {
+      onChange(buildYearRange(option.start, option.end));
     }
-    onChange(buildYearRange(year, endYear));
-  };
-
-  const handleEndChange = (year: number) => {
-    let startYear = currentStart;
-    // If no start selected, or if current start is too close, auto-adjust
-    if (startYear === null || year - startYear < MIN_YEAR_SPAN - 1) {
-      startYear = year - MIN_YEAR_SPAN + 1;
-      // Clamp to min available year
-      const minAvailable = sortedYears[0];
-      if (startYear < minAvailable) startYear = minAvailable;
-    }
-    onChange(buildYearRange(startYear, year));
   };
 
   // Range info
@@ -254,25 +238,15 @@ export default function YearRangeFilter({
       <div className="flex items-center gap-1.5">
         <CalendarRange size={12} className="text-[#6B7299]" />
         <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7299]">
-          Year Range (min. {MIN_YEAR_SPAN} years)
+          Year Range ({EXACT_YEAR_SPAN} years)
         </span>
       </div>
 
-      {/* Two dropdowns side by side */}
-      <div className="grid grid-cols-2 gap-2">
-        <YearDropdown
-          label="From"
-          value={currentStart}
-          options={startYearOptions}
-          onChange={handleStartChange}
-        />
-        <YearDropdown
-          label="To"
-          value={currentEnd}
-          options={endYearOptions}
-          onChange={handleEndChange}
-        />
-      </div>
+      <RangeDropdown
+        value={currentValue}
+        options={rangeOptions}
+        onChange={handleChange}
+      />
 
       {/* Range indicator */}
       {rangeSpan > 0 && (

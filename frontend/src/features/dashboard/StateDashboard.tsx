@@ -717,6 +717,16 @@ export default function StateDashboard() {
           newFilters.time_period = [];
           if (newTypes.some(isBlackspotVisualization)) {
             newFilters.severity = [];
+            // Enforce exactly 3 years if not already set or invalid length
+            if (!current.year || current.year.length !== 3) {
+              const defaultYears = years
+                .slice(0, 3)
+                .map(String)
+                .sort((a, b) => Number(a) - Number(b));
+              if (defaultYears.length === 3) {
+                newFilters.year = defaultYears;
+              }
+            }
           }
         }
 
