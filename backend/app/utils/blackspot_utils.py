@@ -105,6 +105,7 @@ class CrashPoint:
     lon: float
     severity: str = "Unknown"
     number_of_vehicles: int = 0
+    fatalities: int = 0
 
 
 @dataclass
@@ -175,13 +176,13 @@ def _compute_qualifying_count(counts: dict[str, int]) -> int:
     return sum(n for sev, n in counts.items() if QUALIFYING_SEVERITIES.get(sev, False))
 
 
-def _build_qualification_reasons(qualifying_count: int) -> list[str]:
+def _build_qualification_reasons(qualifying_count: int, total_fatalities: int) -> list[str]:
     """
     Return a list of human-readable qualification reasons for a cluster.
 
-    Currently the sole criterion is that the qualifying crash count reaches
-    MIN_QUALIFYING_CRASHES.  Additional criteria can be added here in the
-    future without touching the detection algorithms.
+    Currently the criteria are:
+    1. qualifying crash count reaches MIN_QUALIFYING_CRASHES
+    2. total fatalities reaches 10
     """
     reasons: list[str] = []
     qualifying_labels = [s for s, q in QUALIFYING_SEVERITIES.items() if q]
@@ -189,6 +190,10 @@ def _build_qualification_reasons(qualifying_count: int) -> list[str]:
         reasons.append(
             f"≥{MIN_QUALIFYING_CRASHES} qualifying crashes "
             f"({', '.join(qualifying_labels)}) within {SEARCH_RADIUS_M:.0f} m"
+        )
+    if total_fatalities >= 10:
+        reasons.append(
+            f"≥10 total fatalities within {SEARCH_RADIUS_M:.0f} m"
         )
     return reasons
 
@@ -287,8 +292,9 @@ def _make_blackspot(
     counts = _severity_counts(severities)
 
     # ── Step 1: Qualification (independent of priority) ──────────────────────
+    total_fatalities = sum(points[i].fatalities for i in member_indices)
     qualifying_count = _compute_qualifying_count(counts)
-    reasons = _build_qualification_reasons(qualifying_count)
+    reasons = _build_qualification_reasons(qualifying_count, total_fatalities)
     if not reasons:
         return None   # cluster does not meet the qualification threshold
 

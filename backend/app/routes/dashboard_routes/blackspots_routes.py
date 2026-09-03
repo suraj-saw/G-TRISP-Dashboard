@@ -108,7 +108,7 @@ def get_blackspots(
     if severity:
         query = query.filter(Accident.severity.in_(severity))
 
-    accidents = query.with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
+    accidents = query.with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time, (func.coalesce(Accident.driver_killed, 0) + func.coalesce(Accident.passenger_killed, 0) + func.coalesce(Accident.pedestrian_killed, 0)).label("fatalities")).all()
 
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
@@ -126,6 +126,7 @@ def get_blackspots(
             lon=a.longitude,
             severity=a.severity or "Unknown",
             number_of_vehicles=a.number_of_vehicles or 0,
+            fatalities=a.fatalities or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -181,7 +182,7 @@ def get_pedestrian_blackspots(
             func.coalesce(Accident.pedestrian_grievous_injury, 0) +
             func.coalesce(Accident.pedestrian_minor_injury, 0)
         ) > 0
-    ).with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
+    ).with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time, func.coalesce(Accident.pedestrian_killed, 0).label("fatalities")).all()
 
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
@@ -199,6 +200,7 @@ def get_pedestrian_blackspots(
             lon=a.longitude,
             severity=a.severity or "Unknown",
             number_of_vehicles=a.number_of_vehicles or 0,
+            fatalities=a.fatalities or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -248,7 +250,7 @@ def get_dbscan_blackspots(
     if severity:
         query = query.filter(Accident.severity.in_(severity))
 
-    accidents = query.with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
+    accidents = query.with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time, (func.coalesce(Accident.driver_killed, 0) + func.coalesce(Accident.passenger_killed, 0) + func.coalesce(Accident.pedestrian_killed, 0)).label("fatalities")).all()
 
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
@@ -266,6 +268,7 @@ def get_dbscan_blackspots(
             lon=a.longitude,
             severity=a.severity or "Unknown",
             number_of_vehicles=a.number_of_vehicles or 0,
+            fatalities=a.fatalities or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
@@ -321,7 +324,7 @@ def get_pedestrian_dbscan_blackspots(
             func.coalesce(Accident.pedestrian_grievous_injury, 0) +
             func.coalesce(Accident.pedestrian_minor_injury, 0)
         ) > 0
-    ).with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time).all()
+    ).with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time, func.coalesce(Accident.pedestrian_killed, 0).label("fatalities")).all()
 
     validation_error = validate_observation_period(accidents, selected_years=year)
     if validation_error:
@@ -339,6 +342,7 @@ def get_pedestrian_dbscan_blackspots(
             lon=a.longitude,
             severity=a.severity or "Unknown",
             number_of_vehicles=a.number_of_vehicles or 0,
+            fatalities=a.fatalities or 0,
         )
         for idx, a in enumerate(accidents)
         if a.latitude is not None and a.longitude is not None
