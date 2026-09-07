@@ -312,8 +312,8 @@ export default function ImportRecordsModal({ open, onClose, onSuccess }: Props) 
                       <ul className="list-disc list-inside space-y-0.5 text-blue-600">
                         <li>First row must contain column headers.</li>
                         <li>Column names must match the database field names.</li>
-                        <li>Rows with invalid values or duplicate accident IDs will be skipped.</li>
-                        <li>Only valid rows are sent for final import after confirmation.</li>
+                        <li>Rows with validation issues or duplicates will be imported and flagged for review.</li>
+                        <li>All rows are sent for final import after confirmation.</li>
                       </ul>
                     </div>
 
@@ -372,11 +372,11 @@ export default function ImportRecordsModal({ open, onClose, onSuccess }: Props) 
                       <div>
                         <p className="text-sm font-bold text-slate-800">
                           {validCount > 0
-                            ? `${validCount} valid row(s) ready for import`
-                            : "No valid rows available to import"}
+                            ? `${validCount} row(s) ready for import`
+                            : "No rows available to import"}
                         </p>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          Invalid and duplicate rows are not included in the final import.
+                          Rows with validation issues or duplicates will be imported and flagged for review.
                         </p>
                       </div>
                     </div>

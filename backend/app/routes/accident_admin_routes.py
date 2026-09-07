@@ -96,38 +96,7 @@ def _make_point(lat: Optional[float], lon: Optional[float]):
         return None
 
 
-def _parse_datetime(value: Any):
-    if value is None or (isinstance(value, float) and pd.isna(value)):
-        return None
-    if isinstance(value, datetime):
-        return value
-    if isinstance(value, str):
-        value = value.strip()
-        if not value:
-            return None
-        for fmt in (
-            "%Y-%m-%dT%H:%M:%S",
-            "%Y-%m-%dT%H:%M",
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%d %H:%M",
-            "%Y-%m-%d",
-            "%d-%m-%Y %H:%M:%S",
-            "%d-%m-%Y %H:%M",
-            "%d-%m-%Y",
-            "%d/%m/%Y %H:%M:%S",
-            "%d/%m/%Y %H:%M",
-            "%d/%m/%Y",
-        ):
-            try:
-                return datetime.strptime(value, fmt)
-            except ValueError:
-                continue
-        try:
-            return datetime.fromisoformat(value)
-        except ValueError:
-            return "INVALID"
-    return None
-
+from app.utils.datetime_utils import parse_accident_datetime
 
 def _is_blank(value: Any) -> bool:
     return value is None or (isinstance(value, float) and pd.isna(value)) or str(value).strip() == ""
@@ -161,7 +130,7 @@ def _validate_import_row(row: Dict[str, Any]) -> List[str]:
                 errors.append(f"Column '{col}': expected number, got '{val}'")
 
     dt_val = _clean_text(row.get("accident_date_time"))
-    if dt_val is not None and _parse_datetime(dt_val) == "INVALID":
+    if dt_val is not None and parse_accident_datetime(dt_val) is None:
         errors.append(
             f"Column 'accident_date_time': could not parse '{dt_val}' as a date/time"
         )
@@ -169,23 +138,38 @@ def _validate_import_row(row: Dict[str, Any]) -> List[str]:
     return errors
 
 
+def _normalize_district_for_match(district_name: str) -> str:
+    if not district_name:
+        return ""
+    d = str(district_name).lower()
+    if "western railway ahmedabad" in d:
+        return "ahmedabad"
+    if "wstn rly vadodara" in d or "wrly vadodara" in d:
+        return "vadodara"
+    return d.replace(" city", "").replace(" rural", "").replace(" district", "").strip()
+
+
 def _coerce_import_record(row: Dict[str, Any]) -> Dict[str, Any]:
     def _float(value: Any) -> Optional[float]:
         if _is_blank(value):
             return None
-        return float(value)
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
 
     def _int(value: Any) -> int:
         if _is_blank(value):
             return 0
-        return int(float(value))
+        try:
+            return int(float(value))
+        except (ValueError, TypeError):
+            return 0
 
     coerced = {col: _clean_text(row.get(col)) for col in EXPECTED_COLUMNS}
     coerced["latitude"] = _float(row.get("latitude"))
     coerced["longitude"] = _float(row.get("longitude"))
-    coerced["accident_date_time"] = _parse_datetime(row.get("accident_date_time"))
-    if coerced["accident_date_time"] == "INVALID":
-        coerced["accident_date_time"] = None
+    coerced["accident_date_time"] = parse_accident_datetime(row.get("accident_date_time"))
     for col in INTEGER_COLUMNS:
         coerced[col] = _int(row.get(col))
     coerced["district"] = coerced.get("district") or "Surat"
@@ -248,8 +232,15 @@ def add_accident(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
-    accident_id = payload.get("accident_id") or f"MANUAL-{uuid.uuid4().hex[:10].upper()}"
+    accident_id = payload.get("accident_id")
+    if not accident_id:
+        raise HTTPException(status_code=400, detail="Accident ID is required.")
+
     district = payload.get("district") or "Surat"
+
+    requires_attention = False
+    invalidation_reasons = []
+    is_duplicate = False
 
     existing = (
         db.query(Accident)
@@ -257,10 +248,36 @@ def add_accident(
         .first()
     )
     if existing:
-        raise HTTPException(
-            status_code=409,
-            detail=f"An accident with ID '{accident_id}' already exists.",
-        )
+        is_duplicate = True
+        requires_attention = True
+        invalidation_reasons.append("Duplicate Record")
+
+    lat = payload.get("latitude")
+    lon = payload.get("longitude")
+    is_valid_coordinates = True
+
+    if lat is not None and lon is not None:
+        from app.utils.coordinate_validator import validate_coordinate, ValidationStatus
+        coord_res = validate_coordinate(float(lat), float(lon), db)
+        if not coord_res.is_valid:
+            is_valid_coordinates = False
+            requires_attention = True
+            if coord_res.status in (ValidationStatus.OUTSIDE_STATE, ValidationStatus.NO_DISTRICT):
+                invalidation_reasons.append("Outside State")
+            elif coord_res.status == ValidationStatus.INVALID_COORDS:
+                invalidation_reasons.append("Invalid Coordinates")
+            else:
+                invalidation_reasons.append("Validation Error")
+        else:
+            reported_dist = coord_res.matched_district
+            if reported_dist:
+                clean_provided = _normalize_district_for_match(district)
+                clean_reported = _normalize_district_for_match(reported_dist)
+                if clean_reported != clean_provided:
+                    if not (clean_provided == 'ahmadabad' and clean_reported == 'ahmedabad'):
+                        is_valid_coordinates = False
+                        requires_attention = True
+                        invalidation_reasons.append("District Mismatch")
 
     row = _coerce_import_record({**payload, "accident_id": accident_id, "district": district})
     record = Accident(
@@ -293,7 +310,10 @@ def add_accident(
         light_condition=row.get("light_condition"),
         visibility=row.get("visibility"),
         traffic_violation=row.get("traffic_violation"),
-        is_valid_coordinates=row.get("is_valid_coordinates", True),
+        is_valid_coordinates=is_valid_coordinates,
+        requires_attention=requires_attention,
+        is_duplicate=is_duplicate,
+        invalidation_reasons=", ".join(invalidation_reasons) if invalidation_reasons else None,
     )
 
     db.add(record)
@@ -322,7 +342,7 @@ def get_accidents(
     visibility: Optional[str] = None,
     traffic_violation: Optional[str] = None,
     collision_feature: Optional[str] = None,
-    requires_attention: Optional[bool] = None,
+    record_status: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
@@ -340,8 +360,15 @@ def get_accidents(
             | (Accident.traffic_violation.ilike(pattern))
         )
 
-    if requires_attention is not None:
-        query = query.filter(Accident.requires_attention == requires_attention)
+    if record_status:
+        if record_status == "valid":
+            query = query.filter(Accident.requires_attention == False)
+        elif record_status == "duplicate":
+            query = query.filter((Accident.is_duplicate == True) | (Accident.invalidation_reasons.ilike("%Duplicate%")))
+        elif record_status == "district_mismatch":
+            query = query.filter(Accident.invalidation_reasons.ilike("%District Mismatch%"))
+        elif record_status == "outside_state":
+            query = query.filter(Accident.invalidation_reasons.ilike("%Outside Gujarat State%"))
 
     filter_map = {
         "district": district,
@@ -492,21 +519,76 @@ async def upload_accidents_file(
     if df.empty:
         raise HTTPException(status_code=400, detail="The uploaded file contains no data rows.")
 
-    file_columns = [str(c).strip() for c in df.columns.tolist()]
-    df.columns = file_columns
-    missing_columns = [c for c in EXPECTED_COLUMNS if c not in file_columns]
-    if missing_columns:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "missing_columns",
-                "message": f"The uploaded file is missing {len(missing_columns)} required column(s).",
-                "missing": missing_columns,
-                "expected": EXPECTED_COLUMNS,
-            },
-        )
+    import re
+    import difflib
 
-    df = df[EXPECTED_COLUMNS]
+    def normalize_column(col_name: str) -> str:
+        col_name = str(col_name).strip().lower()
+        col_name = re.sub(r'[^a-z0-9]+', '_', col_name)
+        return col_name.strip('_')
+
+    ALIASES = {
+        # Seed script exact mappings (normalized)
+        "land_mark_name": "landmark_name",
+        "severity_of_the_accident": "severity",
+        "no_of_vehicles_involved": "number_of_vehicles",
+        "drivers_killed": "driver_killed",
+        "drivers_grievous_injury": "driver_grievous_injury",
+        "drivers_minor_injury": "driver_minor_injury",
+        "drivers_no_injury": "driver_no_injury",
+        "passengers_killed": "passenger_killed",
+        "passengers_grievous_injury": "passenger_grievous_injury",
+        "passengers_minor_injury": "passenger_minor_injury",
+        "passengers_no_injury": "passenger_no_injury",
+        "collision_type": "type_of_collision",
+        "collision_nature": "collision_feature",
+        
+        # General aliases
+        "accident_severity": "severity",
+        "no_of_vehicles": "number_of_vehicles",
+        "vehicles_involved": "number_of_vehicles",
+        "total_vehicles": "number_of_vehicles",
+        "landmark": "landmark_name",
+        "location": "accident_location",
+        "date_time": "accident_date_time",
+        "lat": "latitude",
+        "lon": "longitude",
+        "lng": "longitude",
+        "ps": "police_station",
+        "station": "police_station",
+        "dist": "district",
+        "road": "road_name",
+        "weather": "weather_condition",
+        "light": "light_condition",
+        "vis": "visibility",
+    }
+
+    original_columns = df.columns.tolist()
+    column_mapping = {}
+    unmapped_expected = set(EXPECTED_COLUMNS)
+
+    for col in original_columns:
+        norm = normalize_column(col)
+        if norm in unmapped_expected:
+            column_mapping[col] = norm
+            unmapped_expected.remove(norm)
+        elif norm in ALIASES and ALIASES[norm] in unmapped_expected:
+            column_mapping[col] = ALIASES[norm]
+            unmapped_expected.remove(ALIASES[norm])
+            
+    for col in original_columns:
+        if col not in column_mapping:
+            norm = normalize_column(col)
+            matches = difflib.get_close_matches(norm, unmapped_expected, n=1, cutoff=0.7)
+            if matches:
+                column_mapping[col] = matches[0]
+                unmapped_expected.remove(matches[0])
+
+    df.rename(columns=column_mapping, inplace=True)
+    
+    missing_columns = [c for c in EXPECTED_COLUMNS if c not in df.columns]
+    for missing_col in missing_columns:
+        df[missing_col] = None
     raw_rows = df.to_dict(orient="records")
     candidate_ids = [
         str(row.get("accident_id") or "").strip()
@@ -517,11 +599,11 @@ async def upload_accidents_file(
     existing_ids = set()
     if candidate_ids:
         existing = (
-            db.query(Accident.accident_id)
+            db.query(Accident.accident_id, Accident.district)
             .filter(Accident.accident_id.in_(candidate_ids))
             .all()
         )
-        existing_ids = {r[0] for r in existing}
+        existing_ids = {(r[0], _normalize_district_for_match(r[1])) for r in existing}
 
     seen_ids = set()
     valid_rows = []
@@ -532,32 +614,32 @@ async def upload_accidents_file(
         row_num = idx + 2
         row_data = {col: _clean_text(raw_row.get(col)) for col in EXPECTED_COLUMNS}
         row_accident_id = row_data.get("accident_id")
+        row_district = row_data.get("district") or "Surat"
         errors = _validate_import_row(raw_row)
 
-        if row_accident_id and row_accident_id in existing_ids:
+        is_dup = False
+        if row_accident_id and (row_accident_id, _normalize_district_for_match(row_district)) in existing_ids:
             duplicate_rows.append({
                 "row": row_num,
                 "accident_id": row_accident_id,
-                "errors": ["Accident ID already exists in the database."],
+                "errors": ["Accident ID already exists in the database for this district."],
                 "data": row_data,
             })
-            continue
-
-        if row_accident_id and row_accident_id in seen_ids:
+            is_dup = True
+        elif row_accident_id and (row_accident_id, _normalize_district_for_match(row_district)) in seen_ids:
             duplicate_rows.append({
                 "row": row_num,
                 "accident_id": row_accident_id,
-                "errors": ["Accident ID is duplicated within this file."],
+                "errors": ["Accident ID is duplicated within this file for this district."],
                 "data": row_data,
             })
-            continue
+            is_dup = True
 
         if row_accident_id:
-            seen_ids.add(row_accident_id)
+            seen_ids.add((row_accident_id, _normalize_district_for_match(row_district)))
 
         if errors:
             invalid_rows.append({"row": row_num, "errors": errors, "data": row_data})
-            continue
 
         valid_rows.append(_row_to_response(_coerce_import_record(raw_row)))
 
@@ -587,66 +669,81 @@ def import_accidents(
     if not records_data:
         raise HTTPException(status_code=400, detail="No records provided.")
 
-    row_errors = []
     normalized_records = []
     accident_ids = []
-    for idx, row in enumerate(records_data):
-        errors = _validate_import_row(row)
-        if errors:
-            row_errors.append({"row": idx + 1, "errors": errors})
-            continue
-
+    
+    for row in records_data:
         normalized = _coerce_import_record(row)
         if not normalized.get("accident_id"):
             normalized["accident_id"] = f"IMPORT-{uuid.uuid4().hex[:10].upper()}"
         normalized_records.append(normalized)
         accident_ids.append(normalized["accident_id"])
 
-    if row_errors:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "validation_errors",
-                "message": f"Found validation errors in {len(row_errors)} row(s).",
-                "row_errors": row_errors[:50],
-                "total_error_rows": len(row_errors),
-            },
-        )
-
-    duplicate_payload_ids = sorted(
-        {accident_id for accident_id in accident_ids if accident_ids.count(accident_id) > 1}
-    )
-    if duplicate_payload_ids:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "error": "duplicate_records",
-                "message": "The confirmed records contain duplicate accident IDs.",
-                "duplicates": duplicate_payload_ids[:50],
-            },
-        )
-
+    # Check existing for duplicates
     existing_ids = set()
     if accident_ids:
         existing = (
-            db.query(Accident.accident_id)
+            db.query(Accident.accident_id, Accident.district)
             .filter(Accident.accident_id.in_(accident_ids))
             .all()
         )
-        existing_ids = {r[0] for r in existing}
+        existing_ids = {(r[0], _normalize_district_for_match(r[1])) for r in existing}
 
-    if existing_ids:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "error": "duplicate_records",
-                "message": "Some confirmed records already exist in the database.",
-                "duplicates": sorted(existing_ids)[:50],
-            },
-        )
+    # Perform coordinate validation in batch
+    coords = []
+    for row in normalized_records:
+        coords.append((row.get("latitude"), row.get("longitude")))
+        
+    from app.utils.coordinate_validator import validate_coordinates_batch
+    coord_report = validate_coordinates_batch(coords, db, check_district=True)
+    coord_results = coord_report.results if hasattr(coord_report, 'results') else []
 
     inserted = 0
-    for row in normalized_records:
+    for idx, row in enumerate(normalized_records):
+        reasons = []
+        is_valid_coords = True
+        is_dup = False
+        requires_attn = False
+        
+        # Check structural errors from payload
+        str_errors = _validate_import_row(records_data[idx])
+        if str_errors:
+            requires_attn = True
+            reasons.append("Structural Parsing Errors")
+
+        # Check duplicates
+        acc_id = row.get("accident_id")
+        dist = row.get("district") or "Surat"
+        if acc_id and (acc_id, _normalize_district_for_match(dist)) in existing_ids:
+            is_dup = True
+            requires_attn = True
+            reasons.append("Duplicate Record")
+        else:
+            existing_ids.add((acc_id, _normalize_district_for_match(dist)))
+            
+        # Check coordinates
+        if idx < len(coord_results):
+            res = coord_results[idx]
+            if not res.is_valid:
+                is_valid_coords = False
+                requires_attn = True
+                status_val = res.status.value if hasattr(res.status, 'value') else str(res.status)
+                if status_val in ("outside_state", "no_district"):
+                    reasons.append("Outside Gujarat State")
+                elif status_val == "invalid_coords":
+                    reasons.append("Invalid Coordinates")
+                else:
+                    reasons.append("Validation Error")
+            elif res.matched_district:
+                clean_provided = _normalize_district_for_match(dist)
+                clean_reported = _normalize_district_for_match(res.matched_district)
+                if clean_reported != clean_provided:
+                    if not (clean_provided == 'ahmadabad' and clean_reported == 'ahmedabad'):
+                        is_valid_coords = False
+                        requires_attn = True
+                        reasons.append("District Mismatch")
+
+        invalidation_str = ", ".join(reasons) if reasons else None
         record = Accident(
             accident_id=row.get("accident_id"),
             district=row.get("district") or "Surat",
@@ -677,7 +774,10 @@ def import_accidents(
             light_condition=row.get("light_condition"),
             visibility=row.get("visibility"),
             traffic_violation=row.get("traffic_violation"),
-            is_valid_coordinates=row.get("is_valid_coordinates", True),
+            is_valid_coordinates=is_valid_coords,
+            is_duplicate=is_dup,
+            requires_attention=requires_attn,
+            invalidation_reasons=invalidation_str,
         )
         db.add(record)
         inserted += 1

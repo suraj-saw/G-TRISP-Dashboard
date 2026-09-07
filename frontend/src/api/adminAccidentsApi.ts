@@ -55,7 +55,7 @@ export interface AccidentFilters {
   visibility?: string;
   traffic_violation?: string;
   collision_feature?: string;
-  requires_attention?: boolean;
+  record_status?: string;
 }
 
 /**

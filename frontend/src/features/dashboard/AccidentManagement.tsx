@@ -107,9 +107,9 @@ const FILTER_OPTION_KEY: Partial<
 function getShortReason(reason: string | null | undefined): string {
   if (!reason) return "Review";
   const r = reason.toLowerCase();
+  if (r.includes("duplicate")) return "Duplicate";
   if (r.includes("outside gujarat") || r.includes("outside state")) return "Outside State";
   if (r.includes("district mismatch")) return "District Mismatch";
-  if (r.includes("duplicate")) return "Duplicate";
   if (r.includes("invalid coord")) return "Invalid Coords";
   // For any other reason, truncate at 20 chars
   return reason.length > 20 ? reason.slice(0, 18) + "…" : reason;
@@ -127,7 +127,7 @@ export default function AccidentManagement() {
   const [activeFilterCount, setActiveFilterCount] = useState(0);
 
   // Status Filter for requires_attention
-  const [statusFilter, setStatusFilter] = useState<"all" | "review" | "valid">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "valid" | "duplicate" | "district_mismatch" | "outside_state">("all");
 
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -200,15 +200,13 @@ export default function AccidentManagement() {
     const count = Object.values(columnFilters).filter((val) => val && val.trim() !== "").length + (statusFilter !== "all" ? 1 : 0);
     setActiveFilterCount(count);
 
-    let requiresAttentionQuery: boolean | undefined = undefined;
-    if (statusFilter === "review") {
-      requiresAttentionQuery = true;
-    } else if (statusFilter === "valid") {
-      requiresAttentionQuery = false;
+    let recordStatusQuery: string | undefined = undefined;
+    if (statusFilter !== "all") {
+      recordStatusQuery = statusFilter;
     }
 
     try {
-      const res = await adminAccidentsApi.getAccidents(skip, limit, debouncedSearch, { ...columnFilters, requires_attention: requiresAttentionQuery });
+      const res = await adminAccidentsApi.getAccidents(skip, limit, debouncedSearch, { ...columnFilters, record_status: recordStatusQuery });
       setAccidents(res.data);
       setTotal(res.total);
     } catch {
@@ -489,8 +487,10 @@ export default function AccidentManagement() {
                     className="w-40 px-2 py-1.5 bg-white border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-400"
                   >
                     <option value="all">All Records</option>
-                    <option value="review">Requires Review</option>
                     <option value="valid">Valid Records</option>
+                    <option value="duplicate">Duplicate</option>
+                    <option value="district_mismatch">District Mismatch</option>
+                    <option value="outside_state">Outside State</option>
                   </select>
                 </div>
                 {ALL_COLUMNS.filter((c) => c.filterable).map((col) => {

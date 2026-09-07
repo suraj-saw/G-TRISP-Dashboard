@@ -25,6 +25,7 @@ export interface FormData {
   light_condition: string;
   visibility: string;
   traffic_violation: string;
+  district: string;
 }
 
 export const EMPTY_FORM: FormData = {
@@ -52,6 +53,7 @@ export const EMPTY_FORM: FormData = {
   light_condition: "",
   visibility: "",
   traffic_violation: "",
+  district: "",
 };
 
 export const SEVERITY_OPTIONS = [

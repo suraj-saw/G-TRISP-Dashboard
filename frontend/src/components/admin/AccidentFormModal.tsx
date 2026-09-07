@@ -200,23 +200,34 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function StepBasicInfo({
   form,
   update,
-  isEdit
+  isEdit,
+  districts,
 }: {
   form: FormData;
   update: (k: keyof FormData, v: string) => void;
   isEdit: boolean;
+  districts: string[];
 }) {
   return (
     <div className="flex flex-col gap-4">
       <SectionTitle>Identification</SectionTitle>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <Label>Accident ID</Label>
+          <Label required>Accident ID</Label>
           <Input
             value={form.accident_id}
             onChange={(v) => update("accident_id", v)}
-            placeholder="Auto-generated if blank"
+            placeholder="e.g. 2023112140700001"
             disabled={isEdit}
+          />
+        </div>
+        <div>
+          <Label required>District</Label>
+          <Select
+            value={form.district}
+            onChange={(v) => update("district", v)}
+            options={districts}
+            placeholder="Select district"
           />
         </div>
         <div>
@@ -498,6 +509,8 @@ function StepConditions({
  */
 function validateStep(step: number, form: FormData): string | null {
   if (step === 1) {
+    if (!form.accident_id.trim()) return "Accident ID is required.";
+    if (!form.district) return "District is required.";
     if (!form.police_station.trim()) return "Police station is required.";
     if (!form.accident_date_time) return "Accident date & time is required.";
     if (!form.severity) return "Severity is required.";
@@ -530,6 +543,11 @@ export default function AccidentFormModal({ open, onClose, onSuccess, initialDat
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stepError, setStepError] = useState<string | null>(null);
+  const [districts, setDistricts] = useState<string[]>([]);
+
+  useEffect(() => {
+    adminAccidentsApi.getFilterOptions().then((opts) => setDistricts(opts.districts || [])).catch(() => {});
+  }, []);
 
   /**
    * Initializes or resets form state when the modal opens.
@@ -576,6 +594,7 @@ export default function AccidentFormModal({ open, onClose, onSuccess, initialDat
           light_condition: initialData.light_condition || "",
           visibility: initialData.visibility || "",
           traffic_violation: initialData.traffic_violation || "",
+          district: initialData.district || "",
         });
       } else {
         setForm(EMPTY_FORM);
@@ -664,6 +683,7 @@ export default function AccidentFormModal({ open, onClose, onSuccess, initialDat
         light_condition: form.light_condition || null,
         visibility: form.visibility || null,
         traffic_violation: form.traffic_violation || null,
+        district: form.district || "",
       };
 
       if (initialData) {
@@ -795,7 +815,7 @@ export default function AccidentFormModal({ open, onClose, onSuccess, initialDat
                     transition={{ duration: 0.18 }}
                   >
                     {step === 1 && (
-                      <StepBasicInfo form={form} update={update} isEdit={isEdit} />
+                      <StepBasicInfo form={form} update={update} isEdit={isEdit} districts={districts} />
                     )}
                     {step === 2 && <StepLocation form={form} update={update} />}
                     {step === 3 && (
