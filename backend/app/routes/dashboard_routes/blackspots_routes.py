@@ -30,7 +30,16 @@ from app.core.dependencies import get_db
 from app.models.accident import Accident
 from app.models.snapped_accident import SnappedAccident
 from app.models.gujarat_road import GujaratRoad
-from app.utils.accident_utils import apply_filters, validate_observation_period, total_fatalities, total_grievous, total_minor
+from app.utils.accident_utils import (
+    apply_filters,
+    parse_collision_types,
+    parse_collision_natures,
+    parse_weather_conditions,
+    validate_observation_period,
+    total_fatalities,
+    total_grievous,
+    total_minor,
+)
 from app.utils.blackspot_utils import (
     CrashPoint,
     greedy_blackspots,
@@ -95,6 +104,7 @@ def get_blackspots(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -103,7 +113,8 @@ def get_blackspots(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     if severity:
         query = query.filter(Accident.severity.in_(severity))
@@ -163,6 +174,7 @@ def get_pedestrian_blackspots(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -171,7 +183,8 @@ def get_pedestrian_blackspots(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     if severity:
         query = query.filter(Accident.severity.in_(severity))
@@ -237,6 +250,7 @@ def get_dbscan_blackspots(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -245,7 +259,8 @@ def get_dbscan_blackspots(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     if severity:
         query = query.filter(Accident.severity.in_(severity))
@@ -305,6 +320,7 @@ def get_pedestrian_dbscan_blackspots(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -313,7 +329,8 @@ def get_pedestrian_dbscan_blackspots(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     if severity:
         query = query.filter(Accident.severity.in_(severity))
@@ -379,13 +396,14 @@ def get_irc_greedy_blackspots(
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
     road_network_km: Optional[float] = Query(None, ge=1.0),
     db: Session = Depends(get_db),
+    visibility: Optional[List[str]] = Query(None),
 ):
     road_network_km = _resolve_road_network_km(district, road_network_km)
     
     base_query = apply_filters(
         db.query(Accident),
         district, year, None, None, None, None, date_from, date_to, taluka=None, db=db,
-        number_of_vehicles=number_of_vehicles, police_station=None
+        number_of_vehicles=number_of_vehicles, police_station=None, visibility=visibility
     )
     total_network_crashes = base_query.count()
 
@@ -396,7 +414,8 @@ def get_irc_greedy_blackspots(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     if severity:
         if isinstance(severity, list):
@@ -466,13 +485,14 @@ def get_irc_grid_blackspots(
     road_network_km: Optional[float] = Query(None, ge=1.0),
     spacing_m: float = Query(50.0, ge=10.0),
     db: Session = Depends(get_db),
+    visibility: Optional[List[str]] = Query(None),
 ):
     road_network_km = _resolve_road_network_km(district, road_network_km)
     
     base_query = apply_filters(
         db.query(Accident),
         district, year, None, None, None, None, date_from, date_to, taluka=None, db=db,
-        number_of_vehicles=number_of_vehicles, police_station=None
+        number_of_vehicles=number_of_vehicles, police_station=None, visibility=visibility
     )
     total_network_crashes = base_query.count()
 
@@ -483,7 +503,8 @@ def get_irc_grid_blackspots(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     if severity:
         if isinstance(severity, list):
@@ -552,13 +573,14 @@ def get_pedestrian_irc_greedy_blackspots(
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
     road_network_km: Optional[float] = Query(None, ge=1.0),
     db: Session = Depends(get_db),
+    visibility: Optional[List[str]] = Query(None),
 ):
     road_network_km = _resolve_road_network_km(district, road_network_km)
     
     base_query = apply_filters(
         db.query(Accident),
         district, year, None, None, None, None, date_from, date_to, taluka=None, db=db,
-        number_of_vehicles=number_of_vehicles, police_station=None
+        number_of_vehicles=number_of_vehicles, police_station=None, visibility=visibility
     )
     total_network_crashes = base_query.count()
 
@@ -569,7 +591,8 @@ def get_pedestrian_irc_greedy_blackspots(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     if severity:
         if isinstance(severity, list):
@@ -647,13 +670,14 @@ def get_pedestrian_irc_grid_blackspots(
     road_network_km: Optional[float] = Query(None, ge=1.0),
     spacing_m: float = Query(50.0, ge=10.0),
     db: Session = Depends(get_db),
+    visibility: Optional[List[str]] = Query(None),
 ):
     road_network_km = _resolve_road_network_km(district, road_network_km)
     
     base_query = apply_filters(
         db.query(Accident),
         district, year, None, None, None, None, date_from, date_to, taluka=None, db=db,
-        number_of_vehicles=number_of_vehicles, police_station=None
+        number_of_vehicles=number_of_vehicles, police_station=None, visibility=visibility
     )
     total_network_crashes = base_query.count()
 
@@ -664,7 +688,8 @@ def get_pedestrian_irc_grid_blackspots(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     if severity:
         if isinstance(severity, list):
@@ -742,7 +767,8 @@ def get_network_blackspots(
     is_pedestrian: bool = Query(False),
     window_size_m: float = Query(500.0, description="Sliding window size in meters"),
     min_qualifying_crashes: int = Query(3, description="Minimum qualifying crashes"),
-    merge_lanes: bool = Query(False, description="Merge parallel lane segments using spatial clustering")
+    merge_lanes: bool = Query(False, description="Merge parallel lane segments using spatial clustering"),
+    visibility: Optional[List[str]] = Query(None),
 ):
     """
     Computes network-constrained blackspot road segments based on snapped accidents.
@@ -776,7 +802,8 @@ def get_network_blackspots(
         weather_condition, light_condition, collision_type,
         date_from, date_to, taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     
     if severity:
@@ -1248,18 +1275,28 @@ def get_blackspot_crash_stats(
         severity_name = safe_text(accident.severity)
         mapped_severity = "Fatal" if severity_name == "Fatal" else ("Grievous Injury" if severity_name == "Grievous Injury" else "Other")
         severity_counts[mapped_severity] += 1
-        road_counts[safe_text(accident.road_classification)] += 1
-        collision_type_counts[safe_text(accident.type_of_collision)] += 1
-        collision_nature_counts[safe_text(accident.collision_feature)] += 1
-        weather_counts[safe_text(accident.weather_condition)] += 1
+        road_cls = safe_text(accident.road_classification)
+        road_counts[road_cls] += 1
         light_counts[safe_text(accident.light_condition)] += 1
         visibility_counts[safe_text(accident.visibility)] += 1
 
-        road_severity_counts[safe_text(accident.road_classification)][severity_name] += 1
-        collision_severity_counts[safe_text(accident.type_of_collision)][severity_name] += 1
-        weather_severity_counts[safe_text(accident.weather_condition)][severity_name] += 1
+        parsed_weathers = parse_weather_conditions(accident.weather_condition)
+        for wc in parsed_weathers:
+            weather_counts[wc] = weather_counts.get(wc, 0) + 1
+            weather_severity_counts[wc][severity_name] += 1
+
+        parsed_natures = parse_collision_natures(accident.collision_feature)
+        for cn in parsed_natures:
+            collision_nature_counts[cn] = collision_nature_counts.get(cn, 0) + 1
+
+        parsed_collisions = parse_collision_types(accident.type_of_collision)
+        for ct in parsed_collisions:
+            collision_type_counts[ct] = collision_type_counts.get(ct, 0) + 1
+            collision_severity_counts[ct][severity_name] += 1
+            road_collision_counts[road_cls][ct] += 1
+
+        road_severity_counts[road_cls][severity_name] += 1
         light_severity_counts[safe_text(accident.light_condition)][severity_name] += 1
-        road_collision_counts[safe_text(accident.road_classification)][safe_text(accident.type_of_collision)] += 1
 
         ps = safe_text(accident.police_station)
         if ps != "Unknown":
@@ -1352,8 +1389,16 @@ def get_blackspot_crash_stats(
         "visibility_breakdown": [{"label": k, "count": v} for k, v in sorted(visibility_counts.items(), key=lambda item: item[1], reverse=True) if k != "Unknown"],
         "statistical_insights": insights,
         "road_severity_matrix": [{"name": k, **v} for k, v in road_severity_counts.items() if k != "Unknown"],
-        "collision_severity_matrix": [{"name": k, **v} for k, v in collision_severity_counts.items() if k != "Unknown"],
-        "weather_severity_matrix": [{"name": k, **v} for k, v in weather_severity_counts.items() if k != "Unknown"],
+        "collision_severity_matrix": [
+            {"name": k, **v}
+            for k, v in sorted(collision_severity_counts.items(), key=lambda item: sum(item[1].values()), reverse=True)
+            if k != "Unknown"
+        ],
+        "weather_severity_matrix": [
+            {"name": k, **v}
+            for k, v in sorted(weather_severity_counts.items(), key=lambda item: sum(item[1].values()), reverse=True)
+            if k != "Unknown"
+        ],
         "light_severity_matrix": [{"name": k, **v} for k, v in light_severity_counts.items() if k != "Unknown"],
         "road_collision_matrix": [{"name": k, **v} for k, v in road_collision_counts.items() if k != "Unknown"],
         "time_severity_matrix": [{"name": k, **v} for k, v in time_severity_counts.items()],

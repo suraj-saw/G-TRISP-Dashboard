@@ -1,6 +1,6 @@
 import React, { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Edit2, X } from "lucide-react";
+import { Edit2, X, ArrowLeft } from "lucide-react";
 import API from "../../api/axios";
 import { ROUTES } from "../../config/constants";
 import TopBar from "../../components/layout/TopBar";
@@ -12,6 +12,8 @@ interface UserProfile {
   district: string | null;
   taluka: string | null;
   local_address: string | null;
+  post: string | null;
+  police_station: string | null;
 }
 
 interface User {
@@ -26,6 +28,8 @@ interface ProfileForm {
   username: string;
   phone_number: string;
   department: string;
+  post: string;
+  police_station: string;
   state: string;
   district: string;
   taluka: string;
@@ -40,6 +44,8 @@ function Profile() {
     username: "",
     phone_number: "",
     department: "",
+    post: "",
+    police_station: "",
     state: "",
     district: "",
     taluka: "",
@@ -62,6 +68,8 @@ function Profile() {
           username: userData.username || "",
           phone_number: userData.profile?.phone_number || "",
           department: userData.profile?.department || "",
+          post: userData.profile?.post || "",
+          police_station: userData.profile?.police_station || "",
           state: userData.profile?.state || "",
           district: userData.profile?.district || "",
           taluka: userData.profile?.taluka || "",
@@ -93,6 +101,10 @@ function Profile() {
     }
   };
 
+  const handleBack = () => {
+    navigate(-1);
+  };
+
   const handleCancel = () => {
     // Revert form state back to current user data
     if (user) {
@@ -100,6 +112,8 @@ function Profile() {
         username: user.username || "",
         phone_number: user.profile?.phone_number || "",
         department: user.profile?.department || "",
+        post: user.profile?.post || "",
+        police_station: user.profile?.police_station || "",
         state: user.profile?.state || "",
         district: user.profile?.district || "",
         taluka: user.profile?.taluka || "",
@@ -122,6 +136,8 @@ function Profile() {
       username: form.username,
       phone_number: form.phone_number || null,
       department: form.department || null,
+      post: form.post || null,
+      police_station: form.police_station || null,
       state: form.state || null,
       district: form.district || null,
       taluka: form.taluka || null,
@@ -222,15 +238,27 @@ function Profile() {
             </div>
           </div>
 
-          {!isEditing && (
+          <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={() => setIsEditing(true)}
-              className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 text-white px-5 py-2.5 text-sm font-semibold hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg active:scale-95"
+              type="button"
+              onClick={handleBack}
+              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-indigo-600 hover:border-slate-300 transition-all shadow-sm hover:shadow active:scale-95 cursor-pointer"
             >
-              <Edit2 size={16} />
-              Update Profile
+              <ArrowLeft size={16} />
+              Back to Dashboard
             </button>
-          )}
+
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 text-white px-5 py-2.5 text-sm font-semibold hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg active:scale-95 cursor-pointer"
+              >
+                <Edit2 size={16} />
+                Update Profile
+              </button>
+            )}
+          </div>
         </div>
 
         {error && (
@@ -246,7 +274,7 @@ function Profile() {
         )}
 
         <form onSubmit={submitUpdate} className="space-y-6">
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             
             {/* Left Column */}
             <div className="flex flex-col gap-6 lg:gap-8">
@@ -280,20 +308,15 @@ function Profile() {
             {/* Right Column */}
             <div className="flex flex-col gap-6 lg:gap-8">
               
-              {/* Address Card */}
+              {/* Official Details Card */}
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 p-6 sm:p-8">
                 <h2 className="text-base font-bold text-slate-900 mb-6 flex items-center gap-2">
                   <span className="w-1.5 h-6 bg-indigo-500 rounded-full inline-block"></span>
-                  Address
+                  Official Details
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-6">
-                  {renderField("State", "state", isEditing ? form.state : (user.profile?.state || ""), "e.g. Gujarat")}
-                  {renderField("District", "district", isEditing ? form.district : (user.profile?.district || ""), "e.g. Surat")}
-                  {renderField("Taluka", "taluka", isEditing ? form.taluka : (user.profile?.taluka || ""), "e.g. Choryasi")}
-                </div>
-                
-                <div className="mt-2">
-                  {renderField("Local Address / Street", "local_address", isEditing ? form.local_address : (user.profile?.local_address || ""), "e.g. 123 Main St, Near Police Station")}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                  {renderField("Post", "post", isEditing ? form.post : (user.profile?.post || ""), "e.g. Police Inspector")}
+                  {renderField("Police Station", "police_station", isEditing ? form.police_station : (user.profile?.police_station || ""), "e.g. Chouparan Police Station")}
                 </div>
               </div>
 

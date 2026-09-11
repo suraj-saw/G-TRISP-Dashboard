@@ -5,7 +5,9 @@ Accident record model — field names aligned with iRAD
 """
 
 # pyrefly: ignore [missing-import]
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, Float, DateTime, Boolean, UniqueConstraint, Index
+# pyrefly: ignore [missing-import]
+from sqlalchemy.dialects.postgresql import ARRAY
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import declarative_mixin
 # pyrefly: ignore [missing-import]
@@ -73,12 +75,12 @@ class AccidentMixin:
     pedestrian_no_injury       = Column(Integer, nullable=True)
 
     # ── Miscellaneous ─────────────────────────────────────────────────────────
-    type_of_collision = Column(String, nullable=True)
-    collision_feature = Column(String, nullable=True)
-    weather_condition = Column(String, nullable=True)
+    type_of_collision = Column(ARRAY(Text), nullable=True)
+    collision_feature = Column(ARRAY(Text), nullable=True)
+    weather_condition = Column(ARRAY(Text), nullable=True)
     light_condition   = Column(String, nullable=True)
     visibility        = Column(String, nullable=True)
-    traffic_violation = Column(String, nullable=True)
+    traffic_violation = Column(ARRAY(Text), nullable=True)
     accident_description = Column(String, nullable=True)
 
 
@@ -87,6 +89,12 @@ class Accident(AccidentMixin, Base):
     SQLAlchemy model representing an individual road accident record.
     """
     __tablename__ = "accidents"
+    __table_args__ = (
+        Index("idx_accidents_type_of_collision_gin", "type_of_collision", postgresql_using="gin"),
+        Index("idx_accidents_collision_feature_gin", "collision_feature", postgresql_using="gin"),
+        Index("idx_accidents_weather_condition_gin", "weather_condition", postgresql_using="gin"),
+        Index("idx_accidents_traffic_violation_gin", "traffic_violation", postgresql_using="gin"),
+    )
     
     id = Column(Integer, primary_key=True, index=True)
 
@@ -96,5 +104,11 @@ class AccidentBackup(AccidentMixin, Base):
     Backup table structure for accident records.
     """
     __tablename__ = "accidents_backup"
+    __table_args__ = (
+        Index("idx_accidents_backup_type_of_collision_gin", "type_of_collision", postgresql_using="gin"),
+        Index("idx_accidents_backup_collision_feature_gin", "collision_feature", postgresql_using="gin"),
+        Index("idx_accidents_backup_weather_condition_gin", "weather_condition", postgresql_using="gin"),
+        Index("idx_accidents_backup_traffic_violation_gin", "traffic_violation", postgresql_using="gin"),
+    )
     
     id = Column(Integer, primary_key=True, index=True)

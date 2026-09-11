@@ -38,6 +38,10 @@ export interface AccidentRecord {
   requires_attention: boolean;
   is_valid_coordinates: boolean;
   invalidation_reasons: string | null;
+  has_multiple_categories?: boolean;
+  multi_category_columns?: string[];
+  has_blank_fields?: boolean;
+  blank_columns?: string[];
 }
 
 /**
@@ -149,6 +153,32 @@ export const adminAccidentsApi = {
     }
     const res = await API.get<GetAccidentsResponse>(
       `/admin/surat/accidents?${params.toString()}`
+    );
+    return res.data;
+  },
+
+  /**
+   * Fetch all accident record IDs matching search and filters
+   * @param search - Search query string
+   * @param filters - Filter options for accident records
+   */
+  getAccidentIds: async (
+    search: string = "",
+    filters?: AccidentFilters
+  ) => {
+    const params = new URLSearchParams();
+    if (search) {
+      params.append("search", search);
+    }
+    if (filters) {
+      for (const [key, value] of Object.entries(filters)) {
+        if (value !== undefined && value !== "") {
+          params.append(key, String(value));
+        }
+      }
+    }
+    const res = await API.get<{ total: number; ids: number[] }>(
+      `/admin/surat/accidents/ids?${params.toString()}`
     );
     return res.data;
   },

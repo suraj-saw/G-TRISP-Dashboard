@@ -35,11 +35,15 @@ from app.schemas.dashboard_schema import (
 from app.schemas.gujarat_insights_schema import DistrictInsightsResponse
 from app.utils.accident_utils import (
     apply_filters,
+    parse_collision_types,
+    parse_collision_natures,
+    parse_weather_conditions,
     total_fatalities,
     total_grievous,
     total_minor,
 )
 from app.utils.text_utils import safe_text
+from app.utils.district_utils import get_canonical_district
 from app.core.constants import (
     SEVERITY_FATAL,
     UNKNOWN_LABEL,
@@ -66,6 +70,7 @@ def get_by_district(
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -74,6 +79,7 @@ def get_by_district(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
+        visibility=visibility,
     )
 
     rows = query.with_entities(
@@ -88,7 +94,8 @@ def get_by_district(
 
     district_map: dict = defaultdict(lambda: {"accident_count": 0, "fatalities": 0})
     for r in rows:
-        key = safe_text(r.district)
+        canon = get_canonical_district(r.district)
+        key = canon if canon else safe_text(r.district)
         district_map[key]["accident_count"] += (r.accident_count or 0)
         district_map[key]["fatalities"]     += (r.fatalities or 0)
 
@@ -122,6 +129,7 @@ def get_by_severity(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident.severity, func.count(Accident.id).label("count")),
@@ -130,7 +138,8 @@ def get_by_severity(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     rows = query.group_by(Accident.severity).all()
 
@@ -156,6 +165,7 @@ def get_by_collision(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(
@@ -167,22 +177,30 @@ def get_by_collision(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     rows = (
         query
         .group_by(Accident.type_of_collision)
-        .order_by(func.count(Accident.id).desc())
         .all()
     )
+
+    counts = defaultdict(int)
+    for r in rows:
+        raw_val = r[0]
+        cnt = r[1]
+        for ct in parse_collision_types(raw_val):
+            counts[ct] += cnt
 
     return CollisionResponse(
         data=[
             CollisionCount(
-                collision_type=safe_text(r.type_of_collision),
-                count=r.count,
+                collision_type=k,
+                count=v,
             )
-            for r in rows
+            for k, v in sorted(counts.items(), key=lambda x: x[1], reverse=True)
+            if k != "Unknown"
         ]
     )
 
@@ -201,6 +219,7 @@ def get_time_series(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -209,7 +228,8 @@ def get_time_series(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
 
     year_expr = extract("year", Accident.accident_date_time)
@@ -265,6 +285,7 @@ def get_top_dangerous(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident).filter(Accident.severity == SEVERITY_FATAL),
@@ -273,7 +294,8 @@ def get_top_dangerous(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
 
     rows = query.with_entities(
@@ -312,6 +334,7 @@ def get_yearly_comparison(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -320,7 +343,8 @@ def get_yearly_comparison(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
 
     year_expr = extract("year", Accident.accident_date_time)
@@ -478,9 +502,15 @@ def get_district_insights(db: Session = Depends(get_db)):
             .group_by(Accident.district, Accident.type_of_collision)
             .all()
         )
+        collision_counts_by_dist = defaultdict(lambda: defaultdict(int))
+        for dist, collision, count in collision_rows:
+            for ct in parse_collision_types(collision):
+                collision_counts_by_dist[dist][ct] += count
+
         collision_by_district: dict = defaultdict(list)
-        for district, collision, count in collision_rows:
-            collision_by_district[district].append({"label": safe_text(collision), "count": count})
+        for dist, c_dict in collision_counts_by_dist.items():
+            for k, v in sorted(c_dict.items(), key=lambda x: x[1], reverse=True):
+                collision_by_district[dist].append({"label": k, "count": v})
 
         # ---- 7. Most affected station ----
         station_rows = (
@@ -629,6 +659,7 @@ def get_district_stats(
     taluka: Optional[List[str]] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     """Return statistics using the same filters as the spatial view (for single district or all Gujarat)."""
@@ -646,6 +677,7 @@ def get_district_stats(
         date_to=date_to,
         db=db,
         number_of_vehicles=number_of_vehicles,
+        visibility=visibility,
     )
     if severity:
         query = query.filter(Accident.severity.in_(severity))
@@ -704,18 +736,28 @@ def get_district_stats(
         severity_name = safe_text(accident.severity)
         mapped_severity = "Fatal" if severity_name == "Fatal" else ("Grievous Injury" if severity_name == "Grievous Injury" else "Other")
         severity_counts[mapped_severity] += 1
-        road_counts[safe_text(accident.road_classification)] += 1
-        collision_type_counts[safe_text(accident.type_of_collision)] += 1
-        collision_nature_counts[safe_text(accident.collision_feature)] += 1
-        weather_counts[safe_text(accident.weather_condition)] += 1
+        road_cls = safe_text(accident.road_classification)
+        road_counts[road_cls] += 1
         light_counts[safe_text(accident.light_condition)] += 1
         visibility_counts[safe_text(accident.visibility)] += 1
+
+        parsed_weathers = parse_weather_conditions(accident.weather_condition)
+        for wc in parsed_weathers:
+            weather_counts[wc] = weather_counts.get(wc, 0) + 1
+            weather_severity_counts[wc][severity_name] += 1
+
+        parsed_natures = parse_collision_natures(accident.collision_feature)
+        for cn in parsed_natures:
+            collision_nature_counts[cn] = collision_nature_counts.get(cn, 0) + 1
         
-        road_severity_counts[safe_text(accident.road_classification)][severity_name] += 1
-        collision_severity_counts[safe_text(accident.type_of_collision)][severity_name] += 1
-        weather_severity_counts[safe_text(accident.weather_condition)][severity_name] += 1
+        parsed_collisions = parse_collision_types(accident.type_of_collision)
+        for ct in parsed_collisions:
+            collision_type_counts[ct] = collision_type_counts.get(ct, 0) + 1
+            collision_severity_counts[ct][severity_name] += 1
+            road_collision_counts[road_cls][ct] += 1
+        
+        road_severity_counts[road_cls][severity_name] += 1
         light_severity_counts[safe_text(accident.light_condition)][severity_name] += 1
-        road_collision_counts[safe_text(accident.road_classification)][safe_text(accident.type_of_collision)] += 1
         
         ps = safe_text(accident.police_station)
         if ps != "Unknown":
@@ -813,8 +855,16 @@ def get_district_stats(
         "visibility_breakdown": [{"label": k, "count": v} for k, v in sorted(visibility_counts.items(), key=lambda item: item[1], reverse=True) if k != "Unknown"],
         "statistical_insights": insights,
         "road_severity_matrix": [{"name": k, **v} for k, v in road_severity_counts.items() if k != "Unknown"],
-        "collision_severity_matrix": [{"name": k, **v} for k, v in collision_severity_counts.items() if k != "Unknown"],
-        "weather_severity_matrix": [{"name": k, **v} for k, v in weather_severity_counts.items() if k != "Unknown"],
+        "collision_severity_matrix": [
+            {"name": k, **v}
+            for k, v in sorted(collision_severity_counts.items(), key=lambda item: sum(item[1].values()), reverse=True)
+            if k != "Unknown"
+        ],
+        "weather_severity_matrix": [
+            {"name": k, **v}
+            for k, v in sorted(weather_severity_counts.items(), key=lambda item: sum(item[1].values()), reverse=True)
+            if k != "Unknown"
+        ],
         "light_severity_matrix": [{"name": k, **v} for k, v in light_severity_counts.items() if k != "Unknown"],
         "road_collision_matrix": [{"name": k, **v} for k, v in road_collision_counts.items() if k != "Unknown"],
         "time_severity_matrix": [{"name": k, **v} for k, v in time_severity_counts.items()],

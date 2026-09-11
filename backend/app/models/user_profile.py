@@ -31,6 +31,8 @@ class UserProfile(Base):
     district = Column(String, nullable=True)
     taluka = Column(String, nullable=True)
     local_address = Column(String, nullable=True)
+    post = Column(String, nullable=True)
+    police_station = Column(String, nullable=True)
 
     # Relationship back to the User model
     user = relationship("User", back_populates="profile")

@@ -120,29 +120,56 @@ export default function GujaratChoroplethMap() {
 
 
 
-        const normalizeDistrictName = (rawName: string) => {
+        const normalizeDistrictName = (rawName: string): string => {
+          if (!rawName) return "";
           let name = rawName.trim().toLowerCase();
-          name = name.replace(/\s+city$/, "").replace(/\s+rural$/, "").replace(/^wrly\s+/, "");
-          if (name.includes("vav tharad") || name.includes("banaskantha")) return "banas kantha";
-          if (name.includes("vadodara")) return "vadodara";
-          if (name.includes("ahmedabad")) return "ahmadabad";
-          if (name.includes("surat")) return "surat";
+          name = name.replace(/[\-_,/]+/g, " ");
+          name = name.replace(/\b(city|rural|district)\b/g, "").trim();
+          name = name.replace(/\s+/g, " ");
+
+          if (name.includes("ahmedabad") || name.includes("ahmadabad") || name.includes("amdavad")) return "ahmadabad";
+          if (name.includes("amreli")) return "amreli";
+          if (name.includes("anand")) return "anand";
+          if (name.includes("arvalli") || name.includes("aravalli") || name.includes("modasa")) return "arvalli";
+          if (name.includes("vav tharad") || name.includes("banaskantha") || name.includes("banas kantha") || name.includes("palanpur")) return "banas kantha";
+          if (name.includes("bharuch") || name.includes("broach")) return "bharuch";
+          if (name.includes("bhavnagar") || name.includes("bhavanagar")) return "bhavnagar";
+          if (name.includes("botad")) return "botad";
+          if (name.includes("chhotaudepur") || name.includes("chhota udepur") || name.includes("chotaudepur") || name.includes("chota udepur")) return "chhotaudepur";
+          if (name.includes("dahod") || name.includes("dohad")) return "dahod";
+          if (name.includes("dang") || name.includes("dangs") || name.includes("ahwa")) return "dangs";
+          if (name.includes("dwarka") || name.includes("devbhumi")) return "devbhumi dwarka";
+          if (name.includes("gandhinagar")) return "gandhinagar";
+          if (name.includes("gir somnath") || name.includes("girsomnath") || name.includes("veraval")) return "gir somnath";
+          if (name.includes("jamnagar")) return "jamnagar";
+          if (name.includes("junagadh")) return "junagadh";
+          if (name.includes("kachchh") || name.includes("kutch") || name.includes("gandhidham") || name.includes("bhuj")) return "kachchh";
+          if (name.includes("kheda") || name.includes("nadiad")) return "kheda";
+          if (name.includes("mahesana") || name.includes("mehsana")) return "mahesana";
+          if (name.includes("mahisagar") || name.includes("lunawada")) return "mahisagar";
+          if (name.includes("morbi") || name.includes("morvi")) return "morbi";
+          if (name.includes("narmada") || name.includes("rajpipla")) return "narmada";
+          if (name.includes("navsari")) return "navsari";
+          if (name.includes("panchmahal") || name.includes("panch mahal") || name.includes("godhra")) return "panch mahals";
+          if (name.includes("patan")) return "patan";
+          if (name.includes("porbandar")) return "porbandar";
           if (name.includes("rajkot")) return "rajkot";
-          if (name.includes("kachchh") || name.includes("kutchh")) return "kachchh";
-          if (name.includes("panchmahal")) return "panch mahals";
-          if (name.includes("sabarkantha")) return "sabar kantha";
-          if (name.includes("chotaudepur")) return "chhotaudepur";
-          if (name.includes("devbhumi dwrka")) return "devbhumi dwarka";
-          if (name.includes("mahisagar")) return "mahisagar";
-          if (name.includes("bhavanagar")) return "bhavnagar";
+          if (name.includes("sabarkantha") || name.includes("sabar kantha") || name.includes("himatnagar") || name.includes("himmatnagar")) return "sabar kantha";
+          if (name.includes("surat")) return "surat";
+          if (name.includes("surendranagar") || name.includes("surendra nagar")) return "surendranagar";
+          if (name.includes("tapi") || name.includes("vyara")) return "tapi";
+          if (name.includes("vadodara") || name.includes("baroda")) return "vadodara";
+          if (name.includes("valsad") || name.includes("bulsar")) return "valsad";
           return name;
         };
 
         const countByName = new Map<string, number>();
         summary.forEach((s) => {
           const mappedName = normalizeDistrictName(s.district);
-          const currentCount = countByName.get(mappedName) || 0;
-          countByName.set(mappedName, currentCount + s.accident_count);
+          if (mappedName) {
+            const currentCount = countByName.get(mappedName) || 0;
+            countByName.set(mappedName, currentCount + s.accident_count);
+          }
         });
 
         const maxVal = Math.max(1, ...Array.from(countByName.values()));
@@ -296,7 +323,8 @@ export default function GujaratChoroplethMap() {
 
           const slug = String(props.slug ?? "");
 
-          const count = countByName.get(name.trim().toLowerCase()) ?? 0;
+          const mappedGeoName = normalizeDistrictName(name);
+          const count = countByName.get(mappedGeoName) ?? 0;
 
           const d = pathFn(f as any) ?? "";
 

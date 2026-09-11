@@ -375,6 +375,10 @@ export default function DistrictDashboard() {
     };
   }, [navigate]);
 
+  useEffect(() => {
+    sessionStorage.setItem("last_dashboard_path", window.location.pathname);
+  }, []);
+
   // ── Resolve district boundary + display name from the URL slug ──────────
   useEffect(() => {
     if (!districtSlug) return;
@@ -811,7 +815,8 @@ export default function DistrictDashboard() {
           <TopBar
             appName={`G-TRISP · ${districtName || "District"}`}
             user={user}
-            showNotificationBell={false}
+            showNotificationBell={user?.role === "admin" || user?.role === "superadmin"}
+            adminPanelPath={user?.role === "admin" || user?.role === "superadmin" ? ROUTES.ADMIN_PANEL : undefined}
             onLogout={logout}
             sidebarOpen={sidebarOpen}
             onToggleSidebar={() => setSidebarOpen((v) => !v)}
@@ -1006,6 +1011,7 @@ export default function DistrictDashboard() {
                       weatherCondition: filters.weather_condition,
                       lightCondition: filters.light_condition,
                       collisionType: filters.collision_type,
+                      visibility: filters.visibility,
                     }}
                   />
                 ) : analysisView === "temporal" ? (

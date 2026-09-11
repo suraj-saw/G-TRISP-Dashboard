@@ -43,6 +43,7 @@ def get_risk_corridors(
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
     is_pedestrian: bool = Query(False),
     window_size_m: float = Query(500.0, description="Sliding window size in meters"),
     min_qualifying_crashes: int = Query(3, description="Minimum qualifying crashes"),
@@ -79,7 +80,8 @@ def get_risk_corridors(
         weather_condition, light_condition, collision_type,
         date_from, date_to, taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     
     if severity:

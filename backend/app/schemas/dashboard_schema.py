@@ -343,6 +343,8 @@ class FilterOptions(ResponseModel):
     years: List[int] = []
     visibilities: List[str] = []
     number_of_vehicles: List[str] = []
+    jurisdictions: List[str] = []
+    districts: List[str] = []
     
     min_date: Optional[str] = None
     max_date: Optional[str] = None

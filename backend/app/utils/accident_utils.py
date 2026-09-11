@@ -8,44 +8,144 @@ the main project's SQLAlchemy `Accident` model.
 """
 
 from datetime import datetime
+import re
 from typing import Optional, List, Union
 
-# pyrefly: ignore
-from sqlalchemy import extract, func, String
+# pyrefly: ignore [missing-import]
+from sqlalchemy import extract, func, String, Text, cast, or_
+# pyrefly: ignore [missing-import]
+from sqlalchemy.dialects.postgresql import ARRAY
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from app.models.accident import Accident
 from app.utils.taluka_utils import apply_taluka_spatial_filter
 from app.utils.datetime_utils import parse_accident_datetime_from_str
+from app.utils.district_utils import get_district_expansion_list
+
+def normalize_category_name(name: str) -> str:
+    """
+    Dynamically normalizes whitespace, slashes, and capitalization of category tokens
+    without relying on hardcoded category lists.
+    """
+    cleaned = re.sub(r"\s+", " ", name.strip().rstrip("."))
+    cleaned = re.sub(r"\s*/\s*", " / ", cleaned)
+    words = cleaned.split(" ")
+    out = []
+    for i, w in enumerate(words):
+        if i > 0 and w.lower() in ("to", "of", "in", "from", "while", "off", "down", "on", "and", "or"):
+            out.append(w.lower())
+        elif w != "/":
+            out.append(w.capitalize())
+        else:
+            out.append("/")
+    return " ".join(out)
+
+
+def split_and_clean_categories(val: Optional[Union[str, List[str]]]) -> List[str]:
+    """
+    Dynamically splits comma-separated category strings (or processes existing lists),
+    normalizes whitespace and formatting, and returns a deduplicated list of tokens derived directly from data.
+    """
+    if not val:
+        return []
+    if isinstance(val, (list, tuple, set)):
+        items_to_process = list(val)
+    else:
+        items_to_process = str(val).split(",")
+
+    results: List[str] = []
+    seen = set()
+    for part in items_to_process:
+        cleaned = str(part).strip().rstrip(".")
+        if not cleaned or cleaned.lower() in ("unknown", "nan", "none", "null", ""):
+            continue
+        normalized = normalize_category_name(cleaned)
+        norm_key = normalized.lower()
+        if norm_key not in seen:
+            seen.add(norm_key)
+            results.append(normalized)
+    return results
+
+
+# Dynamic aliases for backwards compatibility
+parse_collision_types = split_and_clean_categories
+parse_collision_natures = split_and_clean_categories
+parse_weather_conditions = split_and_clean_categories
+
+
+def get_distinct_categories(db: Session, column) -> List[str]:
+    """
+    Dynamically queries distinct values for a multi-category column from the database.
+    Leverages PostgreSQL unnest() when operating on array columns for optimal performance,
+    falling back to Python-level splitting if called on a text column.
+    """
+    try:
+        raw_rows = db.query(func.unnest(column)).filter(column.isnot(None)).distinct().all()
+        categories = set()
+        for (val,) in raw_rows:
+            if val:
+                for cat in split_and_clean_categories(val):
+                    categories.add(cat)
+        return sorted(categories)
+    except Exception:
+        db.rollback()
+        raw_rows = db.query(column).filter(column.isnot(None)).distinct().all()
+        categories = set()
+        for (val,) in raw_rows:
+            for cat in split_and_clean_categories(val):
+                categories.add(cat)
+        return sorted(categories)
+
+
+def apply_multi_category_filter(query, column, values: Optional[Union[str, List[str]]]):
+    """
+    Filters a multi-category column to match any of the selected categories.
+    Uses PostgreSQL array overlap (.overlap) when the column is an ARRAY,
+    falling back to comma boundary matching if the column is text.
+    """
+    if not values:
+        return query
+    types = values if isinstance(values, list) else [values]
+    normalized_types = []
+    for item in types:
+        item_clean = item.strip()
+        normalized_types.append(item_clean)
+        if "/" in item_clean:
+            normalized_types.append(re.sub(r"\s*/\s*", "/", item_clean))
+            normalized_types.append(re.sub(r"\s*/\s*", " / ", item_clean))
+            normalized_types.append(re.sub(r"\s*/\s*", "/ ", item_clean))
+
+    unique_tokens = list(set(normalized_types))
+
+    try:
+        # PostgreSQL native array overlap (column && ARRAY[...]::text[])
+        return query.filter(column.op("&&")(cast(unique_tokens, ARRAY(Text))))
+    except Exception:
+        # Fallback for text columns
+        conds = []
+        for v in unique_tokens:
+            conds.append(
+                or_(
+                    column == v,
+                    column.ilike(f"{v},%"),
+                    column.ilike(f"%, {v},%"),
+                    column.ilike(f"%,{v},%"),
+                    column.ilike(f"%, {v}"),
+                    column.ilike(f"%,{v}"),
+                )
+            )
+        if conds:
+            query = query.filter(or_(*conds))
+        return query
+
 
 def expand_districts(districts: list[str]) -> list[str]:
-    expanded = []
-    for d in districts:
-        expanded.append(d)
-        d_lower = d.lower()
-        if d_lower in ("ahmadabad", "ahmedabad"):
-            expanded.extend(["Ahmedabad City", "Ahmedabad Rural", "WRLY Ahmedabad"])
-        elif d_lower == "surat":
-            expanded.extend(["Surat City", "Surat Rural"])
-        elif d_lower == "vadodara":
-            expanded.extend(["Vadodara City", "Vadodara Rural", "WRLY Vadodara"])
-        elif d_lower == "rajkot":
-            expanded.extend(["Rajkot City", "Rajkot Rural"])
-        elif d_lower in ("banas kantha", "banaskantha"):
-            expanded.extend(["Banaskantha-PLNPR", "Vav-Tharad"])
-        elif d_lower in ("kachchh", "kutch", "kutchh"):
-            expanded.extend(["Kachchh East, GANDHIDHAM", "Kutchh"])
-        elif d_lower in ("panch mahals", "panchmahal"):
-            expanded.extend(["Panchmahal", "Panch Mahals"])
-        elif d_lower in ("sabar kantha", "sabarkantha"):
-            expanded.extend(["Sabarkantha", "Sabar Kantha"])
-        elif d_lower in ("devbhumi dwarka", "devbhumi dwrka"):
-            expanded.extend(["Devbhumi Dwrka", "Devbhumi Dwarka"])
-        elif d_lower == "chhotaudepur":
-            expanded.extend(["Chotaudepur", "Chhotaudepur"])
-        elif d_lower == "bhavnagar":
-            expanded.extend(["Bhavanagar", "Bhavnagar"])
-    return expanded
+    """
+    Expands a list of district names using the canonical Gujarat district registry,
+    ensuring all spelling variants, commissionerates, subdivisions, and railway police
+    jurisdictions are matched.
+    """
+    return get_district_expansion_list(districts)
 
 def apply_filters(
     query,
@@ -62,6 +162,7 @@ def apply_filters(
     police_station: Optional[Union[str, List[str]]] = None,
     number_of_vehicles: Optional[Union[str, List[str]]] = None,
     visibility=None,
+    traffic_violation: Optional[Union[str, List[str]]] = None,
 ):
     """
     Apply standard dashboard UI filters to an active SQLAlchemy query object.
@@ -118,10 +219,7 @@ def apply_filters(
             query = query.filter(Accident.road_classification == road_classification)
             
     if weather_condition:
-        if isinstance(weather_condition, list):
-            query = query.filter(Accident.weather_condition.in_(weather_condition))
-        else:
-            query = query.filter(Accident.weather_condition == weather_condition)
+        query = apply_multi_category_filter(query, Accident.weather_condition, weather_condition)
             
     if light_condition:
         if isinstance(light_condition, list):
@@ -136,11 +234,11 @@ def apply_filters(
             query = query.filter(Accident.visibility == visibility)
             
     if collision_type:
-        # Note: Internal DB field is 'type_of_collision' based on iRAD standards
-        if isinstance(collision_type, list):
-            query = query.filter(Accident.type_of_collision.in_(collision_type))
-        else:
-            query = query.filter(Accident.type_of_collision == collision_type)
+        query = apply_multi_category_filter(query, Accident.type_of_collision, collision_type)
+
+    if traffic_violation:
+        query = apply_multi_category_filter(query, Accident.traffic_violation, traffic_violation)
+
 
     if number_of_vehicles:
         if isinstance(number_of_vehicles, list):

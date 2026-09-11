@@ -66,6 +66,10 @@ export interface FilterOptions {
   number_of_vehicles: string[];
   /** Available police station options (optional) */
   police_stations?: string[];
+  /** Available jurisdiction options (optional) */
+  jurisdictions?: string[];
+  /** Available district options (optional) */
+  districts?: string[];
   /** Available severity options */
   severities: string[];
   /** Available year options */

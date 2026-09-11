@@ -164,7 +164,7 @@ const HorizontalBarSection: React.FC<{
   nameKey: string;
   fillColor: string;
 }> = ({ data, nameKey, fillColor }) => {
-  const chartData = getTopCategories(data, 10, nameKey);
+  const chartData = getTopCategories(data, 15, nameKey);
   return (
     <ChartContainer>
       <div style={{ width: "100%", height: "300px" }}>

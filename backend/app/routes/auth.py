@@ -364,6 +364,10 @@ def update_me(update_data: UserProfileUpdate, db: Session = Depends(get_db), cur
         current_user.profile.taluka = update_data.taluka
     if update_data.local_address is not None:
         current_user.profile.local_address = update_data.local_address
+    if update_data.post is not None:
+        current_user.profile.post = update_data.post
+    if update_data.police_station is not None:
+        current_user.profile.police_station = update_data.police_station
 
     db.commit()
     db.refresh(current_user)

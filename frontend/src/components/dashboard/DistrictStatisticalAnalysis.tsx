@@ -154,6 +154,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
     filters.weatherCondition,
     filters.lightCondition,
     filters.collisionType,
+    filters.visibility,
   ]);
 
   useEffect(() => {
@@ -238,15 +239,15 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
   );
 
   const processedCollisionType = useMemo(
-    () => getTopCategories(stats?.collision_type_breakdown, 6, "label"),
+    () => getTopCategories(stats?.collision_type_breakdown, undefined, "label"),
     [stats?.collision_type_breakdown]
   );
   const processedCollisionNature = useMemo(
-    () => getTopCategories(stats?.collision_nature_breakdown, 7, "label"),
+    () => getTopCategories(stats?.collision_nature_breakdown, undefined, "label"),
     [stats?.collision_nature_breakdown]
   );
   const processedWeather = useMemo(
-    () => getTopCategories(stats?.weather_breakdown, 8, "label"),
+    () => getTopCategories(stats?.weather_breakdown, undefined, "label"),
     [stats?.weather_breakdown]
   );
   const processedLight = useMemo(
@@ -365,8 +366,9 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
               title="Collision Type Distribution"
               data={processedCollisionType}
               fillColor={CHART_TEAL}
-              yAxisWidth={110}
+              yAxisWidth={130}
               fullLabels={fullLabels}
+              height={280}
             />
 
             <ChartCard title="Vehicles Involved">
@@ -374,7 +376,7 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
               stats.vehicle_involvement_breakdown.length === 0 ? (
                 <EmptyState />
               ) : (
-                <ResponsiveContainer width="100%" height={240}>
+                <ResponsiveContainer width="100%" height={280}>
                   <BarChart
                     data={stats.vehicle_involvement_breakdown}
                     margin={{ top: fullLabels ? 35 : 20, right: 15, left: -15, bottom: 5 }}
@@ -534,8 +536,9 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
               title="Weather Condition Breakdown"
               data={processedWeather}
               fillColor={CHART_BLUE}
-              yAxisWidth={110}
+              yAxisWidth={160}
               fullLabels={fullLabels}
+              height={280}
             />
             <HorizontalCategoryChartCard
               title="Light Condition Analysis"
@@ -543,17 +546,19 @@ const DistrictStatisticalAnalysis: React.FC<DistrictStatisticalAnalysisProps> = 
               fillColor={CHART_PURPLE}
               yAxisWidth={130}
               fullLabels={fullLabels}
+              height={280}
             />
           </div>
 
           {/* Row 5: Collision Nature */}
           <div className="charts-row charts-row--one">
             <HorizontalCategoryChartCard
-              title="Collision Nature Analysis (Top 10)"
+              title="Collision Nature Analysis"
               data={processedCollisionNature}
               fillColor={CHART_INDIGO}
-              yAxisWidth={150}
+              yAxisWidth={190}
               fullLabels={fullLabels}
+              height={360}
             />
           </div>
 

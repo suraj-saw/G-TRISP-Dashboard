@@ -40,6 +40,7 @@ export const toDataFilterKey = (filters: DashboardFilters): string =>
     road_classification: filters.road_classification,
     weather_condition: filters.weather_condition,
     light_condition: filters.light_condition,
+    visibility: filters.visibility,
     collision_type: filters.collision_type,
     number_of_vehicles: filters.number_of_vehicles,
     police_station: filters.police_station,

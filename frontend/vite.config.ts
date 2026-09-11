@@ -43,6 +43,15 @@ export default defineConfig(({ mode }) => {
     ],
 
     // ----------------------------------------------------------------------
+    // Dependency Optimization Settings
+    // ----------------------------------------------------------------------
+    // Prevents Vite's pre-bundler from attempting to optimize maplibre-gl's internal
+    // web workers, which causes missing 'maplibre-gl-worker.mjs' cache errors.
+    optimizeDeps: {
+      exclude: ["maplibre-gl"],
+    },
+
+    // ----------------------------------------------------------------------
     // Development Server Settings
     // ----------------------------------------------------------------------
     server: {

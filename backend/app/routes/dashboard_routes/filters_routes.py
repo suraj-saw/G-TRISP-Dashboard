@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_db
 from app.models.accident import Accident
 from app.schemas.dashboard_schema import FilterOptions, SummaryResponse
-from app.utils.accident_utils import apply_filters
+from app.utils.accident_utils import apply_filters, get_distinct_categories
 from app.core.constants import (
     SEVERITY_DAMAGE_ONLY,
     UNKNOWN_LABEL,
@@ -63,15 +63,33 @@ def get_filter_options(
         year_q = apply_taluka_spatial_filter(year_q, Accident, Accident.location, taluka, db)
     years = sorted([int(r[0]) for r in year_q.distinct().all()])
 
+    raw_districts = [
+        r[0]
+        for r in db.query(Accident.district)
+        .filter(Accident.district.isnot(None), Accident.district != "", Accident.district != "nan")
+        .distinct()
+        .all()
+    ]
+
+    def clean_jurisdiction(name: str) -> str:
+        s = name.strip()
+        if s.upper().startswith("WRLY"):
+            return "WRLY " + s[4:].strip().title()
+        return " ".join(p.capitalize() for p in s.split())
+
+    jurisdiction_options = sorted(list(set(clean_jurisdiction(d) for d in raw_districts)))
+
     return FilterOptions(
         road_classifications=distinct(Accident.road_classification),
-        weather_conditions=distinct(Accident.weather_condition),
+        weather_conditions=get_distinct_categories(db, Accident.weather_condition),
         light_conditions=distinct(Accident.light_condition),
-        collision_types=distinct(Accident.type_of_collision),
+        collision_types=get_distinct_categories(db, Accident.type_of_collision),
         police_stations=distinct(Accident.police_station),
         severities=distinct(Accident.severity),
         visibilities=distinct(Accident.visibility),
         number_of_vehicles=[str(int(r[0])) for r in db.query(Accident.number_of_vehicles).filter(Accident.number_of_vehicles.isnot(None)).distinct().order_by(Accident.number_of_vehicles).all()],
+        jurisdictions=jurisdiction_options,
+        districts=jurisdiction_options,
         years=years,
         min_date=min_dt.date().isoformat() if min_dt else None,
         max_date=max_dt.date().isoformat() if max_dt else None,

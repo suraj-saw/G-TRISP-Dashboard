@@ -60,14 +60,14 @@ export interface ProcessedDataPoint {
  */
 export const getTopCategories = (
   data: MetricDataPoint[] | undefined,
-  limit: number,
+  limit?: number,
   key: "label" | "road_type" = "label"
 ): ProcessedDataPoint[] => {
   if (!data || data.length === 0) return [];
 
   const sorted = [...data].sort((a, b) => b.count - a.count);
 
-  if (sorted.length <= limit) {
+  if (limit === undefined || sorted.length <= limit) {
     return sorted.map((item) => ({
       name: item[key] || "Unknown",
       count: item.count,
@@ -168,7 +168,8 @@ export const HorizontalCategoryChartCard: React.FC<{
   className?: string;
   yAxisWidth?: number;
   fullLabels?: boolean;
-}> = ({ title, data, fillColor, className = "", yAxisWidth = 110, fullLabels = false }) => {
+  height?: number;
+}> = ({ title, data, fillColor, className = "", yAxisWidth = 110, fullLabels = false, height = 240 }) => {
   if (!data || data.length === 0) {
     return (
       <ChartCard title={title} className={className}>
@@ -179,7 +180,7 @@ export const HorizontalCategoryChartCard: React.FC<{
 
   return (
     <ChartCard title={title} className={className}>
-      <ResponsiveContainer width="100%" height={240}>
+      <ResponsiveContainer width="100%" height={height}>
         <BarChart
           data={data}
           layout="vertical"

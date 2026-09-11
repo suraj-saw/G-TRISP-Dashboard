@@ -19,6 +19,12 @@ matplotlib.use('Agg')
 from collections import defaultdict
 from datetime import datetime
 
+from app.utils.accident_utils import (
+    parse_collision_types,
+    parse_collision_natures,
+    parse_weather_conditions,
+)
+
 # Standardized color palette for consistent dashboard UI
 CHART_BLUE = "#3b82f6"
 CHART_TEAL = "#14b8a6"
@@ -193,8 +199,8 @@ def generate_all_charts(accidents: list) -> dict:
     # 3. Collision Type (H-Bar)
     ct_counts = defaultdict(int)
     for a in accidents:
-        ct = getattr(a, "type_of_collision", "Unknown") or "Unknown"
-        ct_counts[ct] += 1
+        for ct in parse_collision_types(getattr(a, "type_of_collision", None)):
+            ct_counts[ct] += 1
     charts["collision_type"] = _plot_horizontal_bar(ct_counts, "Collision Type Distribution", CHART_TEAL)
     
     # 4. Vehicles Involved (V-Bar)
@@ -210,8 +216,8 @@ def generate_all_charts(accidents: list) -> dict:
     # 5. Weather Condition (H-Bar)
     wc_counts = defaultdict(int)
     for a in accidents:
-        wc = getattr(a, "weather_condition", "Unknown") or "Unknown"
-        wc_counts[wc] += 1
+        for wc in parse_weather_conditions(getattr(a, "weather_condition", None)):
+            wc_counts[wc] += 1
     charts["weather"] = _plot_horizontal_bar(wc_counts, "Weather Condition Breakdown", CHART_BLUE)
     
     # 6. Light Condition (H-Bar)
@@ -224,8 +230,9 @@ def generate_all_charts(accidents: list) -> dict:
     # 7. Collision Nature (H-Bar)
     cn_counts = defaultdict(int)
     for a in accidents:
-        cn = getattr(a, "nature_of_accident", "Unknown") or "Unknown"
-        cn_counts[cn] += 1
+        feat = getattr(a, "collision_feature", None) or getattr(a, "nature_of_accident", None)
+        for cn in parse_collision_natures(feat):
+            cn_counts[cn] += 1
     charts["collision_nature"] = _plot_horizontal_bar(cn_counts, "Collision Nature Analysis", CHART_INDIGO)
     
     import calendar

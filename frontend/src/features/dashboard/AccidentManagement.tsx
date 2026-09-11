@@ -13,6 +13,8 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Loader2,
   AlertCircle,
   FileSpreadsheet,
@@ -20,6 +22,12 @@ import {
   X,
   Filter,
   ChevronDown,
+  Layers,
+  HelpCircle,
+  Tags,
+  Check,
+  CheckSquare,
+  CheckCheck,
 } from "lucide-react";
 import {
   adminAccidentsApi,
@@ -43,7 +51,7 @@ interface ColumnDef {
 }
 
 const ALL_COLUMNS: ColumnDef[] = [
-  { key: "status", label: "Status", group: "Identification", defaultVisible: true, width: 140, filterable: false, type: "text" },
+  { key: "status", label: "Status", group: "Identification", defaultVisible: true, width: 155, filterable: false, type: "text" },
   { key: "accident_id", label: "Accident ID", group: "Identification", defaultVisible: true, width: 180, filterable: false, type: "text" },
   { key: "district", label: "District", group: "Identification", defaultVisible: true, width: 120, filterable: true, type: "text" },
   { key: "police_station", label: "Police Station", group: "Identification", defaultVisible: true, width: 160, filterable: true, type: "text" },
@@ -116,6 +124,135 @@ function getShortReason(reason: string | null | undefined): string {
 }
 
 /**
+ * Detects and returns names of columns that contain multiple categories.
+ */
+function getMultiCategoryColumns(acc: AccidentRecord): string[] {
+  if (acc.multi_category_columns && acc.multi_category_columns.length > 0) {
+    return acc.multi_category_columns;
+  }
+  const cols: string[] = [];
+  const check = (val: string | null | undefined, name: string) => {
+    if (val && val.includes(",")) cols.push(name);
+  };
+  check(acc.type_of_collision, "Collision Type");
+  check(acc.collision_feature, "Collision Feature");
+  check(acc.weather_condition, "Weather Condition");
+  check(acc.traffic_violation, "Traffic Violation");
+  return cols;
+}
+
+const BLANK_COLUMNS_CONFIG: { key: keyof AccidentRecord; label: string }[] = [
+  { key: "police_station", label: "Police Station" },
+  { key: "accident_date_time", label: "Date & Time" },
+  { key: "road_name", label: "Road Name" },
+  { key: "road_classification", label: "Road Classification" },
+  { key: "landmark_name", label: "Landmark Name" },
+  { key: "type_of_collision", label: "Collision Type" },
+  { key: "collision_feature", label: "Collision Nature" },
+  { key: "weather_condition", label: "Weather" },
+  { key: "light_condition", label: "Light Condition" },
+  { key: "visibility", label: "Visibility" },
+  { key: "traffic_violation", label: "Traffic Violation" },
+];
+
+function isBlankField(val: any): boolean {
+  if (val === null || val === undefined) return true;
+  if (Array.isArray(val)) {
+    const cleaned = val.filter(
+      (x) => x !== null && x !== undefined && String(x).trim() !== "" && String(x).trim() !== "-"
+    );
+    return cleaned.length === 0;
+  }
+  const s = String(val).trim();
+  return s === "" || s === "-" || s.toLowerCase() === "nan" || s.toLowerCase() === "null";
+}
+
+function getBlankColumns(acc: AccidentRecord): string[] {
+  if (acc.blank_columns && acc.blank_columns.length > 0) {
+    return acc.blank_columns;
+  }
+  return BLANK_COLUMNS_CONFIG
+    .filter((col) => isBlankField(acc[col.key]))
+    .map((col) => col.label);
+}
+
+interface StatusBadgeInfo {
+  label: string;
+  tooltip: string;
+  isAttention: boolean;
+  type: "valid" | "multi_category" | "blank_fields" | "multi_status" | "attention";
+}
+
+function getRecordStatusInfo(acc: AccidentRecord): StatusBadgeInfo {
+  const activeStatuses: { title: string; detail?: string; isAttention: boolean }[] = [];
+
+  // 1. Attention / Invalidation reasons
+  if (acc.requires_attention) {
+    activeStatuses.push({
+      title: getShortReason(acc.invalidation_reasons),
+      detail: acc.invalidation_reasons || "Requires Review",
+      isAttention: true,
+    });
+  }
+
+  // 2. Multiple categories
+  const multiCols = getMultiCategoryColumns(acc);
+  if (multiCols.length > 0) {
+    activeStatuses.push({
+      title: "Multi Category",
+      detail: `Multiple categories in: ${multiCols.join(", ")}`,
+      isAttention: false,
+    });
+  }
+
+  // 3. Blank fields in specified 11 columns
+  const blankCols = getBlankColumns(acc);
+  if (blankCols.length > 0) {
+    activeStatuses.push({
+      title: "Blank Fields",
+      detail: `Blank in: ${blankCols.join(", ")}`,
+      isAttention: false,
+    });
+  }
+
+  if (activeStatuses.length === 0) {
+    return {
+      label: "Valid",
+      tooltip: "Valid record (included in visualizations)",
+      isAttention: false,
+      type: "valid",
+    };
+  }
+
+  if (activeStatuses.length === 1) {
+    const s = activeStatuses[0];
+    let type: StatusBadgeInfo["type"] = "attention";
+    if (s.title === "Multi Category") type = "multi_category";
+    else if (s.title === "Blank Fields") type = "blank_fields";
+
+    return {
+      label: s.title,
+      tooltip: s.detail || s.title,
+      isAttention: s.isAttention,
+      type,
+    };
+  }
+
+  // Multiple statuses active
+  const hasAttention = activeStatuses.some((s) => s.isAttention);
+  const tooltipDetails = activeStatuses
+    .map((s) => (s.detail ? s.detail : s.title))
+    .join(" • ");
+
+  return {
+    label: "Multi Status",
+    tooltip: `Multiple statuses active: ${tooltipDetails}`,
+    isAttention: hasAttention,
+    type: "multi_status",
+  };
+}
+
+/**
  * AccidentManagement Component
  * @component_responsibility Manages the state and rendering of the primary accident data table, including fetching data, filtering, column visibility, and row selection.
  * @state_management Uses complex local state for pagination, debounced search, active filters, selected rows, and visible columns.
@@ -126,8 +263,10 @@ export default function AccidentManagement() {
   const [accidents, setAccidents] = useState<AccidentRecord[]>([]);
   const [activeFilterCount, setActiveFilterCount] = useState(0);
 
-  // Status Filter for requires_attention
-  const [statusFilter, setStatusFilter] = useState<"all" | "valid" | "duplicate" | "district_mismatch" | "outside_state">("all");
+  // Status Filter for requires_attention, blanks & category cardinality
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "valid" | "multiple_categories" | "blank_fields" | "multi_status" | "duplicate" | "district_mismatch" | "outside_state"
+  >("all");
 
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -171,6 +310,9 @@ export default function AccidentManagement() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<number[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
+  const [selectionMenuOpen, setSelectionMenuOpen] = useState(false);
+  const selectionMenuRef = useRef<HTMLDivElement>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   // Debounce global search
@@ -182,11 +324,14 @@ export default function AccidentManagement() {
     return () => clearTimeout(handler);
   }, [globalSearch]);
 
-  // Close column menu on outside click
+  // Close menus on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (columnMenuRef.current && !columnMenuRef.current.contains(e.target as Node)) {
         setColumnMenuOpen(false);
+      }
+      if (selectionMenuRef.current && !selectionMenuRef.current.contains(e.target as Node)) {
+        setSelectionMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -263,23 +408,56 @@ export default function AccidentManagement() {
   const somePageSelected = pageIds.some((id) => selectedIds.has(id));
   const selectedOnPageCount = pageIds.filter((id) => selectedIds.has(id)).length;
   const selectedOnOtherPages = selectedIds.size - selectedOnPageCount;
+  const isAllMatchingSelected = total > 0 && selectedIds.size >= total;
 
   useEffect(() => {
     if (selectAllRef.current) {
-      selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
+      if (isAllMatchingSelected) {
+        selectAllRef.current.indeterminate = false;
+      } else {
+        selectAllRef.current.indeterminate =
+          (somePageSelected && !allPageSelected) ||
+          (selectedIds.size > 0 && !allPageSelected);
+      }
     }
-  }, [somePageSelected, allPageSelected]);
+  }, [somePageSelected, allPageSelected, isAllMatchingSelected, selectedIds.size]);
+
+  const handleSelectAllMatching = async () => {
+    if (total === 0) return;
+    setIsSelectingAll(true);
+    try {
+      let recordStatusQuery: string | undefined = undefined;
+      if (statusFilter !== "all") {
+        recordStatusQuery = statusFilter;
+      }
+      const res = await adminAccidentsApi.getAccidentIds(debouncedSearch, {
+        ...columnFilters,
+        record_status: recordStatusQuery,
+      });
+      setSelectedIds(new Set(res.ids));
+    } catch {
+      alert("Failed to select all records.");
+    } finally {
+      setIsSelectingAll(false);
+    }
+  };
 
   const toggleSelectAll = () => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (allPageSelected) {
+    if (isAllMatchingSelected) {
+      setSelectedIds(new Set());
+    } else if (allPageSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
         pageIds.forEach((id) => next.delete(id));
-      } else {
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
         pageIds.forEach((id) => next.add(id));
-      }
-      return next;
-    });
+        return next;
+      });
+    }
   };
 
   const toggleSelectRow = (id: number) => {
@@ -337,6 +515,24 @@ export default function AccidentManagement() {
   const visibleCols = ALL_COLUMNS.filter((c) => visibleColumns.has(c.key));
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(skip / limit) + 1;
+
+  const [pageInput, setPageInput] = useState<string>(String(currentPage));
+
+  useEffect(() => {
+    setPageInput(String(currentPage));
+  }, [currentPage]);
+
+  const handlePageInputCommit = () => {
+    const pageNum = parseInt(pageInput, 10);
+    if (isNaN(pageNum) || pageNum < 1) {
+      setPageInput(String(currentPage));
+      return;
+    }
+    const maxPage = Math.max(1, totalPages);
+    const targetPage = Math.min(Math.max(1, pageNum), maxPage);
+    setPageInput(String(targetPage));
+    setSkip((targetPage - 1) * limit);
+  };
 
   const formatCellValue = (col: ColumnDef, value: any): React.ReactNode => {
     if (value === null || value === undefined || value === "") return <span className="text-slate-300">—</span>;
@@ -462,11 +658,6 @@ export default function AccidentManagement() {
               )}
             </AnimatePresence>
           </div>
-
-          {/* Record count */}
-          <span className="text-xs text-slate-400 ml-auto shrink-0">
-            {total.toLocaleString()} records
-          </span>
         </div>
 
         {/* Row 2: Column filters (collapsible) */}
@@ -488,6 +679,9 @@ export default function AccidentManagement() {
                   >
                     <option value="all">All Records</option>
                     <option value="valid">Valid Records</option>
+                    <option value="multiple_categories">Multiple Categories</option>
+                    <option value="blank_fields">Blank Fields</option>
+                    <option value="multi_status">Multi Status</option>
                     <option value="duplicate">Duplicate</option>
                     <option value="district_mismatch">District Mismatch</option>
                     <option value="outside_state">Outside State</option>
@@ -540,29 +734,68 @@ export default function AccidentManagement() {
         </AnimatePresence>
 
         {selectedIds.size > 0 && (
-          <div className="flex items-center gap-2 flex-wrap px-1 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg">
-            <span className="text-xs font-semibold text-indigo-700">
-              {selectedIds.size} selected
-              {selectedOnOtherPages > 0 && (
-                <span className="font-normal text-indigo-500">
-                  {" "}({selectedOnPageCount} on this page, {selectedOnOtherPages} on other pages)
-                </span>
+          <div className="flex items-center justify-between gap-3 flex-wrap px-3 py-2 bg-indigo-50/90 border border-indigo-200 rounded-xl shadow-xs">
+            <div className="flex items-center gap-2.5 flex-wrap text-xs">
+              <span className="font-bold text-indigo-900">
+                {isAllMatchingSelected ? (
+                  <span className="inline-flex items-center gap-1.5 text-indigo-950 font-bold">
+                    <CheckCheck className="w-4 h-4 text-indigo-600 shrink-0" />
+                    All {total.toLocaleString()} {activeFilterCount > 0 || debouncedSearch ? "filtered " : ""}records selected
+                  </span>
+                ) : (
+                  <span>
+                    <span className="text-indigo-950">{selectedIds.size.toLocaleString()} selected</span>
+                    {selectedOnOtherPages > 0 ? (
+                      <span className="font-normal text-indigo-600 ml-1">
+                        ({selectedOnPageCount} on this page, {selectedOnOtherPages.toLocaleString()} on other pages)
+                      </span>
+                    ) : (
+                      selectedOnPageCount === pageIds.length && total > pageIds.length && (
+                        <span className="font-normal text-indigo-600 ml-1">
+                          (all {pageIds.length} on this page)
+                        </span>
+                      )
+                    )}
+                  </span>
+                )}
+              </span>
+
+              {/* One-click button to select all records across all pages */}
+              {!isAllMatchingSelected && total > selectedIds.size && (
+                <button
+                  type="button"
+                  onClick={handleSelectAllMatching}
+                  disabled={isSelectingAll}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold text-indigo-700 bg-white hover:bg-indigo-100/70 border border-indigo-300 shadow-xs hover:text-indigo-900 transition-all cursor-pointer"
+                >
+                  {isSelectingAll ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                  ) : (
+                    <CheckSquare className="w-3.5 h-3.5 text-indigo-600" />
+                  )}
+                  Select all {total.toLocaleString()} {activeFilterCount > 0 || debouncedSearch ? "filtered " : ""}records
+                </button>
               )}
-            </span>
-            <button
-              onClick={() => handleDeleteRequest(Array.from(selectedIds))}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 transition-colors"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Delete selected
-            </button>
-            <button
-              onClick={() => setSelectedIds(new Set())}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
-            >
-              <X className="w-3 h-3" />
-              Clear selection
-            </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleDeleteRequest(Array.from(selectedIds))}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 shadow-xs transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete selected ({selectedIds.size.toLocaleString()})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-indigo-100/60 transition-colors cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                Clear selection
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -589,16 +822,81 @@ export default function AccidentManagement() {
         <table className="w-full text-sm text-left whitespace-nowrap">
           <thead className="bg-slate-100/80 text-slate-600 font-semibold uppercase text-[11px] tracking-wider sticky top-0 z-20">
             <tr>
-              <th className="py-2.5 px-3 border-b border-slate-200 w-10 sticky left-0 bg-slate-100/90 z-30">
-                <input
-                  ref={selectAllRef}
-                  type="checkbox"
-                  checked={allPageSelected}
-                  onChange={toggleSelectAll}
-                  disabled={accidents.length === 0}
-                  className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20"
-                  title="Select all on this page"
-                />
+              <th className="py-2.5 px-3 border-b border-slate-200 w-14 sticky left-0 bg-slate-100/90 z-30">
+                <div className="relative inline-flex items-center gap-0.5" ref={selectionMenuRef}>
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={isAllMatchingSelected || allPageSelected}
+                    onChange={toggleSelectAll}
+                    disabled={accidents.length === 0}
+                    className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 cursor-pointer"
+                    title={
+                      isAllMatchingSelected
+                        ? "All matching records selected (click to clear)"
+                        : allPageSelected
+                        ? "All on page selected (click to deselect page)"
+                        : "Select all on this page"
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSelectionMenuOpen(!selectionMenuOpen)}
+                    className="p-0.5 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-200 transition-colors cursor-pointer"
+                    title="Selection options"
+                  >
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+
+                  {selectionMenuOpen && (
+                    <div className="absolute left-0 top-full mt-1 w-52 bg-white rounded-lg border border-slate-200 shadow-xl z-40 p-1 text-xs normal-case tracking-normal">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            pageIds.forEach((id) => next.add(id));
+                            return next;
+                          });
+                          setSelectionMenuOpen(false);
+                        }}
+                        className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 flex items-center justify-between font-medium cursor-pointer"
+                      >
+                        <span>Select this page</span>
+                        <span className="text-[11px] text-slate-400">({pageIds.length})</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleSelectAllMatching();
+                          setSelectionMenuOpen(false);
+                        }}
+                        disabled={isSelectingAll || total === 0}
+                        className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 flex items-center justify-between font-medium cursor-pointer"
+                      >
+                        <span>Select all matching</span>
+                        <span className="text-[11px] text-indigo-600 font-semibold">({total.toLocaleString()})</span>
+                      </button>
+
+                      {selectedIds.size > 0 && (
+                        <>
+                          <div className="my-1 border-t border-slate-100" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedIds(new Set());
+                              setSelectionMenuOpen(false);
+                            }}
+                            className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-rose-50 text-rose-600 font-medium cursor-pointer"
+                          >
+                            Clear selection
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </th>
               {visibleCols.map((col) => (
                 <th
@@ -662,21 +960,38 @@ export default function AccidentManagement() {
                     title={String((acc as any)[col.key] ?? "")}
                   >
                     <div className="truncate flex items-center gap-2">
-                      {col.key === "status" ? (
-                        acc.requires_attention ? (
+                      {col.key === "status" ? (() => {
+                        const info = getRecordStatusInfo(acc);
+                        if (info.isAttention) {
+                          return (
+                            <div
+                              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200 shadow-sm cursor-help w-full"
+                              title={info.tooltip}
+                            >
+                              <AlertCircle className="w-3 h-3 shrink-0" />
+                              <span className="truncate">{info.label}</span>
+                            </div>
+                          );
+                        }
+
+                        // Valid records (used in visualization) styled in green
+                        let Icon = Check;
+                        if (info.type === "multi_category") Icon = Layers;
+                        else if (info.type === "blank_fields") Icon = HelpCircle;
+                        else if (info.type === "multi_status") Icon = Tags;
+
+                        return (
                           <div
-                            className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200 shadow-sm cursor-help w-full"
-                            title={acc.invalidation_reasons || "Requires Review"}
+                            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-sm ${
+                              info.label !== "Valid" ? "cursor-help" : ""
+                            } w-full`}
+                            title={info.tooltip}
                           >
-                            <AlertCircle className="w-3 h-3 shrink-0" />
-                            <span className="truncate">{getShortReason(acc.invalidation_reasons)}</span>
+                            <Icon className="w-3 h-3 shrink-0 text-emerald-600" />
+                            <span className="truncate">{info.label}</span>
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 border border-emerald-200">
-                            <span>Valid</span>
-                          </div>
-                        )
-                      ) : (
+                        );
+                      })() : (
                         formatCellValue(col, (acc as any)[col.key])
                       )}
                     </div>
@@ -715,24 +1030,66 @@ export default function AccidentManagement() {
           {" "}of{" "}
           <span className="font-bold text-slate-800">{total.toLocaleString()}</span>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => skip >= limit && setSkip(skip - limit)}
-            disabled={skip === 0}
-            className="p-1 rounded-md hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span className="px-2 text-xs font-medium">
-            {currentPage} / {Math.max(1, totalPages)}
-          </span>
-          <button
-            onClick={() => skip + limit < total && setSkip(skip + limit)}
-            disabled={skip + limit >= total}
-            className="p-1 rounded-md hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => setSkip(0)}
+              disabled={skip === 0}
+              title="First page"
+              className="p-1.5 rounded-md hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600 transition-colors cursor-pointer"
+            >
+              <ChevronsLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => skip >= limit && setSkip(skip - limit)}
+              disabled={skip === 0}
+              title="Previous page"
+              className="p-1.5 rounded-md hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600 transition-colors cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
+            <span>Page</span>
+            <input
+              type="number"
+              min={1}
+              max={Math.max(1, totalPages)}
+              value={pageInput}
+              onChange={(e) => setPageInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handlePageInputCommit();
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              onBlur={handlePageInputCommit}
+              aria-label="Direct page number input"
+              title="Type a page number and press Enter"
+              className="w-12 px-1.5 py-1 text-center bg-white border border-slate-300 rounded-md text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <span className="text-slate-500">of {Math.max(1, totalPages)}</span>
+          </div>
+
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => skip + limit < total && setSkip(skip + limit)}
+              disabled={skip + limit >= total}
+              title="Next page"
+              className="p-1.5 rounded-md hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600 transition-colors cursor-pointer"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setSkip((Math.max(1, totalPages) - 1) * limit)}
+              disabled={skip + limit >= total}
+              title="Last page"
+              className="p-1.5 rounded-md hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600 transition-colors cursor-pointer"
+            >
+              <ChevronsRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 

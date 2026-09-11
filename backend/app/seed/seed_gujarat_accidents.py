@@ -35,6 +35,12 @@ from app.core.config import POSTGIS_SRID
 from app.core.constants import NULL_TEXT_SENTINEL, DEFAULT_SEED_BATCH_SIZE
 from app.utils.datetime_utils import parse_accident_datetime
 from app.utils.coordinate_validator import validate_coordinates_batch
+from app.utils.accident_utils import split_and_clean_categories
+from app.utils.district_utils import (
+    get_canonical_district,
+    is_same_district,
+    is_railway_police,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -148,24 +154,25 @@ def _load_dataset(path: Path) -> pd.DataFrame:
 def _get_official_district(raw_name: str | None, official_districts: list[str]) -> str | None:
     if not raw_name:
         return None
-    clean = str(raw_name).strip().replace("-", " ")
-    
-    # Hardcoded overrides for specific files
-    clean_lower_override = clean.lower()
-    if "vav tharad" in clean_lower_override or "banaskantha" in clean_lower_override:
-        return "BANAS KANTHA"
-    if "wrly vadodara" in clean_lower_override:
-        return "VADODARA"
 
+    # 1. High-accuracy canonical resolution
+    canon = get_canonical_district(raw_name)
+    if canon and canon in official_districts:
+        return canon
+
+    clean = str(raw_name).strip().replace("-", " ")
     clean = clean.replace(" City", "").replace(" Rural", "").replace(" District", "")
-    
-    # Do case-insensitive fuzzy matching
+
+    canon_clean = get_canonical_district(clean)
+    if canon_clean and canon_clean in official_districts:
+        return canon_clean
+
+    # 2. Case-insensitive fuzzy matching fallback
     clean_lower = clean.lower()
     official_lower = [d.lower() for d in official_districts]
-    
+
     matches = difflib.get_close_matches(clean_lower, official_lower, n=1, cutoff=0.3)
     if matches:
-        # Return the original case from the official list by finding its index
         idx = official_lower.index(matches[0])
         return official_districts[idx]
     return None
@@ -204,12 +211,12 @@ def _build_accident(row, official_district: str, seen_records: set[tuple[str, st
         pedestrian_minor_injury    = _clean_int_zero(row.get("pedestrian_minor_injury")),
         pedestrian_no_injury       = _clean_int_zero(row.get("pedestrian_no_injury")),
 
-        type_of_collision = _clean_text(row.get("type_of_collision")),
-        collision_feature = _clean_text(row.get("collision_feature")),
-        weather_condition = _clean_text(row.get("weather_condition")),
+        type_of_collision = split_and_clean_categories(row.get("type_of_collision")) or None,
+        collision_feature = split_and_clean_categories(row.get("collision_feature")) or None,
+        weather_condition = split_and_clean_categories(row.get("weather_condition")) or None,
         light_condition   = _clean_text(row.get("light_condition")),
         visibility        = _clean_text(row.get("visibility")),
-        traffic_violation = _clean_text(row.get("traffic_violation")),
+        traffic_violation = split_and_clean_categories(row.get("traffic_violation")) or None,
         accident_description = _clean_text(row.get("accident_description")),
         
         is_duplicate = is_duplicate,
@@ -249,17 +256,32 @@ def _validate_coordinates(df: pd.DataFrame, db: Session, default_district: str) 
     df["coord_reason"] = coord_reasons
 
     reported_districts = [res.matched_district for res in results] if results else []
+    candidates_list = [res.candidate_districts for res in results] if results else []
     mismatches = 0
     if reported_districts:
         for idx, reported_dist in enumerate(reported_districts):
             if is_valid_list[idx] and reported_dist:
-                dist = default_district
-                if dist and dist.lower() != reported_dist.lower():
-                    # Allow Ahmadabad/Ahmedabad spelling variant
-                    if not (dist.lower() == 'ahmadabad' and reported_dist.lower() == 'ahmedabad'):
-                        is_valid_series.iloc[idx] = False
-                        coord_reasons[idx] = f"District Mismatch (coordinate falls in {reported_dist}, claimed {dist})"
-                        mismatches += 1
+                # Row-level claimed district takes precedence if present, else default_district
+                row_dist = df.at[idx, "district"] if "district" in df.columns else None
+                dist = str(row_dist).strip() if pd.notna(row_dist) and str(row_dist).strip() else default_district
+
+                # Railway police jurisdictions traverse across multiple districts - not a geographic mismatch
+                if is_railway_police(dist) or is_railway_police(default_district):
+                    continue
+
+                # Check if reported district matches claimed district canonically
+                if is_same_district(dist, reported_dist) or is_same_district(default_district, reported_dist):
+                    continue
+
+                # Check if point lies on border tolerance and matches any candidate district
+                candidates = candidates_list[idx] if idx < len(candidates_list) else []
+                if any(is_same_district(dist, cand) or is_same_district(default_district, cand) for cand in candidates):
+                    continue
+
+                # Definite geographic mismatch
+                is_valid_series.iloc[idx] = False
+                coord_reasons[idx] = f"District Mismatch (coordinate falls in {reported_dist}, claimed {dist})"
+                mismatches += 1
 
     # Re-sync after district mismatch updates
     df["is_valid_coordinates"] = is_valid_series

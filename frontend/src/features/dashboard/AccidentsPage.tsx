@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -41,6 +41,7 @@ type SessionStatus = "checking" | "active" | "kicked";
  */
 export default function AccidentsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [user, setUser] = useState<User | null>(null);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
@@ -186,7 +187,16 @@ export default function AccidentsPage() {
             <motion.button
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
-              onClick={() => navigate(ROUTES.ADMIN_PANEL)}
+              onClick={() =>
+                navigate(ROUTES.ADMIN_PANEL, {
+                  state: {
+                    from:
+                      (location.state as any)?.from ||
+                      sessionStorage.getItem("last_dashboard_path") ||
+                      ROUTES.STATE_DASHBOARD,
+                  },
+                })
+              }
               className="p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-indigo-700 hover:border-indigo-200 hover:shadow-sm transition-all"
               title="Back to Admin Panel"
             >

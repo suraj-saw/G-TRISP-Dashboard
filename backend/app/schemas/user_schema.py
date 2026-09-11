@@ -115,6 +115,8 @@ class UserProfileBase(BaseModel):
     district: Optional[str] = None
     taluka: Optional[str] = None
     local_address: Optional[str] = None
+    post: Optional[str] = None
+    police_station: Optional[str] = None
 
 class UserProfileUpdate(BaseModel):
     """
@@ -127,6 +129,8 @@ class UserProfileUpdate(BaseModel):
     district: Optional[str] = None
     taluka: Optional[str] = None
     local_address: Optional[str] = None
+    post: Optional[str] = None
+    police_station: Optional[str] = None
     
     @field_validator("username")
     @classmethod

@@ -19,6 +19,8 @@ from geoalchemy2.shape import from_shape
 # pyrefly: ignore [missing-import]
 from shapely.geometry import Point
 # pyrefly: ignore [missing-import]
+from sqlalchemy import func
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 from app.core.config import POSTGIS_SRID
@@ -27,6 +29,16 @@ from app.core.dependencies import get_db, get_current_admin_user
 # pyrefly: ignore [missing-import]
 from app.models.accident import Accident
 from app.models.user import User
+from app.utils.accident_utils import (
+    get_distinct_categories,
+    split_and_clean_categories,
+    apply_multi_category_filter,
+)
+from app.utils.district_utils import (
+    is_same_district,
+    is_railway_police,
+    get_canonical_district,
+)
 
 
 router = APIRouter(
@@ -139,14 +151,8 @@ def _validate_import_row(row: Dict[str, Any]) -> List[str]:
 
 
 def _normalize_district_for_match(district_name: str) -> str:
-    if not district_name:
-        return ""
-    d = str(district_name).lower()
-    if "western railway ahmedabad" in d:
-        return "ahmedabad"
-    if "wstn rly vadodara" in d or "wrly vadodara" in d:
-        return "vadodara"
-    return d.replace(" city", "").replace(" rural", "").replace(" district", "").strip()
+    canon = get_canonical_district(district_name)
+    return canon.lower() if canon else str(district_name).strip().lower()
 
 
 def _coerce_import_record(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -187,6 +193,57 @@ def _row_to_response(row: Dict[str, Any]) -> Dict[str, Any]:
 def _record_to_dict(record: Accident) -> Dict[str, Any]:
     row = {c.name: getattr(record, c.name) for c in record.__table__.columns}
     row.pop("location", None)
+
+    # Detect columns with multiple categories
+    field_labels = {
+        "type_of_collision": "Collision Type",
+        "collision_feature": "Collision Feature",
+        "weather_condition": "Weather Condition",
+        "traffic_violation": "Traffic Violation",
+    }
+    multi_category_columns = []
+    for col_key, label in field_labels.items():
+        val = row.get(col_key)
+        if isinstance(val, (list, tuple, set)) and len(val) > 1:
+            multi_category_columns.append(label)
+
+    row["has_multiple_categories"] = len(multi_category_columns) > 0
+    row["multi_category_columns"] = multi_category_columns
+
+    # Detect blank columns among the specified 11 columns
+    blank_field_labels = {
+        "police_station": "Police Station",
+        "accident_date_time": "Date & Time",
+        "road_name": "Road Name",
+        "road_classification": "Road Classification",
+        "landmark_name": "Landmark Name",
+        "type_of_collision": "Collision Type",
+        "collision_feature": "Collision Nature",
+        "weather_condition": "Weather",
+        "light_condition": "Light Condition",
+        "visibility": "Visibility",
+        "traffic_violation": "Traffic Violation",
+    }
+    blank_columns = []
+    for col_key, label in blank_field_labels.items():
+        val = row.get(col_key)
+        if val is None:
+            blank_columns.append(label)
+        elif isinstance(val, (list, tuple, set)):
+            cleaned = [x for x in val if x is not None and str(x).strip() not in ("", "-", "nan", "null", "none", "None")]
+            if len(cleaned) == 0:
+                blank_columns.append(label)
+        else:
+            if str(val).strip() in ("", "-", "nan", "null", "none", "None", "NaN"):
+                blank_columns.append(label)
+
+    row["has_blank_fields"] = len(blank_columns) > 0
+    row["blank_columns"] = blank_columns
+
+    for col in ("type_of_collision", "collision_feature", "weather_condition", "traffic_violation"):
+        val = row.get(col)
+        if isinstance(val, (list, tuple, set)):
+            row[col] = ", ".join(str(x) for x in val if x)
     return row
 
 
@@ -218,9 +275,9 @@ def get_accident_filter_options(
         "police_stations": _distinct_values(db, Accident.police_station),
         "districts": _distinct_values(db, Accident.district),
         "road_names": _distinct_values(db, Accident.road_name),
-        "collision_types": _distinct_values(db, Accident.type_of_collision),
-        "collision_features": _distinct_values(db, Accident.collision_feature),
-        "weather_conditions": _distinct_values(db, Accident.weather_condition),
+        "collision_types": get_distinct_categories(db, Accident.type_of_collision),
+        "collision_features": get_distinct_categories(db, Accident.collision_feature),
+        "weather_conditions": get_distinct_categories(db, Accident.weather_condition),
         "light_conditions": _distinct_values(db, Accident.light_condition),
         "visibilities": _distinct_values(db, Accident.visibility),
     }
@@ -270,14 +327,15 @@ def add_accident(
                 invalidation_reasons.append("Validation Error")
         else:
             reported_dist = coord_res.matched_district
-            if reported_dist:
-                clean_provided = _normalize_district_for_match(district)
-                clean_reported = _normalize_district_for_match(reported_dist)
-                if clean_reported != clean_provided:
-                    if not (clean_provided == 'ahmadabad' and clean_reported == 'ahmedabad'):
-                        is_valid_coordinates = False
-                        requires_attention = True
-                        invalidation_reasons.append("District Mismatch")
+            if reported_dist and not is_railway_police(district):
+                candidates = getattr(coord_res, "candidate_districts", []) or []
+                is_match = is_same_district(district, reported_dist) or any(
+                    is_same_district(district, cand) for cand in candidates
+                )
+                if not is_match:
+                    is_valid_coordinates = False
+                    requires_attention = True
+                    invalidation_reasons.append("District Mismatch")
 
     row = _coerce_import_record({**payload, "accident_id": accident_id, "district": district})
     record = Accident(
@@ -304,12 +362,12 @@ def add_accident(
         pedestrian_grievous_injury=row.get("pedestrian_grievous_injury"),
         pedestrian_minor_injury=row.get("pedestrian_minor_injury"),
         pedestrian_no_injury=row.get("pedestrian_no_injury"),
-        type_of_collision=row.get("type_of_collision"),
-        collision_feature=row.get("collision_feature"),
-        weather_condition=row.get("weather_condition"),
+        type_of_collision=split_and_clean_categories(row.get("type_of_collision")) or None,
+        collision_feature=split_and_clean_categories(row.get("collision_feature")) or None,
+        weather_condition=split_and_clean_categories(row.get("weather_condition")) or None,
         light_condition=row.get("light_condition"),
         visibility=row.get("visibility"),
-        traffic_violation=row.get("traffic_violation"),
+        traffic_violation=split_and_clean_categories(row.get("traffic_violation")) or None,
         is_valid_coordinates=is_valid_coordinates,
         requires_attention=requires_attention,
         is_duplicate=is_duplicate,
@@ -324,6 +382,123 @@ def add_accident(
         "id": record.id,
         "accident_id": record.accident_id,
     }
+
+
+def _build_accidents_query(
+    db: Session,
+    search: Optional[str] = None,
+    district: Optional[str] = None,
+    police_station: Optional[str] = None,
+    severity: Optional[str] = None,
+    road_name: Optional[str] = None,
+    road_classification: Optional[str] = None,
+    type_of_collision: Optional[str] = None,
+    weather_condition: Optional[str] = None,
+    light_condition: Optional[str] = None,
+    visibility: Optional[str] = None,
+    traffic_violation: Optional[str] = None,
+    collision_feature: Optional[str] = None,
+    record_status: Optional[str] = None,
+):
+    query = db.query(Accident)
+
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            (Accident.accident_id.ilike(pattern))
+            | (Accident.police_station.ilike(pattern))
+            | (Accident.road_name.ilike(pattern))
+            | (Accident.district.ilike(pattern))
+            | (Accident.severity.ilike(pattern))
+            | (func.array_to_string(Accident.type_of_collision, ", ").ilike(pattern))
+            | (func.array_to_string(Accident.collision_feature, ", ").ilike(pattern))
+            | (func.array_to_string(Accident.weather_condition, ", ").ilike(pattern))
+            | (func.array_to_string(Accident.traffic_violation, ", ").ilike(pattern))
+        )
+
+    if record_status:
+        if record_status == "valid":
+            query = query.filter(Accident.requires_attention == False)
+        elif record_status == "duplicate":
+            query = query.filter((Accident.is_duplicate == True) | (Accident.invalidation_reasons.ilike("%Duplicate%")))
+        elif record_status == "district_mismatch":
+            query = query.filter(Accident.invalidation_reasons.ilike("%District Mismatch%"))
+        elif record_status == "outside_state":
+            query = query.filter(Accident.invalidation_reasons.ilike("%Outside Gujarat State%"))
+        elif record_status == "multiple_categories":
+            query = query.filter(
+                (Accident.requires_attention == False)
+                & (
+                    (func.coalesce(func.array_length(Accident.type_of_collision, 1), 0) > 1)
+                    | (func.coalesce(func.array_length(Accident.collision_feature, 1), 0) > 1)
+                    | (func.coalesce(func.array_length(Accident.weather_condition, 1), 0) > 1)
+                    | (func.coalesce(func.array_length(Accident.traffic_violation, 1), 0) > 1)
+                )
+            )
+        elif record_status == "blank_fields":
+            query = query.filter(
+                (Accident.requires_attention == False)
+                & (
+                    (Accident.police_station == None) | (Accident.police_station == "")
+                    | (Accident.accident_date_time == None)
+                    | (Accident.road_name == None) | (Accident.road_name == "") | (Accident.road_name == "-")
+                    | (Accident.road_classification == None) | (Accident.road_classification == "") | (Accident.road_classification == "-")
+                    | (Accident.landmark_name == None) | (Accident.landmark_name == "") | (Accident.landmark_name == "-")
+                    | (Accident.light_condition == None) | (Accident.light_condition == "") | (Accident.light_condition == "-")
+                    | (Accident.visibility == None) | (Accident.visibility == "") | (Accident.visibility == "-")
+                    | (Accident.type_of_collision == None) | (func.coalesce(func.cardinality(Accident.type_of_collision), 0) == 0)
+                    | (Accident.collision_feature == None) | (func.coalesce(func.cardinality(Accident.collision_feature), 0) == 0)
+                    | (Accident.weather_condition == None) | (func.coalesce(func.cardinality(Accident.weather_condition), 0) == 0)
+                    | (Accident.traffic_violation == None) | (func.coalesce(func.cardinality(Accident.traffic_violation), 0) == 0)
+                )
+            )
+        elif record_status == "multi_status":
+            multi_cat_cond = (
+                (func.coalesce(func.array_length(Accident.type_of_collision, 1), 0) > 1)
+                | (func.coalesce(func.array_length(Accident.collision_feature, 1), 0) > 1)
+                | (func.coalesce(func.array_length(Accident.weather_condition, 1), 0) > 1)
+                | (func.coalesce(func.array_length(Accident.traffic_violation, 1), 0) > 1)
+            )
+            blank_cond = (
+                (Accident.police_station == None) | (Accident.police_station == "")
+                | (Accident.accident_date_time == None)
+                | (Accident.road_name == None) | (Accident.road_name == "") | (Accident.road_name == "-")
+                | (Accident.road_classification == None) | (Accident.road_classification == "") | (Accident.road_classification == "-")
+                | (Accident.landmark_name == None) | (Accident.landmark_name == "") | (Accident.landmark_name == "-")
+                | (Accident.light_condition == None) | (Accident.light_condition == "") | (Accident.light_condition == "-")
+                | (Accident.visibility == None) | (Accident.visibility == "") | (Accident.visibility == "-")
+                | (Accident.type_of_collision == None) | (func.coalesce(func.cardinality(Accident.type_of_collision), 0) == 0)
+                | (Accident.collision_feature == None) | (func.coalesce(func.cardinality(Accident.collision_feature), 0) == 0)
+                | (Accident.weather_condition == None) | (func.coalesce(func.cardinality(Accident.weather_condition), 0) == 0)
+                | (Accident.traffic_violation == None) | (func.coalesce(func.cardinality(Accident.traffic_violation), 0) == 0)
+            )
+            query = query.filter(
+                (multi_cat_cond & blank_cond)
+                | ((Accident.requires_attention == True) & (blank_cond | multi_cat_cond))
+            )
+
+    filter_map = {
+        "district": district,
+        "police_station": police_station,
+        "severity": severity,
+        "road_name": road_name,
+        "road_classification": road_classification,
+        "type_of_collision": type_of_collision,
+        "weather_condition": weather_condition,
+        "light_condition": light_condition,
+        "visibility": visibility,
+        "traffic_violation": traffic_violation,
+        "collision_feature": collision_feature,
+    }
+    ARRAY_COLUMNS = {"type_of_collision", "collision_feature", "weather_condition", "traffic_violation"}
+    for col_name, col_value in filter_map.items():
+        if col_value:
+            if col_name in ARRAY_COLUMNS:
+                query = apply_multi_category_filter(query, getattr(Accident, col_name), col_value)
+            else:
+                query = query.filter(getattr(Accident, col_name).ilike(f"%{col_value}%"))
+
+    return query
 
 
 @router.get("/accidents")
@@ -346,46 +521,22 @@ def get_accidents(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
-    query = db.query(Accident)
-
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            (Accident.accident_id.ilike(pattern))
-            | (Accident.police_station.ilike(pattern))
-            | (Accident.road_name.ilike(pattern))
-            | (Accident.district.ilike(pattern))
-            | (Accident.severity.ilike(pattern))
-            | (Accident.type_of_collision.ilike(pattern))
-            | (Accident.traffic_violation.ilike(pattern))
-        )
-
-    if record_status:
-        if record_status == "valid":
-            query = query.filter(Accident.requires_attention == False)
-        elif record_status == "duplicate":
-            query = query.filter((Accident.is_duplicate == True) | (Accident.invalidation_reasons.ilike("%Duplicate%")))
-        elif record_status == "district_mismatch":
-            query = query.filter(Accident.invalidation_reasons.ilike("%District Mismatch%"))
-        elif record_status == "outside_state":
-            query = query.filter(Accident.invalidation_reasons.ilike("%Outside Gujarat State%"))
-
-    filter_map = {
-        "district": district,
-        "police_station": police_station,
-        "severity": severity,
-        "road_name": road_name,
-        "road_classification": road_classification,
-        "type_of_collision": type_of_collision,
-        "weather_condition": weather_condition,
-        "light_condition": light_condition,
-        "visibility": visibility,
-        "traffic_violation": traffic_violation,
-        "collision_feature": collision_feature,
-    }
-    for col_name, col_value in filter_map.items():
-        if col_value:
-            query = query.filter(getattr(Accident, col_name).ilike(f"%{col_value}%"))
+    query = _build_accidents_query(
+        db=db,
+        search=search,
+        district=district,
+        police_station=police_station,
+        severity=severity,
+        road_name=road_name,
+        road_classification=road_classification,
+        type_of_collision=type_of_collision,
+        weather_condition=weather_condition,
+        light_condition=light_condition,
+        visibility=visibility,
+        traffic_violation=traffic_violation,
+        collision_feature=collision_feature,
+        record_status=record_status,
+    )
 
     total = query.count()
     records = (
@@ -400,6 +551,49 @@ def get_accidents(
         "skip": skip,
         "limit": limit,
         "data": [_record_to_dict(record) for record in records],
+    }
+
+
+@router.get("/accidents/ids")
+def get_accident_ids(
+    search: Optional[str] = None,
+    district: Optional[str] = None,
+    police_station: Optional[str] = None,
+    severity: Optional[str] = None,
+    road_name: Optional[str] = None,
+    road_classification: Optional[str] = None,
+    type_of_collision: Optional[str] = None,
+    weather_condition: Optional[str] = None,
+    light_condition: Optional[str] = None,
+    visibility: Optional[str] = None,
+    traffic_violation: Optional[str] = None,
+    collision_feature: Optional[str] = None,
+    record_status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    query = _build_accidents_query(
+        db=db,
+        search=search,
+        district=district,
+        police_station=police_station,
+        severity=severity,
+        road_name=road_name,
+        road_classification=road_classification,
+        type_of_collision=type_of_collision,
+        weather_condition=weather_condition,
+        light_condition=light_condition,
+        visibility=visibility,
+        traffic_violation=traffic_violation,
+        collision_feature=collision_feature,
+        record_status=record_status,
+    )
+
+    rows = query.with_entities(Accident.id).all()
+    ids = [r[0] for r in rows]
+    return {
+        "total": len(ids),
+        "ids": ids,
     }
 
 
@@ -437,12 +631,16 @@ def update_accident(
     record.pedestrian_grievous_injury = row.get("pedestrian_grievous_injury")
     record.pedestrian_minor_injury = row.get("pedestrian_minor_injury")
     record.pedestrian_no_injury = row.get("pedestrian_no_injury")
-    record.type_of_collision = row.get("type_of_collision")
-    record.collision_feature = row.get("collision_feature")
-    record.weather_condition = row.get("weather_condition")
+    if "type_of_collision" in row:
+        record.type_of_collision = split_and_clean_categories(row.get("type_of_collision")) or None
+    if "collision_feature" in row:
+        record.collision_feature = split_and_clean_categories(row.get("collision_feature")) or None
+    if "weather_condition" in row:
+        record.weather_condition = split_and_clean_categories(row.get("weather_condition")) or None
     record.light_condition = row.get("light_condition")
     record.visibility = row.get("visibility")
-    record.traffic_violation = row.get("traffic_violation")
+    if "traffic_violation" in row:
+        record.traffic_violation = split_and_clean_categories(row.get("traffic_violation")) or None
     if "is_valid_coordinates" in payload:
         record.is_valid_coordinates = payload["is_valid_coordinates"]
 
@@ -481,11 +679,16 @@ def bulk_delete_accidents(
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail="Invalid ID list") from exc
 
-    deleted = (
-        db.query(Accident)
-        .filter(Accident.id.in_(ids))
-        .delete(synchronize_session=False)
-    )
+    deleted = 0
+    chunk_size = 1000
+    for i in range(0, len(ids), chunk_size):
+        chunk = ids[i : i + chunk_size]
+        count = (
+            db.query(Accident)
+            .filter(Accident.id.in_(chunk))
+            .delete(synchronize_session=False)
+        )
+        deleted += count
     db.commit()
     return {
         "message": f"{deleted} accident record(s) deleted successfully.",
@@ -734,14 +937,15 @@ def import_accidents(
                     reasons.append("Invalid Coordinates")
                 else:
                     reasons.append("Validation Error")
-            elif res.matched_district:
-                clean_provided = _normalize_district_for_match(dist)
-                clean_reported = _normalize_district_for_match(res.matched_district)
-                if clean_reported != clean_provided:
-                    if not (clean_provided == 'ahmadabad' and clean_reported == 'ahmedabad'):
-                        is_valid_coords = False
-                        requires_attn = True
-                        reasons.append("District Mismatch")
+            elif res.matched_district and not is_railway_police(dist):
+                candidates = getattr(res, "candidate_districts", []) or []
+                is_match = is_same_district(dist, res.matched_district) or any(
+                    is_same_district(dist, cand) for cand in candidates
+                )
+                if not is_match:
+                    is_valid_coords = False
+                    requires_attn = True
+                    reasons.append("District Mismatch")
 
         invalidation_str = ", ".join(reasons) if reasons else None
         record = Accident(
@@ -768,12 +972,12 @@ def import_accidents(
             pedestrian_grievous_injury=row.get("pedestrian_grievous_injury") or 0,
             pedestrian_minor_injury=row.get("pedestrian_minor_injury") or 0,
             pedestrian_no_injury=row.get("pedestrian_no_injury") or 0,
-            type_of_collision=row.get("type_of_collision"),
-            collision_feature=row.get("collision_feature"),
-            weather_condition=row.get("weather_condition"),
+            type_of_collision=split_and_clean_categories(row.get("type_of_collision")) or None,
+            collision_feature=split_and_clean_categories(row.get("collision_feature")) or None,
+            weather_condition=split_and_clean_categories(row.get("weather_condition")) or None,
             light_condition=row.get("light_condition"),
             visibility=row.get("visibility"),
-            traffic_violation=row.get("traffic_violation"),
+            traffic_violation=split_and_clean_categories(row.get("traffic_violation")) or None,
             is_valid_coordinates=is_valid_coords,
             is_duplicate=is_dup,
             requires_attention=requires_attn,

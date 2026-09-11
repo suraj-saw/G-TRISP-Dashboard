@@ -94,7 +94,11 @@ function getParams(
   district: string
 ): URLSearchParams {
   const params = new URLSearchParams();
-  if (district) params.append("district", district);
+  if (district) {
+    params.append("district", district);
+  } else if (filters.district?.length) {
+    filters.district.forEach((d) => params.append("district", d));
+  }
 
   if (filters.year?.length)
     filters.year.forEach((y) => params.append("year", y));
@@ -827,6 +831,8 @@ export interface DistrictStatsFilters {
   lightCondition?: string[];
   /** Collision types to include */
   collisionType?: string[];
+  /** Visibility conditions to include */
+  visibility?: string[];
 }
 
 /**
@@ -962,6 +968,7 @@ export async function getDistrictStats(
     ["weather_condition", filters.weatherCondition],
     ["light_condition", filters.lightCondition],
     ["collision_type", filters.collisionType],
+    ["visibility", filters.visibility],
   ];
   listFilters.forEach(([key, values]) =>
     values?.forEach((value) => params.append(key, value))

@@ -226,26 +226,26 @@ const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
         )}
       </div>
 
-      {searchBar && (
-        <div className="ml-auto max-w-[320px] w-full px-2 flex items-center">
-          {searchBar}
-        </div>
-      )}
-
       {activeView !== "spatial" && (
-        <div className={`${searchBar ? 'ml-2' : 'ml-auto'} h-full flex items-center py-1`}>
+        <div className="ml-4 h-full flex items-center py-1">
           <ExportButton filters={filters} districtName={districtName} />
         </div>
       )}
 
       {showBlackspotExport && (
-        <div className={`${searchBar ? 'ml-2' : 'ml-auto'} h-full flex items-center py-1`}>
+        <div className="ml-4 h-full flex items-center py-1">
           <BlackspotExportButton
             filters={filters}
             algorithm={isDbscanBlackspot ? "dbscan" : "greedy"}
             
             districtName={districtName}
           />
+        </div>
+      )}
+
+      {searchBar && (
+        <div className="ml-auto max-w-[320px] w-full px-2 flex items-center">
+          {searchBar}
         </div>
       )}
 

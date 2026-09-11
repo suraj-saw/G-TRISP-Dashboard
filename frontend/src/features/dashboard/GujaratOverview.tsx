@@ -109,6 +109,13 @@ export default function GujaratOverview({
   }, [allowAdmin, navigate]);
 
   useEffect(() => {
+    sessionStorage.setItem(
+      "last_dashboard_path",
+      allowAdmin ? ROUTES.ADMIN : ROUTES.DASHBOARD
+    );
+  }, [allowAdmin]);
+
+  useEffect(() => {
     if (!showAdminControls) return;
     API.get<Notification[]>("/admin/notifications")
       .then((res) => setNotifications(res.data))

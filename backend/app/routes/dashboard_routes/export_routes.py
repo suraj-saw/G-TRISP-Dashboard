@@ -147,6 +147,7 @@ def export_dashboard_data(
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = apply_filters(
@@ -156,7 +157,8 @@ def export_dashboard_data(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     if severity and "all" not in severity:
         query = query.filter(Accident.severity.in_(severity))

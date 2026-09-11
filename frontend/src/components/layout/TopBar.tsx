@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ChevronDown, LogOut, PanelRight, Mail, Info, UserCircle } from "lucide-react";
 
 import NotificationBell from "./NotificationBell";
@@ -44,6 +44,7 @@ function TopBar({
   adminPanelPath,
 }: Props) {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // State for toggling the logout confirmation modal
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
@@ -102,7 +103,12 @@ function TopBar({
           {/* Admin Panel Button */}
           {adminPanelPath && (
             <button
-              onClick={() => navigate(adminPanelPath)}
+              onClick={() => {
+                if (location.pathname.startsWith("/dashboard") || location.pathname === ROUTES.ADMIN) {
+                  sessionStorage.setItem("last_dashboard_path", location.pathname);
+                }
+                navigate(adminPanelPath, { state: { from: location.pathname } });
+              }}
               className="
                 flex items-center gap-2 px-4 py-1.5 
                 rounded-xl border border-slate-200 bg-white 

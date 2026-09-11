@@ -30,7 +30,7 @@ from app.schemas.dashboard_schema import (
     WeatherCount,
     WeatherResponse,
 )
-from app.utils.accident_utils import apply_filters, total_fatalities
+from app.utils.accident_utils import apply_filters, total_fatalities, split_and_clean_categories
 from app.utils.text_utils import safe_text
 from app.core.constants import CASUALTY_TYPES
 
@@ -51,37 +51,58 @@ def get_by_violation(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
-    query = apply_filters(
-        db.query(
-            Accident.traffic_violation,
-            func.count(Accident.id).label("count"),
-        ),
-        district, year, road_classification,
-        weather_condition, light_condition, collision_type,
-        date_from, date_to,
-        taluka=taluka, db=db,
-        number_of_vehicles=number_of_vehicles,
-        police_station=police_station
-    )
-    rows = (
-        query
-        .filter(
-            Accident.traffic_violation.isnot(None),
-            Accident.traffic_violation != "",
-            Accident.traffic_violation != "nan",
+    try:
+        unnested_col = func.unnest(Accident.traffic_violation).label("violation")
+        base_q = apply_filters(
+            db.query(unnested_col),
+            district, year, road_classification,
+            weather_condition, light_condition, collision_type,
+            date_from, date_to,
+            taluka=taluka, db=db,
+            number_of_vehicles=number_of_vehicles,
+            police_station=police_station,
+            visibility=visibility,
+        ).filter(Accident.traffic_violation.isnot(None))
+        subq = base_q.subquery()
+        rows = (
+            db.query(subq.c.violation, func.count().label("count"))
+            .filter(subq.c.violation.isnot(None), subq.c.violation != "", subq.c.violation != "nan")
+            .group_by(subq.c.violation)
+            .order_by(func.count().desc())
+            .all()
         )
-        .group_by(Accident.traffic_violation)
-        .order_by(func.count(Accident.id).desc())
-        .all()
-    )
-
-    return ViolationResponse(
-        data=[
-            ViolationCount(traffic_violation=r.traffic_violation, count=r.count)
-            for r in rows
-        ]
-    )
+        return ViolationResponse(
+            data=[
+                ViolationCount(traffic_violation=r[0], count=r[1])
+                for r in rows
+                if r[0] != "Unknown"
+            ]
+        )
+    except Exception:
+        db.rollback()
+        query = apply_filters(
+            db.query(Accident.traffic_violation, func.count(Accident.id).label("count")),
+            district, year, road_classification,
+            weather_condition, light_condition, collision_type,
+            date_from, date_to,
+            taluka=taluka, db=db,
+            number_of_vehicles=number_of_vehicles,
+            police_station=police_station,
+            visibility=visibility,
+        ).filter(Accident.traffic_violation.isnot(None)).group_by(Accident.traffic_violation)
+        counts = defaultdict(int)
+        for raw_val, cnt in query.all():
+            for v in split_and_clean_categories(raw_val):
+                counts[v] += cnt
+        return ViolationResponse(
+            data=[
+                ViolationCount(traffic_violation=k, count=v)
+                for k, v in sorted(counts.items(), key=lambda x: x[1], reverse=True)
+                if k != "Unknown"
+            ]
+        )
 
 
 @router.get("/by-road", response_model=RoadClassResponse)
@@ -97,6 +118,7 @@ def get_by_road(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -105,7 +127,8 @@ def get_by_road(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
 
     fatality_expr = func.sum(
@@ -150,6 +173,7 @@ def get_by_weather(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(
@@ -161,22 +185,30 @@ def get_by_weather(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     rows = (
         query
         .group_by(Accident.weather_condition)
-        .order_by(func.count(Accident.id).desc())
         .all()
     )
+
+    counts = defaultdict(int)
+    for r in rows:
+        raw_val = r[0]
+        cnt = r[1]
+        for wc in split_and_clean_categories(raw_val):
+            counts[wc] += cnt
 
     return WeatherResponse(
         data=[
             WeatherCount(
-                weather_condition=safe_text(r.weather_condition),
-                count=r.count,
+                weather_condition=k,
+                count=v,
             )
-            for r in rows
+            for k, v in sorted(counts.items(), key=lambda x: x[1], reverse=True)
+            if k != "Unknown"
         ]
     )
 
@@ -195,6 +227,7 @@ def get_by_light(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(
@@ -206,7 +239,8 @@ def get_by_light(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     rows = (
         query
@@ -239,6 +273,7 @@ def get_by_police_station(
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -247,6 +282,7 @@ def get_by_police_station(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
+        visibility=visibility,
     )
 
     fatality_expr = func.sum(
@@ -293,6 +329,7 @@ def get_casualty_breakdown(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -301,7 +338,8 @@ def get_casualty_breakdown(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
 
     row = query.with_entities(

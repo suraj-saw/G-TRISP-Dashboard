@@ -49,6 +49,7 @@ def get_temporal_analysis(
     number_of_vehicles: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -57,7 +58,8 @@ def get_temporal_analysis(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     if severity:
         if isinstance(severity, list):

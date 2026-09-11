@@ -57,6 +57,7 @@ import {
   Calendar,
   AlertCircle,
   Cloud,
+  Shield,
 } from "lucide-react";
 
 import {
@@ -139,6 +140,7 @@ type FilterId =
   | "month"
   | "day"
   | "time_period"
+  | "district"
   | "severity"
   | "road_classification"
   | "weather_condition"
@@ -163,6 +165,7 @@ const MAP_FILTERS: FilterConfigItem[] = [
   { id: "visualization_variant", label: "Visualization Variant" },
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
+  { id: "district", label: "Area of Jurisdiction" },
   { id: "year", label: "Year" },
   { id: "year_range", label: "Year Range" },
   { id: "taluka", label: "Taluka" },
@@ -182,6 +185,7 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "visualization_variant", label: "Visualization Variant" },
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
+  { id: "district", label: "Area of Jurisdiction" },
   { id: "year", label: "Year" },
   { id: "year_range", label: "Year Range" },
   { id: "month", label: "Month" },
@@ -314,6 +318,7 @@ export default function StateDashboard() {
   >([]);
   const [openPanels, setOpenPanels] = useState({ 
     map: true, 
+    jurisdiction: true,
     time: true, 
     incident: false, 
     environment: false 
@@ -371,6 +376,10 @@ export default function StateDashboard() {
       active = false;
     };
   }, [navigate]);
+
+  useEffect(() => {
+    sessionStorage.setItem("last_dashboard_path", ROUTES.STATE_DASHBOARD);
+  }, []);
 
   // ── Resolve state boundary ──────────
   useEffect(() => {
@@ -592,6 +601,10 @@ export default function StateDashboard() {
       value: p,
       label: p,
     })), // NEW
+    district: (filterOptions?.jurisdictions || filterOptions?.districts || []).map((d) => ({
+      value: d,
+      label: d,
+    })),
     taluka: talukaOptions, // NEW
     date_from: [],
     date_to: [],
@@ -794,7 +807,8 @@ export default function StateDashboard() {
           <TopBar
             appName="G-TRISP · State"
             user={user}
-            showNotificationBell={false}
+            showNotificationBell={user?.role === "admin" || user?.role === "superadmin"}
+            adminPanelPath={user?.role === "admin" || user?.role === "superadmin" ? ROUTES.ADMIN_PANEL : undefined}
             onLogout={logout}
             sidebarOpen={sidebarOpen}
             onToggleSidebar={() => setSidebarOpen((v) => !v)}
@@ -833,11 +847,13 @@ export default function StateDashboard() {
 
             {(() => {
               const MAP_FILTER_IDS = ["baseMap", "visualization_type", "visualization_variant"];
+              const JURISDICTION_FILTER_IDS = ["district"];
               const TIME_FILTER_IDS = ["date_from", "date_to", "year", "year_range", "month", "day", "time_period"];
               const INCIDENT_FILTER_IDS = ["severity", "collision_type", "number_of_vehicles"];
               const ENVIRONMENT_FILTER_IDS = ["road_classification", "weather_condition", "light_condition", "visibility"];
 
               const mapFilters = activeFilterConfig.filter((f) => MAP_FILTER_IDS.includes(f.id));
+              const jurisdictionFilters = activeFilterConfig.filter((f) => JURISDICTION_FILTER_IDS.includes(f.id));
               const timeFilters = activeFilterConfig.filter((f) => TIME_FILTER_IDS.includes(f.id));
               const incidentFilters = activeFilterConfig.filter((f) => INCIDENT_FILTER_IDS.includes(f.id));
               const environmentFilters = activeFilterConfig.filter((f) => ENVIRONMENT_FILTER_IDS.includes(f.id));
@@ -905,6 +921,7 @@ export default function StateDashboard() {
               return (
                 <div className="flex flex-col gap-3">
                   {analysisView === "spatial" && renderAccordion("map", "Map Settings", mapFilters, Layers)}
+                  {renderAccordion("jurisdiction", "Area of Jurisdiction", jurisdictionFilters, Shield)}
                   {renderAccordion("time", "Time Period", timeFilters, Calendar)}
                   {renderAccordion("incident", "Incident Details", incidentFilters, AlertCircle)}
                   {renderAccordion("environment", "Environment", environmentFilters, Cloud)}
@@ -986,6 +1003,7 @@ export default function StateDashboard() {
                       weatherCondition: filters.weather_condition,
                       lightCondition: filters.light_condition,
                       collisionType: filters.collision_type,
+                      visibility: filters.visibility,
                     }}
                   />
                 ) : analysisView === "temporal" ? (

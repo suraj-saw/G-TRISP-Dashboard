@@ -5,7 +5,7 @@
  * @dependencies framer-motion, lucide-react, react-router-dom
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
@@ -73,6 +73,36 @@ import { StatusBadge } from "./admin/StatusBadge";
  */
 function AdminPanel() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleBackToDashboard = () => {
+    // 1. Check if passed via location.state?.from
+    const stateFrom = (location.state as { from?: string } | null)?.from;
+    if (
+      stateFrom &&
+      (stateFrom.startsWith("/dashboard") || stateFrom === ROUTES.ADMIN || stateFrom === ROUTES.HOME_PAGE) &&
+      stateFrom !== ROUTES.ADMIN_PANEL &&
+      stateFrom !== ROUTES.ADMIN_ACCIDENTS
+    ) {
+      navigate(stateFrom);
+      return;
+    }
+
+    // 2. Check sessionStorage for the last visited dashboard
+    const savedDashboard = sessionStorage.getItem("last_dashboard_path");
+    if (
+      savedDashboard &&
+      (savedDashboard.startsWith("/dashboard") || savedDashboard === ROUTES.ADMIN || savedDashboard === ROUTES.HOME_PAGE) &&
+      savedDashboard !== ROUTES.ADMIN_PANEL &&
+      savedDashboard !== ROUTES.ADMIN_ACCIDENTS
+    ) {
+      navigate(savedDashboard);
+      return;
+    }
+
+    // 3. Fallback to State Dashboard
+    navigate(ROUTES.STATE_DASHBOARD);
+  };
 
   const [user, setUser] = useState<User | null>(null);
   const [, setAdminData] = useState<any>(null);
@@ -380,8 +410,9 @@ function AdminPanel() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => navigate(ROUTES.ADMIN)}
+            onClick={handleBackToDashboard}
             className="shrink-0 flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-md border border-slate-200/60 shadow-sm hover:shadow-md hover:bg-white text-indigo-700 rounded-xl text-sm font-semibold transition-all cursor-pointer"
+            title="Back to Dashboard"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="hidden sm:inline">Back to Dashboard</span>
@@ -390,7 +421,16 @@ function AdminPanel() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => navigate(ROUTES.ADMIN_ACCIDENTS)}
+            onClick={() =>
+              navigate(ROUTES.ADMIN_ACCIDENTS, {
+                state: {
+                  from:
+                    (location.state as any)?.from ||
+                    sessionStorage.getItem("last_dashboard_path") ||
+                    ROUTES.STATE_DASHBOARD,
+                },
+              })
+            }
             className="shrink-0 flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-indigo-700/25 transition-all cursor-pointer"
           >
             <Database className="w-4 h-4" />

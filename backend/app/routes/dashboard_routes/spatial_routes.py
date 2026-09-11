@@ -55,6 +55,7 @@ def get_heatmap(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -63,7 +64,8 @@ def get_heatmap(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     if severity:
         if isinstance(severity, list):
@@ -139,6 +141,7 @@ def get_kde_heatmap(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
     is_pedestrian: bool = Query(False),
 ):
     query = apply_filters(
@@ -148,7 +151,8 @@ def get_kde_heatmap(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     if severity:
         query = query.filter(Accident.severity.in_(severity))
@@ -207,6 +211,7 @@ def get_weighted_kde_heatmap(
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
     is_pedestrian: bool = Query(False),
 ):
     query = apply_filters(
@@ -216,7 +221,8 @@ def get_weighted_kde_heatmap(
         date_from, date_to,
         taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     if severity:
         query = query.filter(Accident.severity.in_(severity))
@@ -287,6 +293,7 @@ def get_snapped_accidents(
     date_to: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
     police_station: Optional[List[str]] = Query(None),
+    visibility: Optional[List[str]] = Query(None),
     is_pedestrian: bool = Query(False),
 ):
     """
@@ -331,7 +338,8 @@ def get_snapped_accidents(
         weather_condition, light_condition, collision_type,
         date_from, date_to, taluka=taluka, db=db,
         number_of_vehicles=number_of_vehicles,
-        police_station=police_station
+        police_station=police_station,
+        visibility=visibility,
     )
     
     if severity:

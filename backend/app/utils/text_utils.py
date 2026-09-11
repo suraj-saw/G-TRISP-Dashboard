@@ -43,8 +43,11 @@ def safe_text(value, default: str = UNKNOWN_LABEL) -> str:
         # or matches our designated null sentinel (e.g., "nan")
         if v == "" or v.lower() == NULL_TEXT_SENTINEL:
             return default
-        return v
-        
+    # Handle list, tuple, or set of category items (e.g. from PostgreSQL ARRAY columns)
+    if isinstance(value, (list, tuple, set)):
+        items = [str(x).strip() for x in value if x is not None and str(x).strip() != ""]
+        return ", ".join(items) if items else default
+
     # For numeric or other non-string types, cast to string safely
     return str(value)
 
