@@ -15,26 +15,13 @@ from sqlalchemy.orm import Session
 # pyrefly: ignore
 from jose import JWTError
 
-from app.database import SessionLocal
+from app.database import SessionLocal, get_db
 from app.models.user import User
 from app.services.auth_service import (
     decode_token,
     is_session_valid,
 )
 from app.core.constants import ACCESS_TOKEN_COOKIE
-
-
-def get_db() -> Generator[Session, None, None]:
-    """
-    FastAPI Dependency to provide a database session per request.
-
-    Guarantees session cleanup after HTTP response is sent.
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:

@@ -27,3 +27,4 @@ from app.models.gujarat_merged_road import GujaratMergedRoad
 # ── Incident & Accident Event Datasets ────────────────────────────────────────
 from app.models.accident          import Accident
 from app.models.snapped_accident  import SnappedAccident
+from app.models.blackspot_remark  import BlackspotRemark

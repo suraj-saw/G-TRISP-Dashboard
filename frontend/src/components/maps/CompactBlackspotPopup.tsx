@@ -5,9 +5,10 @@
  */
 
 import { useState, useEffect } from "react";
-import { FileText, MapPin } from "lucide-react";
+import { FileText, MapPin, MessageSquare } from "lucide-react";
 import { getPriorityColor, getPriorityLabel } from "../../config/blackspotConfig";
 import { reverseGeocode } from "../../api/geocodingApi";
+import type { RemarkClusterSummary } from "../../api/remarksApi";
 
 export interface BlackspotPopupData {
   bs_id?: number | string;
@@ -36,6 +37,10 @@ interface CompactBlackspotPopupProps {
   onMouseLeave?: () => void;
   radiusM?: number;
   segmentM?: number;
+  /** Summary of remarks for this cluster (count + latest remark) */
+  remarksSummary?: RemarkClusterSummary | null;
+  /** Callback to open the full remarks timeline modal */
+  onOpenTimeline?: () => void;
 }
 
 /**
@@ -48,6 +53,8 @@ export default function CompactBlackspotPopup({
   onMouseLeave,
   radiusM = 250,
   segmentM,
+  remarksSummary,
+  onOpenTimeline,
 }: CompactBlackspotPopupProps) {
   const priorityScore = data.priority_score ?? 0;
   const priorityColor = getPriorityColor(priorityScore);
@@ -56,6 +63,9 @@ export default function CompactBlackspotPopup({
 
   const totalCrashes = data.crash_count ?? data.accident_count ?? 0;
   const qualifyingCrashes = data.qualifying_count ?? totalCrashes;
+
+  const remarksCount = remarksSummary?.count ?? 0;
+  const hasRemarks = remarksCount > 0;
 
   const [landmark, setLandmark] = useState<string | null>(null);
   const [loadingLandmark, setLoadingLandmark] = useState(false);
@@ -84,29 +94,49 @@ export default function CompactBlackspotPopup({
 
   return (
     <div
-      className="w-[210px] sm:w-[220px] overflow-hidden rounded-xl bg-white/95 backdrop-blur-md shadow-xl border border-slate-200/90 font-sans tracking-tight text-slate-800 transition-all select-none"
+      className="w-[210px] sm:w-[220px] overflow-hidden rounded-xl bg-white/95 backdrop-blur-md shadow-xl border border-slate-200/90 font-sans tracking-tight text-slate-800 transition-all select-none relative"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      {/* Top Banner with Priority Label and Export Button */}
+      {/* Top Banner with Priority Label, Remark and Export Buttons */}
       <div
         className="px-2.5 py-1 text-[9.5px] font-bold tracking-wider text-white uppercase flex items-center justify-between"
         style={{ backgroundColor: priorityColor }}
       >
-        <span className="truncate max-w-[155px]">{priorityLabel}</span>
-        {data.crash_ids && onExport && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onExport(data);
-            }}
-            className="pointer-events-auto p-0.5 rounded hover:bg-white/20 text-white transition-colors ml-1 shrink-0 cursor-pointer"
-            title="Generate PDF Report"
-            type="button"
-          >
-            <FileText size={12} />
-          </button>
-        )}
+        <span className="truncate max-w-[130px]">{priorityLabel}</span>
+        <div className="flex items-center shrink-0">
+          {data.crash_ids && onOpenTimeline && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenTimeline();
+              }}
+              className="pointer-events-auto flex items-center gap-0.5 px-1 py-0.5 rounded hover:bg-white/20 text-white transition-colors ml-0.5 shrink-0 cursor-pointer"
+              title={hasRemarks ? `View Remarks Timeline (${remarksCount})` : "Add Remark"}
+              type="button"
+            >
+              <MessageSquare size={11} />
+              {hasRemarks && (
+                <span className="text-[8.5px] font-bold bg-white/30 px-1 py-0.2 rounded-full leading-none">
+                  {remarksCount}
+                </span>
+              )}
+            </button>
+          )}
+          {data.crash_ids && onExport && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onExport(data);
+              }}
+              className="pointer-events-auto p-0.5 rounded hover:bg-white/20 text-white transition-colors ml-0.5 shrink-0 cursor-pointer"
+              title="Generate PDF Report"
+              type="button"
+            >
+              <FileText size={12} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Content Body */}

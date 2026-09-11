@@ -37,6 +37,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 # pyrefly: ignore
 from jose import JWTError
 
@@ -137,25 +138,32 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Username or email already exists")
 
-    new_user = User(
-        username=user.username,
-        email=user.email,
-        hashed_password=hash_password(user.password),
-        status="pending",
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    try:
+        new_user = User(
+            username=user.username,
+            email=user.email,
+            hashed_password=hash_password(user.password),
+            status="pending",
+        )
+        db.add(new_user)
+        db.flush()
 
-    db.add(Notification(
-        type="user_registration",
-        message=(
-            f"New user '{new_user.username}' ({new_user.email}) "
-            "registered and is awaiting approval."
-        ),
-        related_user_id=new_user.id,
-    ))
-    db.commit()
+        db.add(Notification(
+            type="user_registration",
+            message=(
+                f"New user '{new_user.username}' ({new_user.email}) "
+                "registered and is awaiting approval."
+            ),
+            related_user_id=new_user.id,
+        ))
+        db.commit()
+        db.refresh(new_user)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Username or email already exists.")
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Registration failed due to a database error.") from exc
 
     return {
         "message": "Registration successful. Your account is pending admin approval.",
@@ -369,8 +377,13 @@ def update_me(update_data: UserProfileUpdate, db: Session = Depends(get_db), cur
     if update_data.police_station is not None:
         current_user.profile.police_station = update_data.police_station
 
-    db.commit()
-    db.refresh(current_user)
+    try:
+        db.commit()
+        db.refresh(current_user)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database transaction failed while updating profile.") from exc
+
     return current_user
 
 
@@ -483,14 +496,21 @@ def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
         logger.warning("Attempted password reset with invalid or expired token")
         raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
         
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        logger.error(f"Valid reset token found for non-existent user_id: {user_id}")
-        raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
+    try:
+        user = db.query(User).filter(User.id == user_id).with_for_update().first()
+        if not user:
+            logger.error(f"Valid reset token found for non-existent user_id: {user_id}")
+            raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
 
-    # Hash new password and save
-    user.hashed_password = hash_password(new_password)
-    db.commit()
+        # Hash new password and save
+        user.hashed_password = hash_password(new_password)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database transaction failed while updating password.") from exc
     
     logger.info(f"Password successfully reset for user: {user.email}")
     

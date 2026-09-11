@@ -54,5 +54,13 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 
-# Re-export get_db from app.core.dependencies for backwards compatibility
-from app.core.dependencies import get_db  # noqa: F401
+def get_db():
+    """
+    FastAPI Dependency to provide a database session per request.
+    Guarantees session cleanup after HTTP response is sent.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

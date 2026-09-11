@@ -115,36 +115,44 @@ def change_user_role(
     current_user: User = Depends(get_current_superadmin_user),
 ):
     """Change the role of a user (Superadmin only)."""
-    target = db.query(User).filter(User.id == user_id).first()
+    try:
+        target = db.query(User).filter(User.id == user_id).with_for_update().first()
 
-    if not target:
-        raise HTTPException(status_code=404, detail="User not found")
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    if target.role == "superadmin":
-        raise HTTPException(status_code=400, detail="Cannot change role of a superadmin account")
+        if target.role == "superadmin":
+            raise HTTPException(status_code=400, detail="Cannot change role of a superadmin account")
 
-    if target.role == payload.role:
-        raise HTTPException(
-            status_code=400,
-            detail=f"User is already {payload.role}.",
-        )
+        if target.role == payload.role:
+            raise HTTPException(
+                status_code=400,
+                detail=f"User is already {payload.role}.",
+            )
 
-    old_role = target.role
-    target.role = payload.role
+        old_role = target.role
+        target.role = payload.role
 
-    db.add(Notification(
-        type="role_change",
-        message=(
-            f"User '{target.username}' ({target.email}) role changed "
-            f"from {old_role} to {payload.role} by {current_user.username}."
-        ),
-        related_user_id=target.id,
-        acted_by_admin_id=current_user.id,
-        is_read=False,
-    ))
+        db.add(Notification(
+            type="role_change",
+            message=(
+                f"User '{target.username}' ({target.email}) role changed "
+                f"from {old_role} to {payload.role} by {current_user.username}."
+            ),
+            related_user_id=target.id,
+            acted_by_admin_id=current_user.id,
+            is_read=False,
+        ))
 
-    db.commit()
-    db.refresh(target)
+        db.commit()
+        db.refresh(target)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database transaction failed while updating user role.") from exc
+
     return target
 
 
@@ -203,10 +211,15 @@ def mark_all_notifications_read(
     route so FastAPI does not try to coerce the literal string 'read-all'
     into an integer.
     """
-    db.query(Notification).filter(Notification.is_read == False).update(
-        {"is_read": True}, synchronize_session=False
-    )
-    db.commit()
+    try:
+        db.query(Notification).filter(Notification.is_read == False).update(
+            {"is_read": True}, synchronize_session=False
+        )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update notifications.") from exc
+
     return {"ok": True}
 
 
@@ -216,12 +229,25 @@ def mark_notification_read(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
-    notif = db.query(Notification).filter(Notification.id == notification_id).first()
+    try:
+        notif = (
+            db.query(Notification)
+            .filter(Notification.id == notification_id)
+            .with_for_update()
+            .first()
+        )
 
-    if not notif:
-        raise HTTPException(status_code=404, detail="Notification not found")
+        if not notif:
+            raise HTTPException(status_code=404, detail="Notification not found")
 
-    notif.is_read = True
-    db.commit()
-    db.refresh(notif)
-    return notif
+        notif.is_read = True
+        db.commit()
+        db.refresh(notif)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to mark notification read.") from exc
+
+    return notif

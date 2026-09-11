@@ -19,6 +19,7 @@ from app.routes.dashboard_routes import (
     corridors_routes,
     temporal_routes,
     export_routes,
+    remarks_routes,
 )
 
 router = APIRouter(
@@ -34,3 +35,4 @@ router.include_router(blackspots_routes.router)
 router.include_router(corridors_routes.router)
 router.include_router(temporal_routes.router)
 router.include_router(export_routes.router)
+router.include_router(remarks_routes.router)

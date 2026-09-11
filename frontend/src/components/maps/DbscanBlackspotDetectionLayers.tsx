@@ -23,6 +23,14 @@ import CompactBlackspotPopup, {
   type BlackspotPopupData,
 } from "./CompactBlackspotPopup";
 import { BlackspotPdfReport } from "../../features/export/BlackspotPdfReport";
+import BlackspotRemarksTimelineModal from "./BlackspotRemarksTimelineModal";
+import {
+  computeCrashIdsHash,
+  fetchRemarksBulk,
+  type Remark,
+  type RemarkClusterSummary,
+  type ClusterLookupItem,
+} from "../../api/remarksApi";
 
 interface Props {
   filters: DashboardFilters;
@@ -89,6 +97,22 @@ export default function DbscanBlackspotDetectionLayers({
     priorityLabel?: string;
   } | null>(null);
 
+  // Remarks state: maps crash_ids_hash → RemarkClusterSummary
+  const [remarksMap, setRemarksMap] = useState<Record<string, RemarkClusterSummary>>({});
+  // Maps bs_id → crash_ids_hash for lookup when rendering popup
+  const [bsIdToHash, setBsIdToHash] = useState<Record<string, string>>({});
+
+  // Timeline modal state
+  const [timelineModalData, setTimelineModalData] = useState<{
+    crashIds: string;
+    bsId?: number | string;
+    priorityScore?: number;
+    priorityLabel?: string;
+    crashCount?: number;
+    centroidLat?: number;
+    centroidLon?: number;
+  } | null>(null);
+
   // Cancel any pending dismiss when component unmounts
   useEffect(() => {
     return () => {
@@ -146,6 +170,59 @@ export default function DbscanBlackspotDetectionLayers({
       active = false;
     };
   }, [filterKey]);
+
+  // ── Bulk-load remarks for all blackspot clusters ─────────────────────────
+  useEffect(() => {
+    if (!data || data.centroids.features.length === 0) return;
+
+    let active = true;
+
+    (async () => {
+      try {
+        const features = data.centroids.features;
+        const hashEntries: { bsId: string; hash: string }[] = [];
+        const clusterItems: ClusterLookupItem[] = [];
+
+        for (const f of features) {
+          const crashIdsStr = f.properties?.crash_ids;
+          const bsId = f.properties?.bs_id;
+          if (!crashIdsStr || bsId === undefined) continue;
+
+          const ids = String(crashIdsStr).split(",").map((id: string) => id.trim()).filter(Boolean);
+          if (ids.length === 0) continue;
+
+          const hash = await computeCrashIdsHash(ids);
+          hashEntries.push({ bsId: String(bsId), hash });
+
+          const coords = f.geometry && f.geometry.type === "Point" ? f.geometry.coordinates : null;
+          if (coords) {
+            clusterItems.push({
+              bs_id: String(bsId),
+              hash,
+              centroid_lat: coords[1],
+              centroid_lon: coords[0],
+              radius_m: data?.radius_m ?? SEARCH_RADIUS_M,
+            });
+          }
+        }
+
+        if (!active || hashEntries.length === 0) return;
+
+        const idToHash: Record<string, string> = {};
+        for (const { bsId, hash } of hashEntries) {
+          idToHash[bsId] = hash;
+        }
+        setBsIdToHash(idToHash);
+
+        const remarks = await fetchRemarksBulk(clusterItems);
+        if (active) setRemarksMap(remarks);
+      } catch (err) {
+        console.warn("[DbscanBlackspotDetectionLayers] Failed to load remarks:", err);
+      }
+    })();
+
+    return () => { active = false; };
+  }, [data]);
 
   useEffect(() => {
     const map = mapRef?.getMap();
@@ -505,8 +582,82 @@ export default function DbscanBlackspotDetectionLayers({
               scheduleDismiss();
             }}
             radiusM={data?.radius_m ?? SEARCH_RADIUS_M}
+            remarksSummary={
+              hovered.bs_id !== undefined && bsIdToHash[String(hovered.bs_id)]
+                ? remarksMap[bsIdToHash[String(hovered.bs_id)]] ?? null
+                : null
+            }
+            onOpenTimeline={() => {
+              if (hovered.crash_ids) {
+                setTimelineModalData({
+                  crashIds: String(hovered.crash_ids),
+                  bsId: hovered.bs_id,
+                  priorityScore: hovered.priority_score,
+                  priorityLabel: hovered.priority_label,
+                  crashCount: hovered.crash_count,
+                  centroidLat: hovered.latitude,
+                  centroidLon: hovered.longitude,
+                });
+              }
+            }}
           />
         </Popup>
+      )}
+
+      {/* Remarks Timeline Modal */}
+      {timelineModalData && (
+        <BlackspotRemarksTimelineModal
+          isOpen={true}
+          onClose={() => setTimelineModalData(null)}
+          crashIds={timelineModalData.crashIds}
+          clusterId={timelineModalData.bsId}
+          priorityScore={timelineModalData.priorityScore}
+          priorityLabel={timelineModalData.priorityLabel}
+          crashCount={timelineModalData.crashCount}
+          district={districtName || filters.district?.[0]}
+          centroidLat={timelineModalData.centroidLat}
+          centroidLon={timelineModalData.centroidLon}
+          visualizationType="dbscan_blackspot"
+          onRemarkAdded={(newRemark) => {
+            const bsIdStr = timelineModalData.bsId !== undefined ? String(timelineModalData.bsId) : null;
+            const hash = bsIdStr ? bsIdToHash[bsIdStr] : null;
+            if (hash) {
+              setRemarksMap((prev) => ({
+                ...prev,
+                [hash]: {
+                  count: (prev[hash]?.count || 0) + 1,
+                  latest_remark: newRemark,
+                },
+              }));
+            }
+          }}
+          onRemarkUpdated={(updatedRemark) => {
+            const bsIdStr = timelineModalData.bsId !== undefined ? String(timelineModalData.bsId) : null;
+            const hash = bsIdStr ? bsIdToHash[bsIdStr] : null;
+            if (hash && remarksMap[hash]?.latest_remark?.id === updatedRemark.id) {
+              setRemarksMap((prev) => ({
+                ...prev,
+                [hash]: {
+                  ...prev[hash],
+                  latest_remark: updatedRemark,
+                },
+              }));
+            }
+          }}
+          onRemarkDeleted={(_remarkId, remainingCount, latestRemark) => {
+            const bsIdStr = timelineModalData.bsId !== undefined ? String(timelineModalData.bsId) : null;
+            const hash = bsIdStr ? bsIdToHash[bsIdStr] : null;
+            if (hash) {
+              setRemarksMap((prev) => ({
+                ...prev,
+                [hash]: {
+                  count: remainingCount,
+                  latest_remark: latestRemark,
+                },
+              }));
+            }
+          }}
+        />
       )}
 
       {/* PDF Report Generator */}

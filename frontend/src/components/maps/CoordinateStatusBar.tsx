@@ -63,14 +63,14 @@ export default function CoordinateStatusBar() {
 
     map.on("mousemove", handleMouseMove);
     map.on("zoomend", handleZoomEnd);
-    map.on("mouseleave", handleMouseLeave);
+    map.on("mouseout", handleMouseLeave);
 
     initializeCoordinates(map);
 
     return () => {
       map.off("mousemove", handleMouseMove);
       map.off("zoomend", handleZoomEnd);
-      map.off("mouseleave", handleMouseLeave);
+      map.off("mouseout", handleMouseLeave);
     };
   }, [mapRef, initializeCoordinates]);
 

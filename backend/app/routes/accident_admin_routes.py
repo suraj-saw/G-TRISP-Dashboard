@@ -374,9 +374,14 @@ def add_accident(
         invalidation_reasons=", ".join(invalidation_reasons) if invalidation_reasons else None,
     )
 
-    db.add(record)
-    db.commit()
-    db.refresh(record)
+    try:
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database transaction failed while adding accident record.") from exc
+
     return {
         "message": "Accident record added successfully.",
         "id": record.id,
@@ -604,48 +609,90 @@ def update_accident(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
-    record = db.query(Accident).filter(Accident.id == accident_id).first()
-    if not record:
-        raise HTTPException(status_code=404, detail="Accident not found")
+    try:
+        record = (
+            db.query(Accident)
+            .filter(Accident.id == accident_id)
+            .with_for_update()
+            .first()
+        )
+        if not record:
+            raise HTTPException(status_code=404, detail="Accident not found")
 
-    row = _coerce_import_record({**_record_to_dict(record), **payload})
-    record.district = row.get("district") or "Surat"
-    record.police_station = row.get("police_station")
-    record.accident_date_time = row.get("accident_date_time")
-    record.latitude = row.get("latitude")
-    record.longitude = row.get("longitude")
-    record.location = _make_point(row.get("latitude"), row.get("longitude"))
-    record.road_name = row.get("road_name")
-    record.road_classification = row.get("road_classification")
-    record.severity = row.get("severity")
-    record.number_of_vehicles = row.get("number_of_vehicles")
-    record.driver_killed = row.get("driver_killed")
-    record.driver_grievous_injury = row.get("driver_grievous_injury")
-    record.driver_minor_injury = row.get("driver_minor_injury")
-    record.driver_no_injury = row.get("driver_no_injury")
-    record.passenger_killed = row.get("passenger_killed")
-    record.passenger_grievous_injury = row.get("passenger_grievous_injury")
-    record.passenger_minor_injury = row.get("passenger_minor_injury")
-    record.passenger_no_injury = row.get("passenger_no_injury")
-    record.pedestrian_killed = row.get("pedestrian_killed")
-    record.pedestrian_grievous_injury = row.get("pedestrian_grievous_injury")
-    record.pedestrian_minor_injury = row.get("pedestrian_minor_injury")
-    record.pedestrian_no_injury = row.get("pedestrian_no_injury")
-    if "type_of_collision" in row:
-        record.type_of_collision = split_and_clean_categories(row.get("type_of_collision")) or None
-    if "collision_feature" in row:
-        record.collision_feature = split_and_clean_categories(row.get("collision_feature")) or None
-    if "weather_condition" in row:
-        record.weather_condition = split_and_clean_categories(row.get("weather_condition")) or None
-    record.light_condition = row.get("light_condition")
-    record.visibility = row.get("visibility")
-    if "traffic_violation" in row:
-        record.traffic_violation = split_and_clean_categories(row.get("traffic_violation")) or None
-    if "is_valid_coordinates" in payload:
-        record.is_valid_coordinates = payload["is_valid_coordinates"]
+        # Selective patching to prevent overwriting concurrent updates on other fields
+        coerced_patch = _coerce_import_record(payload)
+        
+        # Scalar fields that can be updated directly if provided in payload
+        for field in [
+            "district", "police_station", "accident_date_time", "road_name",
+            "road_classification", "severity", "number_of_vehicles",
+            "driver_killed", "driver_grievous_injury", "driver_minor_injury", "driver_no_injury",
+            "passenger_killed", "passenger_grievous_injury", "passenger_minor_injury", "passenger_no_injury",
+            "pedestrian_killed", "pedestrian_grievous_injury", "pedestrian_minor_injury", "pedestrian_no_injury",
+            "light_condition", "visibility", "requires_attention", "is_duplicate"
+        ]:
+            if field in payload:
+                setattr(record, field, coerced_patch.get(field))
 
-    db.commit()
-    db.refresh(record)
+        # Array fields
+        for array_field in ["type_of_collision", "collision_feature", "weather_condition", "traffic_violation"]:
+            if array_field in payload:
+                setattr(record, array_field, split_and_clean_categories(payload.get(array_field)) or None)
+
+        if "is_valid_coordinates" in payload:
+            record.is_valid_coordinates = payload["is_valid_coordinates"]
+
+        # Coordinates & spatial point synchronization
+        if "latitude" in payload or "longitude" in payload or "district" in payload:
+            lat = payload.get("latitude", record.latitude)
+            lon = payload.get("longitude", record.longitude)
+            record.latitude = float(lat) if lat is not None else None
+            record.longitude = float(lon) if lon is not None else None
+            record.location = _make_point(record.latitude, record.longitude)
+
+            # Re-validate coordinates and district consistency
+            if record.latitude is not None and record.longitude is not None:
+                from app.utils.coordinate_validator import validate_coordinate
+                coord_res = validate_coordinate(record.latitude, record.longitude, db)
+                if not coord_res.is_valid:
+                    record.is_valid_coordinates = False
+                    record.requires_attention = True
+                    record.invalidation_reasons = "Invalid Coordinates"
+                else:
+                    reported_dist = coord_res.matched_district
+                    if reported_dist and not is_railway_police(record.district):
+                        candidates = getattr(coord_res, "candidate_districts", []) or []
+                        is_match = is_same_district(record.district, reported_dist) or any(
+                            is_same_district(record.district, cand) for cand in candidates
+                        )
+                        if not is_match:
+                            record.is_valid_coordinates = False
+                            record.requires_attention = True
+                            record.invalidation_reasons = "District Mismatch"
+                        else:
+                            record.is_valid_coordinates = True
+                            if not record.is_duplicate:
+                                record.requires_attention = False
+                                record.invalidation_reasons = None
+                    else:
+                        record.is_valid_coordinates = True
+                        if not record.is_duplicate:
+                            record.requires_attention = False
+                            record.invalidation_reasons = None
+
+            # Invalidate stale precomputed snapped accident cache so corridors stay consistent
+            from app.models.snapped_accident import SnappedAccident
+            db.query(SnappedAccident).filter(SnappedAccident.accident_id == record.id).delete()
+
+        db.commit()
+        db.refresh(record)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database transaction failed while updating accident record.") from exc
+
     return {"message": "Accident record updated successfully.", "id": record.id}
 
 
@@ -655,12 +702,25 @@ def delete_accident(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
-    record = db.query(Accident).filter(Accident.id == accident_id).first()
-    if not record:
-        raise HTTPException(status_code=404, detail="Accident not found")
+    try:
+        record = (
+            db.query(Accident)
+            .filter(Accident.id == accident_id)
+            .with_for_update()
+            .first()
+        )
+        if not record:
+            raise HTTPException(status_code=404, detail="Accident not found")
 
-    db.delete(record)
-    db.commit()
+        db.delete(record)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database transaction failed while deleting accident record.") from exc
+
     return {"message": "Accident record deleted successfully.", "id": accident_id}
 
 
@@ -681,15 +741,20 @@ def bulk_delete_accidents(
 
     deleted = 0
     chunk_size = 1000
-    for i in range(0, len(ids), chunk_size):
-        chunk = ids[i : i + chunk_size]
-        count = (
-            db.query(Accident)
-            .filter(Accident.id.in_(chunk))
-            .delete(synchronize_session=False)
-        )
-        deleted += count
-    db.commit()
+    try:
+        for i in range(0, len(ids), chunk_size):
+            chunk = ids[i : i + chunk_size]
+            count = (
+                db.query(Accident)
+                .filter(Accident.id.in_(chunk))
+                .delete(synchronize_session=False)
+            )
+            deleted += count
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database transaction failed during bulk delete.") from exc
+
     return {
         "message": f"{deleted} accident record(s) deleted successfully.",
         "deleted": deleted,
@@ -986,5 +1051,10 @@ def import_accidents(
         db.add(record)
         inserted += 1
 
-    db.commit()
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database transaction failed while saving imported records.") from exc
+
     return {"message": f"Successfully imported {inserted} record(s).", "inserted": inserted}
