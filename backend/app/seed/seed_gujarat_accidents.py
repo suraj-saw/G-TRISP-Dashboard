@@ -22,6 +22,8 @@ from geoalchemy2.shape import from_shape
 # pyrefly: ignore
 from shapely.geometry import Point
 # pyrefly: ignore [missing-import]
+from sqlalchemy import text
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 _BACKEND = Path(__file__).resolve().parents[2]
@@ -297,19 +299,27 @@ def seed_gujarat_accidents(
     skip_validation: bool = False,
     only: list[str] | None = None,
 ) -> None:
-    Base.metadata.create_all(bind=engine)
+    if force:
+        logger.info("force=True — recreating accidents table to ensure schema is fully up-to-date...")
+        Accident.__table__.drop(bind=engine, checkfirst=True)
+        Accident.__table__.create(bind=engine, checkfirst=True)
+    else:
+        Base.metadata.create_all(bind=engine)
+        # Self-healing migration for existing tables created on older schemas
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE accidents ADD COLUMN IF NOT EXISTS is_valid_coordinates BOOLEAN DEFAULT TRUE NOT NULL;"))
+            conn.execute(text("ALTER TABLE accidents ADD COLUMN IF NOT EXISTS is_duplicate BOOLEAN DEFAULT FALSE NOT NULL;"))
+            conn.execute(text("ALTER TABLE accidents ADD COLUMN IF NOT EXISTS requires_attention BOOLEAN DEFAULT FALSE NOT NULL;"))
+            conn.execute(text("ALTER TABLE accidents ADD COLUMN IF NOT EXISTS invalidation_reasons VARCHAR;"))
+            conn.commit()
+
     db = SessionLocal()
 
     try:
-        existing = db.query(Accident).count()
-        if existing > 0 and not force and not append:
+        existing = db.query(Accident).count() if not force else 0
+        if existing > 0 and not append:
             logger.info("accidents table already has %d rows — skipping. Pass --force to re-seed or --append to append.", existing)
             return
-
-        if force and existing > 0:
-            logger.info("force=True — deleting %d existing rows …", existing)
-            db.query(Accident).delete()
-            db.commit()
 
         seen_records: set[tuple[str, str]] = set(
             (row.accident_id, row.district)
