@@ -5,7 +5,7 @@ KDE density maps, and risk corridor evaluations.
 """
 
 # ---------------------------------------------------------------------------
-# MoRTH Blackspot Detection (Greedy & DBSCAN)
+# MoRTH Blackspot Detection
 # ---------------------------------------------------------------------------
 
 # Search radius in meters for grouping adjacent crashes into a blackspot

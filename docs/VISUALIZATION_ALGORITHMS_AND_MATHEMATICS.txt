@@ -24,7 +24,7 @@ TABLE OF CONTENTS
 3. Accident Road Snapping: Eliminating GPS Drift
 4. Crash Density Heatmaps (KDE): Finding Macroscopic Hazard Zones
 5. MoRTH Blackspot Detection (500-Meter Section Analysis)
-6. DBSCAN Blackspot Detection (Isolating Independent Hazards)
+6. MoRTH Non-Overlapping Visualization (Voronoi Half-Plane Partitioning)
 7. IRC:131 Blackspot Categorization (AATC Rate Benchmark Method)
 8. Network-Constrained Blackspots (True Linear Highway Chainage)
 9. Continuous Risk Corridors (Merging Hazardous Highway Stretches)
@@ -240,7 +240,7 @@ Rendered as a continuous, glowing color surface:
 Related Files:
   - backend/app/utils/blackspot_utils.py
   - backend/app/core/gis_config.py
-  - frontend/src/components/maps/DbscanBlackspotDetectionLayers.tsx
+  - frontend/src/components/maps/BlackspotDetectionLayers.tsx
   - frontend/src/config/blackspotConfig.ts
 
 5.1 The Practical Problem & Ministry Criteria
@@ -321,39 +321,38 @@ into 5 equal intervals:
 
 
 ================================================================================
-6. DBSCAN BLACKSPOT DETECTION (ISOLATING INDEPENDENT HAZARDS)
+6. MoRTH NON-OVERLAPPING VISUALIZATION (VORONOI HALF-PLANE PARTITIONING)
 ================================================================================
 
-Related File: backend/app/utils/blackspot_utils.py (dbscan_blackspots)
+Related Files: 
+  - backend/app/utils/blackspot_utils.py (resolve_non_overlapping_polygons)
+  - backend/app/utils/irc_blackspot_utils.py
 
-6.1 The Practical Problem
--------------------------
-In heavily congested urban corridors (e.g., Surat Ring Road or SG Highway in
-Ahmedabad), accidents occur continuously over 4 to 5 kilometers. Standard density
-clustering algorithms tend to merge the entire 5 km highway into one enormous,
-unmanageable cluster. But civil engineering tenders and municipal budgets are
-awarded for specific 500-meter remedial works (such as rebuilding an intersection
-or constructing an underpass).
+6.1 Note on DBSCAN Blackspots Removal
+-------------------------------------
+Previously, a "MoRTH DBSCAN Blackspot" option existed that performed Euclidean
+center suppression (> 500m separation). However, hard center distance suppression
+caused high-severity fatal clusters (such as consecutive highway junction zones
+spaced ~300-400m apart) to be inadvertently dropped or silenced. The DBSCAN option
+has been completely removed from both the dashboard UI and codebase.
 
-6.2 How the Algorithm Works (Non-Maximum Overlap Suppression)
-------------------------------------------------------------
-1. Fixed Neighborhood Search:
-   Using radius epsilon = 250m and MinPoints = 5, every crash with >= 5 neighbors
-   is flagged as a candidate cluster center.
+6.2 How Non-Overlapping Buffers Are Formed (Voronoi Midpoint Bisector)
+----------------------------------------------------------------------
+1. Greedy Clustering:
+   Crashes are clustered iteratively using 250m radius buffers with point deduplication
+   (crash points already claimed by higher-ranked clusters are removed from consideration).
+   This ensures each accident is counted at most once and no fatal cluster is dropped.
 
-2. Descending Sort:
-   Candidate centers are sorted strictly by crash density (densest centers first).
-
-3. Overlap Suppression Rule:
-   The algorithm selects the densest candidate center first. Then, it evaluates
-   every subsequent candidate center and enforces a minimum separation distance:
-     Euclidean_Distance(candidate_center, accepted_center) > 500 meters (2 * epsilon)
-
-   Any candidate center within 500 meters of an already accepted center is suppressed.
-
-4. Result:
-   Every identified blackspot is guaranteed to be a distinct, non-overlapping
-   500-meter road segment that can be independently inspected, audited, and funded.
+2. Half-Plane Boundary Partitioning:
+   When two neighboring 250m circles overlap (center-to-center distance < 500m),
+   a perpendicular bisector line is calculated halfway between their centroids.
+   Each circle is clipped to its respective half-plane:
+     Half-Plane(C_A, C_B) = { p in R^2 | ||p - C_A|| <= ||p - C_B|| }
+   
+3. Guaranteed 0 Visual Overlap:
+   Every blackspot retains its legal MoRTH ranking and points, while the rendered
+   polygonal footprints are perfectly disjoint (0.0 m^2 intersection area), cleanly
+   demarcating responsibility between adjacent blackspots.
 
 
 ================================================================================
@@ -660,8 +659,7 @@ Visualization Layer     Core Mathematical Formula         Primary Objective
 -----------------------------------------------------------------------------------------
 Snapped Accidents       ST_ClosestPoint + ST_Distance     Eliminates 10-50m GPS drift onto road
 KDE Density Heatmap     Quartic Kernel: (3/pi)*(1-u^2)^2  Continuous smoothed density (0-100 scale)
-MoRTH Blackspots        Haversine Metric + Bucket Queue   Clusters with >=5 qualifying crashes / 250m
-DBSCAN Blackspots       Non-Max Suppression (>500m gap)   Isolates independent 500m road hazards
+MoRTH Blackspots        Voronoi Half-Plane Partitioning   Zero visual overlap without dropping real clusters
 IRC:131 Blackspots      AATC vs Benchmark Rate M (x15..x3) Eliminates urban bias; flags rural hazards
 Network Blackspots      1D Sliding Window along LRS Line  Restricts analysis strictly to road centerline
 Highway Risk Corridors  Topological Gap Merging (<=100m)  Combines contiguous blackspots into corridors

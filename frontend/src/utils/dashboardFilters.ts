@@ -10,7 +10,6 @@ import type { DashboardFilters } from "../types/dashboard";
  */
 export const BLACKSPOT_VISUALIZATION_TYPES = new Set([
   "blackspot",
-  "dbscan_blackspot",
   "irc_greedy_blackspot",
   "irc_grid_blackspot",
 ]);

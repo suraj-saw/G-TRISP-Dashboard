@@ -13,10 +13,9 @@ neighbourhood (haversine radius) is used to approximate a 500 m linear
 section. (A future migration to a road-network/graph-based approach will
 replace this radial approximation.)
 
-Two spatial detection algorithms are provided:
-
-  greedy_blackspots()    — density-first greedy sweep.
-  dbscan_blackspots()    — overlap-suppressed fixed-radius sweep.
+Spatial detection algorithm:
+ 
+   greedy_blackspots()    — density-first greedy sweep with Voronoi non-overlapping visual partitioning.
 
 Performance note
 ----------------
@@ -517,95 +516,6 @@ def greedy_blackspots(
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ALGORITHM 2: DBSCAN-style overlap-suppressed sweep
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def dbscan_blackspots(
-    points: list[CrashPoint],
-    radius_m: float = SEARCH_RADIUS_M,
-    min_crashes: int = MIN_QUALIFYING_CRASHES,
-) -> list[Blackspot]:
-    """
-    Overlap-suppressed fixed-radius blackspot detection.
-
-    Unlike greedy_blackspots(), crashes may belong to more than one candidate's
-    neighbourhood before overlap suppression.  The densest non-overlapping
-    centres are accepted; each is then checked against the configurable
-    qualification rules before being added to the output.
-
-    Overlap suppression rule: two blackspot circles must not overlap
-    (centre separation > 2 × radius_m) so each spatial section is identified
-    independently.
-
-    Ranking: qualified blackspots are ordered by priority_score descending
-    (highest priority first), then by crash_count descending.
-    """
-    n = len(points)
-    if n == 0:
-        return []
-
-    ref_lat_rad = math.radians(sum(p.lat for p in points) / n)
-    xs = [0.0] * n
-    ys = [0.0] * n
-    for i, p in enumerate(points):
-        xs[i], ys[i] = _project_xy(p.lat, p.lon, ref_lat_rad)
-
-    cell_size = max(radius_m, 1.0)
-    grid = _build_grid(xs, ys, cell_size)
-
-    neighbour_counts = [
-        len(_neighbours_within(i, xs, ys, grid, cell_size, radius_m))
-        for i in range(n)
-    ]
-
-    # Pre-filter by minimum count.
-    candidates = [i for i in range(n) if neighbour_counts[i] >= min_crashes]
-    if not candidates:
-        return []
-
-    # Densest centres get first pick in overlap suppression.
-    candidates.sort(key=lambda i: -neighbour_counts[i])
-
-    # Overlap suppression: accept only if centre is > 2×radius_m from every
-    # already-accepted centre.
-    two_r2 = (2 * radius_m) ** 2
-    kept: list[int] = []
-    for idx in candidates:
-        overlap = any(
-            (xs[idx] - xs[k]) ** 2 + (ys[idx] - ys[k]) ** 2 < two_r2
-            for k in kept
-        )
-        if not overlap:
-            kept.append(idx)
-
-    raw_results: list[tuple[int, list[int]]] = [
-        (idx, _neighbours_within(idx, xs, ys, grid, cell_size, radius_m))
-        for idx in kept
-    ]
-
-    # Rank by priority_score descending, then by cluster size descending.
-    # Priority score is computed here solely for sorting; the authoritative
-    # value is stored on the Blackspot dataclass after _make_blackspot().
-    def _rank_key(item: tuple[int, list[int]]) -> tuple[int, int]:
-        _, members = item
-        severities = [points[i].severity for i in members]
-        counts = _severity_counts(severities)
-        score = _compute_priority_score(counts)
-        return (-score, -len(members))
-
-    raw_results.sort(key=_rank_key)
-
-    blackspots: list[Blackspot] = []
-    for idx, members in raw_results:
-        bs = _make_blackspot(len(blackspots) + 1, idx, members, points)
-        if bs is not None:
-            blackspots.append(bs)
-
-    _apply_dynamic_priority_levels(blackspots)
-    return blackspots
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # GeoJSON OUTPUT
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -625,6 +535,96 @@ def circle_polygon_geojson(
         coords.append([lon + dx / m_per_deg_lon, lat + dy / m_per_deg_lat])
 
     return {"type": "Polygon", "coordinates": [coords]}
+
+
+def resolve_non_overlapping_polygons(
+    anchors: list[tuple[float, float]],
+    radius_m: float,
+    n_points: int = 64,
+) -> list[dict]:
+    """
+    Generate GeoJSON polygon geometries for anchor points (lat, lon).
+    If two or more anchor buffers overlap (distance < 2 * radius_m), clip the
+    overlapping boundary along the perpendicular bisector between their centers
+    so that NO two polygons overlap in the visualization, while maintaining the
+    full valid spatial extent and correct identification of each blackspot.
+    """
+    n = len(anchors)
+    if n == 0:
+        return []
+
+    try:
+        import shapely.geometry as sg
+    except ImportError:
+        return [circle_polygon_geojson(lat, lon, radius_m, n_points) for lat, lon in anchors]
+
+    raw_polys = []
+    for lat, lon in anchors:
+        lat_rad = math.radians(lat)
+        m_per_deg_lat = 111_320.0
+        m_per_deg_lon = 111_320.0 * math.cos(lat_rad) or 1e-9
+        coords = []
+        for k in range(n_points):
+            theta = 2 * math.pi * (k / n_points)
+            coords.append((
+                lon + (radius_m * math.cos(theta)) / m_per_deg_lon,
+                lat + (radius_m * math.sin(theta)) / m_per_deg_lat,
+            ))
+        coords.append(coords[0])
+        raw_polys.append(sg.Polygon(coords))
+
+    two_r = 2.0 * radius_m
+    overlaps = defaultdict(list)
+    for i in range(n):
+        lat_i, lon_i = anchors[i]
+        for j in range(i + 1, n):
+            lat_j, lon_j = anchors[j]
+            if _haversine_m(lat_i, lon_i, lat_j, lon_j) < two_r:
+                overlaps[i].append(j)
+                overlaps[j].append(i)
+
+    if not overlaps:
+        return [sg.mapping(p) for p in raw_polys]
+
+    clipped_polys = list(raw_polys)
+    BIG = 0.5  # ~55 km half-plane bounding box
+
+    for i, neighbors in overlaps.items():
+        c1_lon, c1_lat = anchors[i][1], anchors[i][0]
+        cur_poly = clipped_polys[i]
+        for j in neighbors:
+            c2_lon, c2_lat = anchors[j][1], anchors[j][0]
+            dx = c2_lon - c1_lon
+            dy = c2_lat - c1_lat
+            dist = math.hypot(dx, dy)
+            if dist < 1e-9:
+                continue
+            mx = (c1_lon + c2_lon) / 2.0
+            my = (c1_lat + c2_lat) / 2.0
+            ux, uy = -dy / dist, dx / dist
+            vx, vy = -dx / dist, -dy / dist
+
+            half_plane = sg.Polygon([
+                (mx - BIG * ux, my - BIG * uy),
+                (mx + BIG * ux, my + BIG * uy),
+                (mx + BIG * ux + BIG * vx, my + BIG * uy + BIG * vy),
+                (mx - BIG * ux + BIG * vx, my - BIG * uy + BIG * vy),
+            ])
+            try:
+                clipped = cur_poly.intersection(half_plane)
+                if not clipped.is_empty and clipped.is_valid:
+                    cur_poly = clipped
+            except Exception:
+                pass
+        clipped_polys[i] = cur_poly
+
+    geoms = []
+    for i, p in enumerate(clipped_polys):
+        if p.is_empty or not p.is_valid:
+            geoms.append(circle_polygon_geojson(anchors[i][0], anchors[i][1], radius_m, n_points))
+        else:
+            geoms.append(sg.mapping(p))
+    return geoms
 
 
 def blackspots_to_geojson(blackspots: list[Blackspot], radius_m: float) -> dict:
@@ -653,7 +653,10 @@ def blackspots_to_geojson(blackspots: list[Blackspot], radius_m: float) -> dict:
     sorted_blackspots = sorted(blackspots, key=lambda bs: bs.priority_score, reverse=True)
     total_blackspots = len(sorted_blackspots)
 
-    for rank, bs in enumerate(sorted_blackspots, start=1):
+    anchors = [(bs.anchor_lat, bs.anchor_lon) for bs in sorted_blackspots]
+    geoms = resolve_non_overlapping_polygons(anchors, radius_m)
+
+    for rank, (bs, geom) in enumerate(zip(sorted_blackspots, geoms), start=1):
         props = {
             # ── New terminology ────────────────────────────────────────────
             "priority_rank":              rank,
@@ -682,7 +685,7 @@ def blackspots_to_geojson(blackspots: list[Blackspot], radius_m: float) -> dict:
         circle_features.append({
             "type": "Feature",
             "properties": props,
-            "geometry": circle_polygon_geojson(bs.anchor_lat, bs.anchor_lon, radius_m),
+            "geometry": geom,
         })
         centroid_features.append({
             "type": "Feature",

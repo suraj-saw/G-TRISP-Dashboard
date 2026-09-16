@@ -69,7 +69,7 @@ def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 class RemarkCreateRequest(BaseModel):
     """Schema for creating a new remark."""
     crash_ids: List[str] = Field(..., min_length=1, description="List of crash/accident DB IDs forming the cluster")
-    visualization_type: str = Field(..., description="Visualization type (e.g., 'blackspot', 'dbscan_blackspot')")
+    visualization_type: str = Field(..., description="Visualization type (e.g., 'blackspot', 'irc_greedy_blackspot')")
     district: Optional[str] = Field(None, description="District name")
     centroid_lat: float = Field(..., description="Latitude of the cluster centroid")
     centroid_lon: float = Field(..., description="Longitude of the cluster centroid")

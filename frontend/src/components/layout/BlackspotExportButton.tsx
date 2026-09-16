@@ -40,7 +40,7 @@ interface MenuPos {
  * @state_management Maintains UI states (`open`, `status`), handles form validation state (`bsIdsInput`), and manages the absolute positioning (`pos`) of the portaled dropdown.
  * @param {Object} props - Component properties.
  * @param {DashboardFilters} props.filters - Global dashboard filters applied to the export.
- * @param {BlackspotAlgorithm} props.algorithm - The blackspot detection algorithm used (e.g. 'dbscan', 'greedy').
+ * @param {BlackspotAlgorithm} props.algorithm - The blackspot detection algorithm used (e.g. 'greedy', 'irc_greedy', 'irc_grid').
  * @param {string} [props.districtName] - Optional district name.
  */
 export default function BlackspotExportButton({
@@ -225,7 +225,7 @@ export default function BlackspotExportButton({
     }
   };
 
-  const algorithmLabel = algorithm === "dbscan" ? "DBSCAN" : "Greedy";
+  const algorithmLabel = algorithm === "irc_greedy" ? "IRC (Greedy)" : algorithm === "irc_grid" ? "IRC (Grid)" : "MoRTH";
   const exportLabel = bsIdsInput.trim()
     ? `Blackspot(s) ${bsIdsInput.trim()} accidents`
     : "Please enter blackspot number(s)";
@@ -342,7 +342,7 @@ export default function BlackspotExportButton({
           crashIds={pdfExport.crashIds}
           bsId={pdfExport.bsIdsStr}
           priorityLabel={`Multiple Blackspots (${pdfExport.bsIdsStr})`}
-          detectionMethod={algorithm === "dbscan" ? "MoRTH Blackspot (DBSCAN)" : "MoRTH Blackspot (Greedy)"}
+          detectionMethod={algorithm === "irc_greedy" ? "IRC Blackspot (Greedy)" : algorithm === "irc_grid" ? "IRC Blackspot (Grid)" : "MoRTH Blackspot"}
           districtName={districtName}
           filters={filters}
           onComplete={() => setPdfExport(null)}

@@ -40,6 +40,12 @@ export interface DashboardFilters {
   baseMap?: string;
   /** Visualization types (optional, multiple can be active) */
   visualization_type?: string[];
+  /** Blackspot visualization types (optional, multiple can be active) */
+  blackspots?: string[];
+  /** Hotspot visualization types (optional, multiple can be active) */
+  hotspots?: string[];
+  /** Test visualization types (optional, multiple can be active) */
+  test_visualization?: string[];
   /** Visualization variant (optional) */
   visualization_variant?: string;
   /** Start date for the filter (optional) */

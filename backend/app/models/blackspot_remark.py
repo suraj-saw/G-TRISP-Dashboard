@@ -9,9 +9,13 @@ ensures remarks persist even when blackspot `bs_id` numbering changes due
 to filter or parameter modifications.
 """
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey
+# pyrefly: ignore [missing-import]
 from sqlalchemy.sql import func
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import relationship
+# pyrefly: ignore [missing-import]
 from geoalchemy2 import Geometry
 
 from app.database import Base
@@ -29,7 +33,7 @@ class BlackspotRemark(Base):
         crash_ids (str): Full sorted, comma-joined list of accident DB IDs for
             reference and fuzzy matching.
         visualization_type (str): The blackspot algorithm type that produced
-            the cluster (e.g., "blackspot", "dbscan_blackspot").
+            the cluster (e.g., "blackspot", "irc_greedy_blackspot").
         district (str): District name at the time the remark was created.
         centroid_lat (float): Latitude of the cluster centroid.
         centroid_lon (float): Longitude of the cluster centroid.

@@ -1,7 +1,7 @@
 # backend/app/routes/dashboard_routes/blackspots_routes.py
 
 """
-Blackspot Detection & Export Endpoints (Greedy, DBSCAN, IRC, Pedestrian, Network Blackspots).
+Blackspot Detection & Export Endpoints (MoRTH Greedy, IRC, Pedestrian, Network Blackspots).
 """
 
 import calendar
@@ -43,7 +43,6 @@ from app.utils.accident_utils import (
 from app.utils.blackspot_utils import (
     CrashPoint,
     greedy_blackspots,
-    dbscan_blackspots,
     blackspots_to_geojson,
 )
 from app.utils.irc_blackspot_utils import (
@@ -220,152 +219,6 @@ def get_pedestrian_blackspots(
     ]
 
     blackspots = greedy_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
-    geojson = blackspots_to_geojson(blackspots, radius_m=radius_m)
-
-    return {
-        "total_crashes": len(points),
-        "total_blackspots": len(blackspots),
-        "isolated_crashes": len(points) - sum(b.crash_count for b in blackspots),
-        "radius_m": radius_m,
-        "min_crashes": min_crashes,
-        "circles": geojson["circles"],
-        "centroids": geojson["centroids"],
-    }
-
-
-@router.get("/dbscan-blackspots")
-def get_dbscan_blackspots(
-    district: Optional[List[str]] = Query(None),
-    severity: Optional[List[str]] = Query(None),
-    year: Optional[List[int]] = Query(None),
-    road_classification: Optional[List[str]] = Query(None),
-    weather_condition: Optional[List[str]] = Query(None),
-    light_condition: Optional[List[str]] = Query(None),
-    collision_type: Optional[List[str]] = Query(None),
-    number_of_vehicles: Optional[List[str]] = Query(None),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
-    radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
-    min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
-    taluka: Optional[List[str]] = Query(None),
-    db: Session = Depends(get_db),
-    police_station: Optional[List[str]] = Query(None),
-    visibility: Optional[List[str]] = Query(None),
-):
-    query = apply_filters(
-        db.query(Accident),
-        district, year, road_classification,
-        weather_condition, light_condition, collision_type,
-        date_from, date_to,
-        taluka=taluka, db=db,
-        number_of_vehicles=number_of_vehicles,
-        police_station=police_station,
-        visibility=visibility,
-    )
-    if severity:
-        query = query.filter(Accident.severity.in_(severity))
-
-    accidents = query.with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time, (func.coalesce(Accident.driver_killed, 0) + func.coalesce(Accident.passenger_killed, 0) + func.coalesce(Accident.pedestrian_killed, 0)).label("fatalities")).all()
-
-    validation_error = validate_observation_period(accidents, selected_years=year)
-    if validation_error:
-        return JSONResponse(
-            status_code=400,
-            content={"detail": validation_error},
-        )
-
-    points = [
-        CrashPoint(
-            index=idx,
-            accident_db_id=a.id,
-            accident_id=a.accident_id,
-            lat=a.latitude,
-            lon=a.longitude,
-            severity=a.severity or "Unknown",
-            number_of_vehicles=a.number_of_vehicles or 0,
-            fatalities=a.fatalities or 0,
-        )
-        for idx, a in enumerate(accidents)
-        if a.latitude is not None and a.longitude is not None
-    ]
-
-    blackspots = dbscan_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
-    geojson = blackspots_to_geojson(blackspots, radius_m=radius_m)
-
-    return {
-        "total_crashes": len(points),
-        "total_blackspots": len(blackspots),
-        "isolated_crashes": len(points) - sum(b.crash_count for b in blackspots),
-        "radius_m": radius_m,
-        "min_crashes": min_crashes,
-        "circles": geojson["circles"],
-        "centroids": geojson["centroids"],
-    }
-
-
-@router.get("/pedestrian-dbscan-blackspots")
-def get_pedestrian_dbscan_blackspots(
-    district: Optional[List[str]] = Query(None),
-    severity: Optional[List[str]] = Query(None),
-    year: Optional[List[int]] = Query(None),
-    road_classification: Optional[List[str]] = Query(None),
-    weather_condition: Optional[List[str]] = Query(None),
-    light_condition: Optional[List[str]] = Query(None),
-    collision_type: Optional[List[str]] = Query(None),
-    number_of_vehicles: Optional[List[str]] = Query(None),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
-    radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
-    min_crashes: int = Query(PEDESTRIAN_BLACKSPOT_MIN_CRASHES, ge=2, le=100),
-    taluka: Optional[List[str]] = Query(None),
-    db: Session = Depends(get_db),
-    police_station: Optional[List[str]] = Query(None),
-    visibility: Optional[List[str]] = Query(None),
-):
-    query = apply_filters(
-        db.query(Accident),
-        district, year, road_classification,
-        weather_condition, light_condition, collision_type,
-        date_from, date_to,
-        taluka=taluka, db=db,
-        number_of_vehicles=number_of_vehicles,
-        police_station=police_station,
-        visibility=visibility,
-    )
-    if severity:
-        query = query.filter(Accident.severity.in_(severity))
-
-    accidents = query.filter(
-        (
-            func.coalesce(Accident.pedestrian_killed, 0) +
-            func.coalesce(Accident.pedestrian_grievous_injury, 0) +
-            func.coalesce(Accident.pedestrian_minor_injury, 0)
-        ) > 0
-    ).with_entities(Accident.id, Accident.accident_id, Accident.latitude, Accident.longitude, Accident.severity, Accident.number_of_vehicles, Accident.accident_date_time, func.coalesce(Accident.pedestrian_killed, 0).label("fatalities")).all()
-
-    validation_error = validate_observation_period(accidents, selected_years=year)
-    if validation_error:
-        return JSONResponse(
-            status_code=400,
-            content={"detail": validation_error},
-        )
-
-    points = [
-        CrashPoint(
-            index=idx,
-            accident_db_id=a.id,
-            accident_id=a.accident_id,
-            lat=a.latitude,
-            lon=a.longitude,
-            severity=a.severity or "Unknown",
-            number_of_vehicles=a.number_of_vehicles or 0,
-            fatalities=a.fatalities or 0,
-        )
-        for idx, a in enumerate(accidents)
-        if a.latitude is not None and a.longitude is not None
-    ]
-
-    blackspots = dbscan_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
     geojson = blackspots_to_geojson(blackspots, radius_m=radius_m)
 
     return {
@@ -988,7 +841,7 @@ def export_blackspots(
     date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
     min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
-    algorithm: str = Query("greedy", enum=["greedy", "dbscan"]),
+    algorithm: Optional[str] = Query("greedy"),
     bs_ids: Optional[str] = Query(None, description="Blackspot number(s) to export: single (e.g. 3), range (e.g. 1-5), or comma-separated (e.g. 1,3,5)"),
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
@@ -1032,10 +885,7 @@ def export_blackspots(
                 number_of_vehicles=a.number_of_vehicles or 0,
             ))
 
-    if algorithm == "dbscan":
-        blackspots = dbscan_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
-    else:
-        blackspots = greedy_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
+    blackspots = greedy_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
 
     acc_by_db_id = {a.id: a for a in filtered_accidents}
 
@@ -1077,12 +927,13 @@ def export_blackspots(
             except ValueError:
                 pass
 
+    safe_algorithm = (algorithm or "greedy").lower()
     timestamp = dt.now().strftime("%Y%m%d_%H%M%S")
     if bs_ids is not None and bs_ids.strip():
         safe_bs_ids = bs_ids.replace(' ', '_').replace(',', '_').replace('-', '_to_')
-        filename = f"blackspots_{safe_bs_ids}_accidents_{algorithm}_{timestamp}"
+        filename = f"blackspots_{safe_bs_ids}_accidents_{safe_algorithm}_{timestamp}"
     else:
-        filename = f"all_blackspot_accidents_{algorithm}_{timestamp}"
+        filename = f"all_blackspot_accidents_{safe_algorithm}_{timestamp}"
 
     if format == "csv":
         csv_data = build_accident_csv(accidents_with_bs)
@@ -1097,7 +948,7 @@ def export_blackspots(
 
     meta_rows = [
         ("Export Date", dt.now().strftime("%d %b %Y %H:%M")),
-        ("Algorithm", algorithm.upper()),
+        ("Algorithm", safe_algorithm.upper()),
         ("Blackspot #", bs_ids if bs_ids is not None and bs_ids.strip() else "All"),
         ("Total Blackspots", len(target_bs)),
         ("Total Accident Records", len(accidents_with_bs)),
@@ -1130,7 +981,7 @@ def get_crash_ids_by_bs_ids(
     date_to: Optional[str] = Query(None),
     radius_m: float = Query(BLACKSPOT_RADIUS_METERS, ge=50, le=2000),
     min_crashes: int = Query(BLACKSPOT_MIN_CRASHES, ge=2, le=100),
-    algorithm: str = Query("greedy", enum=["greedy", "dbscan"]),
+    algorithm: Optional[str] = Query("greedy"),
     bs_ids: Optional[str] = Query(None),
     taluka: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
@@ -1162,10 +1013,7 @@ def get_crash_ids_by_bs_ids(
                 number_of_vehicles=a.number_of_vehicles or 0,
             ))
 
-    if algorithm == "dbscan":
-        blackspots = dbscan_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
-    else:
-        blackspots = greedy_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
+    blackspots = greedy_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
 
     target_bs_ids = []
     if bs_ids is not None:

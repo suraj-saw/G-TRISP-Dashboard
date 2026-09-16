@@ -79,10 +79,18 @@ function TopBar({
       >
         {/* LEFT SIDE: Branding */}
         <div className="flex items-center gap-4">
-          {/* App Title */}
-          <h1 className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 to-indigo-950 bg-clip-text text-transparent">
-            {appName}
-          </h1>
+          {/* App Title / Logo */}
+          <button
+            type="button"
+            onClick={() => navigate(ROUTES.HOME_PAGE)}
+            className="flex items-center gap-2 rounded-lg text-left transition-all hover:opacity-80 active:scale-98 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer"
+            title="Go to Landing Page"
+            aria-label="Go to Landing Page"
+          >
+            <h1 className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 to-indigo-950 bg-clip-text text-transparent select-none">
+              {appName}
+            </h1>
+          </button>
         </div>
 
         {/* RIGHT SIDE: Navigation & Profile Dropdown */}

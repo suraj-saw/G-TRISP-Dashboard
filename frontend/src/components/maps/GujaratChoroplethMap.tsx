@@ -11,8 +11,6 @@ import { useNavigate } from "react-router-dom";
 
 import { geoMercator, geoPath } from "d3-geo";
 
-import { scaleSqrt } from "d3-scale";
-
 import { Loader2, AlertCircle } from "lucide-react";
 
 import { fetchAllGujaratDistricts } from "../../api/geoApi";
@@ -22,6 +20,44 @@ import { fetchGujaratDistrictSummary } from "../../api/gujaratDashboardApi";
 import { buildDistrictDashboardPath } from "../../config/constants";
 
 import { useDistrictInsights } from "../../context/DistrictInsightsContext";
+
+// 33 distinct, softly graded shades for Gujarat's 33 districts (Rank 1 = most accidents to Rank 33 = least).
+// Crafted with harmonious, controlled saturation and smooth lightness progression to avoid jarring contrast.
+const RANK_COLORS_33: string[] = [
+  "#29447a", // Rank 1 (Most Accidents)
+  "#2c4881", // Rank 2
+  "#2e4c87", // Rank 3
+  "#31508d", // Rank 4
+  "#345493", // Rank 5
+  "#375899", // Rank 6
+  "#3a5c9f", // Rank 7
+  "#3d60a5", // Rank 8
+  "#4064ab", // Rank 9
+  "#4368b0", // Rank 10
+  "#466cb6", // Rank 11
+  "#4c71b9", // Rank 12
+  "#5376bb", // Rank 13
+  "#5a7bbd", // Rank 14
+  "#6180bf", // Rank 15
+  "#6886c1", // Rank 16
+  "#6f8bc3", // Rank 17 (Median)
+  "#7690c5", // Rank 18
+  "#7d96c7", // Rank 19
+  "#849bc9", // Rank 20
+  "#8aa0cb", // Rank 21
+  "#91a5ce", // Rank 22
+  "#97aad0", // Rank 23
+  "#9eafd2", // Rank 24
+  "#a5b5d5", // Rank 25
+  "#abbad7", // Rank 26
+  "#b1bfda", // Rank 27
+  "#b8c4dd", // Rank 28
+  "#bec9df", // Rank 29
+  "#c4cee2", // Rank 30
+  "#cad3e5", // Rank 31
+  "#d1d8e7", // Rank 32
+  "#d7ddea", // Rank 33 (Least Accidents)
+];
 
 // Internal dimensions for the SVG viewBox
 
@@ -38,6 +74,10 @@ interface DistrictFeature {
   name: string;
 
   count: number;
+
+  rank: number;
+
+  totalDistricts: number;
 
   d: string;
 
@@ -172,11 +212,7 @@ export default function GujaratChoroplethMap() {
           }
         });
 
-        const maxVal = Math.max(1, ...Array.from(countByName.values()));
 
-        const colorScale = scaleSqrt<string>()
-          .domain([0, maxVal])
-          .range(["#EAF0FE", "#1E3A8A"]);
 
 
 
@@ -311,16 +347,19 @@ export default function GujaratChoroplethMap() {
 
 
 
-        const built: DistrictFeature[] = [];
+        interface RawDistrict {
+          slug: string;
+          name: string;
+          count: number;
+          d: string;
+        }
+
+        const rawList: RawDistrict[] = [];
 
         for (let i = 0; i < collection.features.length; i++) {
-
           const f = collection.features[i];
-
           const props = f.properties ?? {};
-
           const name = String(props.name ?? "Unknown");
-
           const slug = String(props.slug ?? "");
 
           const mappedGeoName = normalizeDistrictName(name);
@@ -329,14 +368,35 @@ export default function GujaratChoroplethMap() {
           const d = pathFn(f as any) ?? "";
 
           if (d) {
-
-            built.push({ slug, name, count, d, fill: colorScale(count) });
-
+            rawList.push({ slug, name, count, d });
           }
-
         }
 
+        // Rank districts by accident count (descending: Rank 1 = most accidents)
+        const sortedDesc = [...rawList].sort((a, b) => b.count - a.count);
+        const totalDistricts = sortedDesc.length;
 
+        // Assign standard ranking (1, 2, 2, 4...)
+        const rankBySlug = new Map<string, number>();
+        let currentRank = 1;
+        for (let i = 0; i < sortedDesc.length; i++) {
+          if (i > 0 && sortedDesc[i].count < sortedDesc[i - 1].count) {
+            currentRank = i + 1;
+          }
+          rankBySlug.set(sortedDesc[i].slug, currentRank);
+        }
+
+        const built: DistrictFeature[] = rawList.map((item) => {
+          const rank = rankBySlug.get(item.slug) ?? totalDistricts;
+          // Direct 1-to-1 mapping into the 33 curated colors (Rank 1 -> index 0, Rank 33 -> index 32)
+          const colorIndex = Math.min(Math.max(0, rank - 1), RANK_COLORS_33.length - 1);
+          return {
+            ...item,
+            rank,
+            totalDistricts,
+            fill: RANK_COLORS_33[colorIndex],
+          };
+        });
 
         setDistricts(built);
 
@@ -382,7 +442,7 @@ export default function GujaratChoroplethMap() {
 
   const handleMouseMove = useCallback(
 
-    (e: React.MouseEvent<SVGPathElement>, slug: string, name: string) => {
+    (e: React.MouseEvent<SVGPathElement>, dist: DistrictFeature) => {
 
       const rect = containerRef.current?.getBoundingClientRect();
 
@@ -400,31 +460,24 @@ export default function GujaratChoroplethMap() {
 
 
 
-      // Improved Tooltip UI using Tailwind classes directly in innerHTML
-
+      // Tooltip UI displaying solely the District Name
       tip.innerHTML = `
+        <span class="text-[13px] font-bold text-slate-800">${dist.name}</span>
+      `;
 
-      <div class="flex flex-col gap-0.5">
 
-        <span class="text-[13px] font-bold text-slate-800">${name}</span>
-
-        
-
-      </div>
-
-    `;
 
       tip.style.opacity = "1";
 
 
 
-      if (hoveredSlugRef.current !== slug) {
+      if (hoveredSlugRef.current !== dist.slug) {
 
-        hoveredSlugRef.current = slug;
+        hoveredSlugRef.current = dist.slug;
 
-        setHoveredSlug(slug);
+        setHoveredSlug(dist.slug);
 
-        setHoveredDistrict(name);
+        setHoveredDistrict(dist.name);
 
       }
 
@@ -562,13 +615,13 @@ export default function GujaratChoroplethMap() {
 
                 fill={dist.fill}
 
-                stroke="#CBD5E1" // Soft slate border for un-hovered districts
+                stroke="#FFFFFF" // Clean white border for a refined, low-contrast cartographic look
 
-                strokeWidth={0.75}
+                strokeWidth={1}
 
                 style={{ cursor: "pointer", transition: "fill 0.3s ease" }}
 
-                onMouseMove={(e) => handleMouseMove(e, dist.slug, dist.name)}
+                onMouseMove={(e) => handleMouseMove(e, dist)}
 
                 onMouseLeave={handleMouseLeave}
 
@@ -622,43 +675,7 @@ export default function GujaratChoroplethMap() {
 
 
 
-      {/* {!loading && (
 
-        <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-white/90 border border-[#E4E8F4] px-3 py-1.5 text-[11px] font-medium text-slate-500 shadow-sm">
-
-          <MousePointerClick size={12} className="text-[#1e3a8a]" />
-
-          Click a district to explore detailed analytics
-
-        </div>
-
-      )} */}
-
-
-
-      {/* {districts.length > 0 && !loading && (
-
-        <div className="pointer-events-none absolute top-3 right-3 z-10 rounded-xl border border-[#E4E8F4] bg-white/90 px-3 py-2.5 shadow-sm">
-
-          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-
-            Accidents
-
-          </p>
-
-          <div className="h-2 w-28 rounded-full bg-gradient-to-r from-[#EAF0FE] via-[#7AA6F7] to-[#1E3A8A]" />
-
-          <div className="mt-1 flex justify-between text-[9px] font-medium text-slate-400">
-
-            <span>0</span>
-
-            <span>{maxCount.toLocaleString()}</span>
-
-          </div>
-
-        </div>
-
-      )} */}
 
     </div>
 

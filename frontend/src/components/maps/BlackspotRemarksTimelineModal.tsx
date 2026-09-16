@@ -46,7 +46,7 @@ interface BlackspotRemarksTimelineModalProps {
   crashCount?: number;
   /** Location or landmark */
   landmark?: string | null;
-  /** Visualization type (e.g. "blackspot", "dbscan_blackspot") */
+  /** Visualization type (e.g. "blackspot", "irc_greedy_blackspot") */
   visualizationType?: string;
   /** District name */
   district?: string | null;

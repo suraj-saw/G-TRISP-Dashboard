@@ -336,7 +336,7 @@ def irc_grid_blackspots(
     return blackspots
 
 def irc_blackspots_to_geojson(blackspots: List[IrcBlackspot], radius_m: float) -> dict:
-    from app.utils.blackspot_utils import circle_polygon_geojson
+    from app.utils.blackspot_utils import resolve_non_overlapping_polygons
     
     CATEGORY_COLORS = {
         4: "#91CF60", # light green
@@ -354,7 +354,10 @@ def irc_blackspots_to_geojson(blackspots: List[IrcBlackspot], radius_m: float) -
     circle_features = []
     centroid_features = []
 
-    for bs in blackspots:
+    anchors = [(bs.anchor_lat, bs.anchor_lon) for bs in blackspots]
+    geoms = resolve_non_overlapping_polygons(anchors, radius_m)
+
+    for bs, geom in zip(blackspots, geoms):
         props = {
             "bs_id": bs.bs_id,
             "crash_count": bs.crash_count,
@@ -375,7 +378,7 @@ def irc_blackspots_to_geojson(blackspots: List[IrcBlackspot], radius_m: float) -
         circle_features.append({
             "type": "Feature",
             "properties": props,
-            "geometry": circle_polygon_geojson(bs.anchor_lat, bs.anchor_lon, radius_m),
+            "geometry": geom,
         })
         centroid_features.append({
             "type": "Feature",

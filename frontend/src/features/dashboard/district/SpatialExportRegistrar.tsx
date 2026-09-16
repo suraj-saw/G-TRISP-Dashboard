@@ -8,7 +8,6 @@ import type { DashboardFilters } from "../../../types/dashboard";
 interface SpatialExportRegistrarProps {
   analysisView: string;
   isBlackspotDetection: boolean;
-  isDbscanBlackspot: boolean;
   filters: DashboardFilters;
   districtName: string;
   mapRef?: any;
@@ -17,7 +16,6 @@ interface SpatialExportRegistrarProps {
 export function SpatialExportRegistrar({
   analysisView,
   isBlackspotDetection,
-  isDbscanBlackspot,
   filters,
   districtName,
 }: SpatialExportRegistrarProps) {
@@ -25,18 +23,17 @@ export function SpatialExportRegistrar({
 
   useEffect(() => {
     if (analysisView === "spatial") {
-      if (isBlackspotDetection || isDbscanBlackspot) {
+      if (isBlackspotDetection) {
         registerExportHandler({
           supportedFormats: ["csv", "excel"],
           allowClusterSelection: true,
           onExport: async (format, options) => {
             if (format === "csv" || format === "excel") {
-              const isBlackspot = isBlackspotDetection || isDbscanBlackspot;
               await downloadGujaratExport(
                 filters,
                 format,
                 districtName,
-                isBlackspot,
+                isBlackspotDetection,
                 options?.clusterId
               );
             }
@@ -58,7 +55,6 @@ export function SpatialExportRegistrar({
   }, [
     analysisView,
     isBlackspotDetection,
-    isDbscanBlackspot,
     filters,
     districtName,
     registerExportHandler,

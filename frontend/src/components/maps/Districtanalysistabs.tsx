@@ -17,7 +17,6 @@ interface DistrictAnalysisTabsProps {
   filters: DashboardFilters;
   districtName?: string;
   isBlackspotDetection?: boolean;
-  isDbscanBlackspot?: boolean;
   isPedestrianVariant?: boolean;
   searchBar?: React.ReactNode;
 }
@@ -62,12 +61,11 @@ const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
   filters,
   districtName,
   isBlackspotDetection,
-  isDbscanBlackspot,
   // isPedestrianVariant,
   searchBar,
 }) => {
   const showBlackspotExport =
-    activeView === "spatial" && (isBlackspotDetection || isDbscanBlackspot);
+    activeView === "spatial" && Boolean(isBlackspotDetection);
 
   const [isExporting, setIsExporting] = useState(false);
 
@@ -236,8 +234,7 @@ const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
         <div className="ml-4 h-full flex items-center py-1">
           <BlackspotExportButton
             filters={filters}
-            algorithm={isDbscanBlackspot ? "dbscan" : "greedy"}
-            
+            algorithm="greedy"
             districtName={districtName}
           />
         </div>

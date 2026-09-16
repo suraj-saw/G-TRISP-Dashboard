@@ -43,6 +43,9 @@ const defaultFilters: DashboardFilters = {
   date_to: "",
   baseMap: "",
   visualization_type: [],
+  blackspots: [],
+  hotspots: [],
+  test_visualization: [],
   visualization_variant: "",
 };
 

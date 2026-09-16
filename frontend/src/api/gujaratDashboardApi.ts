@@ -362,46 +362,7 @@ export const fetchGujaratPedestrianBlackspots = async (
   });
 };
 
-/**
- * Fetch DBSCAN blackspot data for Gujarat
- * @param filters - Dashboard filter options
- * @param district - District to scope the data
- * @returns Blackspot data structure
- */
-export const fetchGujaratDbscanBlackspots = async (
-  filters: DashboardFilters,
-  district: string
-): Promise<BlackspotData> => {
-  const params = getParams(filters, district);
-  const cacheKey = `gujarat_dbscan_${params.toString()}`;
-  return withCache(cacheKey, async () => {
-    const { data } = await API.get(`${GUJARAT_API_BASE}/dbscan-blackspots`, {
-      params,
-    });
-    return data;
-  });
-};
 
-/**
- * Fetch DBSCAN pedestrian blackspot data for Gujarat
- * @param filters - Dashboard filter options
- * @param district - District to scope the data
- * @returns Blackspot data structure
- */
-export const fetchGujaratPedestrianDbscanBlackspots = async (
-  filters: DashboardFilters,
-  district: string
-): Promise<BlackspotData> => {
-  const params = getParams(filters, district);
-  const cacheKey = `gujarat_pedestrian_dbscan_${params.toString()}`;
-  return withCache(cacheKey, async () => {
-    const { data } = await API.get(
-      `${GUJARAT_API_BASE}/pedestrian-dbscan-blackspots`,
-      { params }
-    );
-    return data;
-  });
-};
 
 /**
  * Fetch IRC Greedy blackspot data for Gujarat

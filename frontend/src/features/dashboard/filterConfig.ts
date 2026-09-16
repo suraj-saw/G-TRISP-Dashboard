@@ -13,7 +13,6 @@ export type VisualizationType =
   | "kde_heatmap"
   | "weighted_kde_heatmap"
   | "blackspot"
-  | "dbscan_blackspot"
   | "irc_greedy_blackspot"
   | "irc_grid_blackspot"
   | "temporal_analysis"
@@ -26,6 +25,9 @@ export type VisualizationType =
 export type FilterId =
   | "baseMap"
   | "visualization_type"
+  | "blackspots"
+  | "hotspots"
+  | "test_visualization"
   | "visualization_variant"
   | "year"
   | "year_range"
@@ -53,17 +55,33 @@ export const VISUALIZATION_OPTIONS = [
   { value: "density_heatmap", label: "Density Heatmap" },
   // { value: "kde_heatmap", label: "Kernel Density Heatmap (KDE)" },
   // { value: "weighted_kde_heatmap", label: "Severity-Weighted KDE Heatmap" },
-  { value: "blackspot", label: "MoRTH Blackspot (Greedy)" },
-  { value: "dbscan_blackspot", label: "MoRTH Blackspot (DBSCAN)" },
+  { value: "blackspot", label: "MoRTH Blackspot" },
   { value: "irc_greedy_blackspot", label: "IRC 131 Blackspot (Greedy)" },
   { value: "irc_grid_blackspot", label: "IRC 131 Blackspot (Grid)" },
   // { value: "snapped_accidents", label: "Network Snapped" },
-  { value: "network_blackspot", label: "Network Blackspots (Segments)" },
-  { value: "network_blackspot_merged", label: "Network Blackspots (Merged Lanes)" },
   { value: "risk_corridors", label: "Risk Corridors" },
+  { value: "temporal_analysis", label: "Temporal Analysis" },
+];
+
+/** Blackspot visualization options */
+export const BLACKSPOT_OPTIONS = [
+  { value: "blackspot", label: "MoRTH Blackspot" },
+  { value: "irc_greedy_blackspot", label: "IRC 131 Blackspot (Greedy)" },
+  { value: "irc_grid_blackspot", label: "IRC 131 Blackspot (Grid)" },
+];
+
+/** Hotspot visualization options */
+export const HOTSPOT_OPTIONS = [
+  { value: "density_heatmap", label: "Density Heatmap" },
+  { value: "risk_corridors", label: "Risk Corridors" },
+];
+
+/** Test visualization options */
+export const TEST_VISUALIZATION_OPTIONS = [
   { value: "road_network", label: "Road Network" },
   { value: "merged_road_network", label: "Merged Road Network" },
-  { value: "temporal_analysis", label: "Temporal Analysis" },
+  { value: "network_blackspot", label: "Network Blackspots (Segments)" },
+  { value: "network_blackspot_merged", label: "Network Blackspots (Merged Lanes)" },
 ];
 
 /** Available visualization variant options */
@@ -79,7 +97,6 @@ export const VISUALIZATION_VARIANT_LABELS: Record<string, string> = {
   // kde_heatmap: "Crash Type",
   // weighted_kde_heatmap: "Crash Type",
   blackspot: "Crash Type",
-  dbscan_blackspot: "Crash Type",
   irc_greedy_blackspot: "Crash Type",
   irc_grid_blackspot: "Crash Type",
   // snapped_accidents: "Crash Type",
@@ -103,7 +120,9 @@ export const hasVisualizationVariants = (visualizationTypes?: string[]): boolean
 /** Filter configuration for map-based visualizations */
 const MAP_FILTERS: FilterConfigItem[] = [
   { id: "baseMap", label: "Base Map", icon: "layers" },
-  { id: "visualization_type", label: "Visualization Type" },
+  { id: "blackspots", label: "Blackspots" },
+  { id: "hotspots", label: "Hotspots" },
+  { id: "test_visualization", label: "Test Visualization" },
   { id: "visualization_variant", label: "Visualization Variant" },
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
@@ -120,7 +139,9 @@ const MAP_FILTERS: FilterConfigItem[] = [
 
 /** Filter configuration for temporal analysis visualizations */
 const TEMPORAL_FILTERS: FilterConfigItem[] = [
-  { id: "visualization_type", label: "Visualization Type" },
+  { id: "blackspots", label: "Blackspots" },
+  { id: "hotspots", label: "Hotspots" },
+  { id: "test_visualization", label: "Test Visualization" },
   { id: "visualization_variant", label: "Visualization Variant" },
   { id: "date_from", label: "Start Date" },
   { id: "date_to", label: "End Date" },
@@ -212,5 +233,8 @@ export const defaultFilters: DashboardFilters = {
   date_to: "",
   baseMap: DEFAULT_BASE_MAP,
   visualization_type: [],
+  blackspots: [],
+  hotspots: [],
+  test_visualization: [],
   visualization_variant: "accident",
 };
