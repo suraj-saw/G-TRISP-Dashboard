@@ -10,6 +10,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ---------------------------------------------------------------------------
+# Project Branding & Identity
+# Single source of truth for dashboard name, API title, and team labels.
+# ---------------------------------------------------------------------------
+PROJECT_NAME: str = os.getenv("PROJECT_NAME", "ASTRA")
+PROJECT_DISPLAY_NAME: str = os.getenv("PROJECT_DISPLAY_NAME", "ASTRA (अस्त्र)")
+APP_TITLE: str = os.getenv("APP_TITLE", "ASTRA Dashboard API")
+PROJECT_FULL_NAME: str = os.getenv(
+    "PROJECT_FULL_NAME", "Advance Spatiotemporal Traffic Risk Analytics"
+)
+TEAM_NAME: str = os.getenv("TEAM_NAME", "ASTRA Team")
+
+# ---------------------------------------------------------------------------
 # PostGIS / Geometry
 # ---------------------------------------------------------------------------
 

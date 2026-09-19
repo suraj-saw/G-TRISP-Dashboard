@@ -1,7 +1,7 @@
 // frontend/vite.config.ts
 //
 // Vite Configuration File (Local/Development Build Tooling)
-// Designed for the G-TRISP Dashboard frontend application.
+// Designed for the ASTRA Dashboard frontend application.
 //
 // Context within the stack:
 // - Configures the fast bundler and development server for the React application.

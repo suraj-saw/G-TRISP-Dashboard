@@ -1,8 +1,31 @@
 // frontend/src/config/constants.ts
 /**
- * Central configuration constants for the G-TRISP frontend.
+ * Central configuration constants for the ASTRA frontend.
  * All previously hardcoded values live here — change once, applies everywhere.
  */
+
+// ---------------------------------------------------------------------------
+// App Branding & Identity Configuration
+// Central source of truth for dashboard name, acronym, and descriptions.
+// ---------------------------------------------------------------------------
+
+export const APP_CONFIG = {
+  /** Short identifier / brand code */
+  name: "ASTRA",
+  /** Primary display name with native script */
+  displayName: "ASTRA (अस्त्र)",
+  /** Native Hindi script representation */
+  hindiName: "अस्त्र",
+  /** Full expanded title of the project */
+  fullName: "Advance Spatiotemporal Traffic Risk Analytics",
+  /** High-level summary of the application */
+  description:
+    "Advance Spatiotemporal Traffic Risk Analytics provides a comprehensive suite of analytical tools to monitor, evaluate, and prevent road accidents across Gujarat.",
+  /** Title used on exported analytics PDF reports */
+  reportTitle: "ASTRA (अस्त्र) Analytics",
+  /** Title used on exported map canvases */
+  canvasTitle: "ASTRA (अस्त्र) DASHBOARD",
+} as const;
 
 // ---------------------------------------------------------------------------
 // API base paths

@@ -119,7 +119,7 @@ def run_geo_seeds(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Run the full G-TRISP data seed pipeline."
+        description="Run the full ASTRA data seed pipeline."
     )
     parser.add_argument(
         "--force",

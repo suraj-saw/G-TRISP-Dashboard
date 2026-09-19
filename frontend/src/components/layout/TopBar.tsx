@@ -12,13 +12,14 @@ import NotificationBell from "./NotificationBell";
 import type { User } from "../../types/user";
 import { TOPBAR_HEIGHT_PX, TOPBAR_Z_INDEX } from "../../config/layout";
 import ConfirmDialog from "../common/ConfirmDialog";
-import { ROUTES } from "../../config/constants";
+import { ROUTES, APP_CONFIG } from "../../config/constants";
 
 /**
  * Props for the TopBar component.
  */
 interface Props {
-  appName: string;
+  appName?: string;
+  subTitle?: string;
   user: User;
   notificationCount?: number;
   onLogout: () => void;
@@ -35,6 +36,7 @@ interface Props {
  */
 function TopBar({
   appName,
+  subTitle,
   user,
   notificationCount = 0,
   onLogout,
@@ -45,6 +47,10 @@ function TopBar({
 }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const displayTitle =
+    appName ||
+    (subTitle ? `${APP_CONFIG.displayName} · ${subTitle}` : APP_CONFIG.displayName);
 
   // State for toggling the logout confirmation modal
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
@@ -88,7 +94,7 @@ function TopBar({
             aria-label="Go to Landing Page"
           >
             <h1 className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 to-indigo-950 bg-clip-text text-transparent select-none">
-              {appName}
+              {displayTitle}
             </h1>
           </button>
         </div>
@@ -99,7 +105,7 @@ function TopBar({
           <button
             onClick={() => navigate(ROUTES.ABOUT)}
             className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium text-slate-600 transition-all hover:bg-slate-50 hover:text-indigo-600"
-            aria-label="About G-TRISP"
+            aria-label={`About ${APP_CONFIG.name}`}
           >
             <Info
               size={16}

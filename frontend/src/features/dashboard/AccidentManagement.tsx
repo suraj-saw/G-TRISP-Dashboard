@@ -311,6 +311,8 @@ export default function AccidentManagement() {
   const [pendingDeleteIds, setPendingDeleteIds] = useState<number[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isSelectingAll, setIsSelectingAll] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportFeedback, setExportFeedback] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [selectionMenuOpen, setSelectionMenuOpen] = useState(false);
   const selectionMenuRef = useRef<HTMLDivElement>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
@@ -439,6 +441,56 @@ export default function AccidentManagement() {
       alert("Failed to select all records.");
     } finally {
       setIsSelectingAll(false);
+    }
+  };
+
+  const handleExportSelected = async () => {
+    if (selectedIds.size === 0) return;
+    setIsExporting(true);
+    try {
+      const filename = await adminAccidentsApi.exportAccidents(Array.from(selectedIds));
+      setExportFeedback({
+        message: `Successfully downloaded ${selectedIds.size.toLocaleString()} selected record(s) in Excel file (${filename}).`,
+        type: "success",
+      });
+      setTimeout(() => setExportFeedback(null), 4500);
+    } catch (err: any) {
+      setExportFeedback({
+        message: err?.response?.data?.detail || "Failed to download selected records as Excel file.",
+        type: "error",
+      });
+      setTimeout(() => setExportFeedback(null), 4500);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportAllFiltered = async () => {
+    if (total === 0) return;
+    setIsExporting(true);
+    try {
+      let recordStatusQuery: string | undefined = undefined;
+      if (statusFilter !== "all") {
+        recordStatusQuery = statusFilter;
+      }
+      const filename = await adminAccidentsApi.exportAccidents(
+        undefined,
+        debouncedSearch,
+        { ...columnFilters, record_status: recordStatusQuery }
+      );
+      setExportFeedback({
+        message: `Successfully downloaded ${total.toLocaleString()} filtered record(s) in Excel file (${filename}).`,
+        type: "success",
+      });
+      setTimeout(() => setExportFeedback(null), 4500);
+    } catch (err: any) {
+      setExportFeedback({
+        message: err?.response?.data?.detail || "Failed to export filtered records as Excel file.",
+        type: "error",
+      });
+      setTimeout(() => setExportFeedback(null), 4500);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -658,6 +710,30 @@ export default function AccidentManagement() {
               )}
             </AnimatePresence>
           </div>
+
+          {/* Export Excel Button */}
+          <button
+            type="button"
+            onClick={selectedIds.size > 0 ? handleExportSelected : handleExportAllFiltered}
+            disabled={isExporting || total === 0}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs"
+            title={
+              selectedIds.size > 0
+                ? `Download ${selectedIds.size.toLocaleString()} selected records as Excel file`
+                : `Download all ${total.toLocaleString()} filtered records as Excel file`
+            }
+          >
+            {isExporting ? (
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+            ) : (
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            )}
+            <span>
+              {selectedIds.size > 0
+                ? `Export Excel (${selectedIds.size.toLocaleString()})`
+                : "Export Excel"}
+            </span>
+          </button>
         </div>
 
         {/* Row 2: Column filters (collapsible) */}
@@ -781,6 +857,20 @@ export default function AccidentManagement() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                onClick={handleExportSelected}
+                disabled={isExporting}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-800 bg-emerald-100/90 hover:bg-emerald-200 border border-emerald-300 shadow-xs transition-colors cursor-pointer disabled:opacity-60"
+                title="Download selected records as Excel file"
+              >
+                {isExporting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-700" />
+                ) : (
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
+                )}
+                Download Excel ({selectedIds.size.toLocaleString()})
+              </button>
+              <button
+                type="button"
                 onClick={() => handleDeleteRequest(Array.from(selectedIds))}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 shadow-xs transition-colors cursor-pointer"
               >
@@ -882,6 +972,21 @@ export default function AccidentManagement() {
                       {selectedIds.size > 0 && (
                         <>
                           <div className="my-1 border-t border-slate-100" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleExportSelected();
+                              setSelectionMenuOpen(false);
+                            }}
+                            disabled={isExporting}
+                            className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-emerald-50 text-emerald-700 flex items-center justify-between font-semibold cursor-pointer"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                              Download selected Excel
+                            </span>
+                            <span className="text-[11px] text-emerald-600">({selectedIds.size.toLocaleString()})</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => {
@@ -1118,6 +1223,35 @@ export default function AccidentManagement() {
         }}
         danger={true}
       />
+
+      {/* ── Toast Feedback for Export ── */}
+      <AnimatePresence>
+        {exportFeedback && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={`fixed top-20 right-6 z-[100] flex items-center gap-3 rounded-2xl border px-5 py-3.5 shadow-xl text-sm font-semibold ${
+              exportFeedback.type === "success"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800 shadow-emerald-900/10"
+                : "bg-rose-50 border-rose-200 text-rose-800 shadow-rose-900/10"
+            }`}
+          >
+            {exportFeedback.type === "success" ? (
+              <FileSpreadsheet className="w-5 h-5 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+            )}
+            <span>{exportFeedback.message}</span>
+            <button
+              onClick={() => setExportFeedback(null)}
+              className="ml-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

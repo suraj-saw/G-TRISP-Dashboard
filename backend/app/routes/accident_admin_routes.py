@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 # pyrefly: ignore [missing-import]
 from geoalchemy2.shape import from_shape
 # pyrefly: ignore [missing-import]
@@ -39,6 +40,7 @@ from app.utils.district_utils import (
     is_railway_police,
     get_canonical_district,
 )
+from app.utils.export_utils import build_admin_accidents_excel
 
 
 router = APIRouter(
@@ -759,6 +761,85 @@ def bulk_delete_accidents(
         "message": f"{deleted} accident record(s) deleted successfully.",
         "deleted": deleted,
     }
+
+
+@router.post("/accidents/export")
+def export_accidents_excel(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Export accident records to a professionally styled Excel (.xlsx) file.
+    Supports exporting explicitly selected record IDs, or falling back to
+    matching filter criteria.
+    """
+    raw_ids = payload.get("ids", [])
+    records = []
+    export_scope = "Selected Records"
+
+    if raw_ids:
+        try:
+            ids = [int(record_id) for record_id in raw_ids]
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="Invalid ID list") from exc
+
+        chunk_size = 1000
+        for i in range(0, len(ids), chunk_size):
+            chunk = ids[i : i + chunk_size]
+            chunk_records = (
+                db.query(Accident)
+                .filter(Accident.id.in_(chunk))
+                .order_by(Accident.accident_date_time.desc())
+                .all()
+            )
+            records.extend(chunk_records)
+        export_scope = f"Selected Records ({len(records)})"
+    else:
+        # Fall back to query filters if no specific IDs were provided
+        query = _build_accidents_query(
+            db=db,
+            search=payload.get("search"),
+            district=payload.get("district"),
+            police_station=payload.get("police_station"),
+            severity=payload.get("severity"),
+            road_name=payload.get("road_name"),
+            road_classification=payload.get("road_classification"),
+            type_of_collision=payload.get("type_of_collision"),
+            weather_condition=payload.get("weather_condition"),
+            light_condition=payload.get("light_condition"),
+            visibility=payload.get("visibility"),
+            traffic_violation=payload.get("traffic_violation"),
+            collision_feature=payload.get("collision_feature"),
+            record_status=payload.get("record_status"),
+        )
+        records = query.order_by(Accident.accident_date_time.desc()).all()
+        export_scope = f"Filtered Records ({len(records)})"
+
+    if not records:
+        raise HTTPException(status_code=404, detail="No accident records found to export.")
+
+    user_identifier = getattr(current_user, "username", None) or getattr(current_user, "email", "Admin")
+
+    meta_rows = [
+        ("Export Source", "ASTRA Accident Management Module"),
+        ("Export Scope", export_scope),
+        ("Total Records Exported", len(records)),
+        ("Export Date & Time", datetime.now().strftime("%d-%b-%Y %I:%M:%S %p")),
+        ("Exported By", user_identifier),
+    ]
+
+    excel_buf = build_admin_accidents_excel(records, meta_rows=meta_rows)
+    filename = f"ASTRA_Accidents_Export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+    return StreamingResponse(
+        excel_buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
 
 
 @router.post("/accidents/upload")

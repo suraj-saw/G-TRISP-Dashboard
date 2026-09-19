@@ -18,6 +18,7 @@ import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
 import { fetchBlackspotCrashStats, fetchBlackspotCrashTemporal } from "../../api/blackspotReportApi";
 import type { DistrictStatsFilters } from "../../api/gujaratDashboardApi";
 import type { DashboardFilters } from "../../types/dashboard";
+import { APP_CONFIG } from "../../config/constants";
 
 interface BlackspotPdfReportProps {
   /** Crash IDs belonging to this blackspot cluster */
@@ -399,7 +400,7 @@ export const BlackspotPdfReport: React.FC<BlackspotPdfReportProps> = ({
         {/* Professional Header */}
         <div style={{ margin: '16px 12px 24px', paddingBottom: '16px', borderBottom: '3px solid #991b1b', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ textAlign: 'left' }}>
-            <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#991b1b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.02em' }}>G-TRISP Analytics</h1>
+            <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#991b1b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.02em' }}>{APP_CONFIG.reportTitle}</h1>
             <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#64748b', margin: '4px 0 0 0' }}>Blackspot Cluster #{bsId} — Accident Analysis Report</h2>
             {districtName && (
               <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#334155', margin: '4px 0 0 0' }}>

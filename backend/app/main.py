@@ -1,7 +1,7 @@
 # backend/app/main.py
 
 """
-G-TRISP Dashboard API — Application Entry Point.
+ASTRA Dashboard API — Application Entry Point.
 
 This module initializes the FastAPI application instance, configures global 
 middleware (CORS, GZip), registers all API routers, and manages the application 
@@ -33,6 +33,7 @@ from app.core.constants import (
     DB_ADVISORY_LOCK_ID,
     GZIP_MINIMUM_SIZE_BYTES,
 )
+from app.core.config import APP_TITLE
 
 load_dotenv()
 
@@ -92,7 +93,7 @@ async def lifespan(app: FastAPI):
 
 # Initialize the core FastAPI application
 app = FastAPI(
-    title="G-TRISP Dashboard API",
+    title=APP_TITLE,
     version="1.0.0",
     docs_url="/api/docs",           # Swagger UI endpoint
     openapi_url="/api/openapi.json", # OpenAPI schema endpoint
@@ -150,7 +151,7 @@ def home():
     Returns:
         dict: A welcome message indicating the API is reachable.
     """
-    return {"message": "G-TRISP Dashboard API is running"}
+    return {"message": f"{APP_TITLE} is running"}
 
 
 @app.get("/health")

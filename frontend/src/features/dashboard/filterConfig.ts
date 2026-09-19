@@ -158,23 +158,14 @@ const TEMPORAL_FILTERS: FilterConfigItem[] = [
   { id: "collision_type", label: "Collision type" },
 ];
 
-/** Removes the severity filter from a filter configuration array */
-const withoutSeverity = (filters: FilterConfigItem[]): FilterConfigItem[] =>
-  filters.filter((filter) => filter.id !== "severity");
-
 /** IDs that are replaced by year_range for blackspot visualizations */
 const BLACKSPOT_REPLACED_IDS = new Set<FilterId>(["date_from", "date_to", "year"]);
 
 /**
  * For blackspot visualizations, replaces date_from, date_to, and year with year_range.
- * Also removes the severity filter.
  */
 const forBlackspot = (filters: FilterConfigItem[]): FilterConfigItem[] =>
-  withoutSeverity(
-    filters.filter((f) =>
-      !BLACKSPOT_REPLACED_IDS.has(f.id)
-    )
-  );
+  filters.filter((f) => !BLACKSPOT_REPLACED_IDS.has(f.id));
 
 /**
  * For non-blackspot visualizations, removes the year_range filter (not applicable).

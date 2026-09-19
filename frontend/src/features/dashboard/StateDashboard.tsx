@@ -656,7 +656,7 @@ export default function StateDashboard() {
       // Both active: keep all filters (date, year, year_range, severity)
       return base;
     } else if (hasBlackspot) {
-      return base.filter((f) => !BLACKSPOT_REPLACED_IDS.has(f.id) && f.id !== "severity");
+      return base.filter((f) => !BLACKSPOT_REPLACED_IDS.has(f.id));
     } else {
       return base.filter((f) => f.id !== "year_range");
     }
@@ -764,7 +764,6 @@ export default function StateDashboard() {
           newFilters.day = [];
           newFilters.time_period = [];
           if (newTypes.some(isBlackspotVisualization)) {
-            newFilters.severity = [];
             // Enforce exactly 3 years if not already set or invalid length
             if (!current.year || current.year.length !== 3) {
               const defaultYears = years
@@ -839,7 +838,7 @@ export default function StateDashboard() {
       <div className="fixed inset-0 bg-[#F1F4FB] overflow-hidden">
         <div className={`fixed left-0 right-0 top-0 ${TOPBAR_Z_INDEX}`}>
           <TopBar
-            appName="G-TRISP · State"
+            subTitle="State"
             user={user}
             showNotificationBell={user?.role === "admin" || user?.role === "superadmin"}
             adminPanelPath={user?.role === "admin" || user?.role === "superadmin" ? ROUTES.ADMIN_PANEL : undefined}

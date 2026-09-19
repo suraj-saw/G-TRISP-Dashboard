@@ -1,3 +1,5 @@
+import { APP_CONFIG } from "./constants";
+
 export interface AboutMetadataItem {
   label: string;
   value: string;
@@ -29,13 +31,13 @@ export interface AboutTechnologyCategory {
 
 export const ABOUT_CONFIG = {
   project: {
-    name: "G-TRISP",
-    fullName: "Traffic and Road Incident Safety Platform",
+    name: APP_CONFIG.displayName,
+    fullName: APP_CONFIG.fullName,
     description:
       "A district-level road safety intelligence platform that combines GIS visualization, statistical insights, and temporal analysis to support evidence-based planning and decision-making.",
-    mark: "GT",
+    mark: APP_CONFIG.name,
     metadata: [
-      { label: "Project name", value: "G-TRISP" },
+      { label: "Project name", value: APP_CONFIG.displayName },
       { label: "Project type", value: "Government & research analytics" },
       { label: "Platform", value: "Responsive web application" },
       { label: "Current version", value: "1.0.0" },

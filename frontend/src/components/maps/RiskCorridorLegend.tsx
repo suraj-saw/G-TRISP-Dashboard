@@ -15,11 +15,9 @@ interface RiskCorridorLegendProps {
 }
 
 const LINE_WIDTHS: Record<CorridorPriorityLevel, string> = {
-  Critical: "5px",
-  "Very High": "4px",
-  High: "3px",
-  Medium: "2.5px",
-  Low: "2px",
+  "Critical Blackspot": "5px",
+  "High-Priority": "3.5px",
+  "Moderate-Priority": "2.5px",
 };
 
 export default function RiskCorridorLegend({
@@ -30,7 +28,7 @@ export default function RiskCorridorLegend({
   if (!isVisible) return null;
 
   return (
-    <div className="absolute bottom-5 right-3 z-20 bg-white/95 backdrop-blur-sm border border-slate-200 shadow-md rounded-lg px-2.5 py-2 pointer-events-auto min-w-[130px] font-sans">
+    <div className="absolute bottom-5 right-3 z-20 bg-white/95 backdrop-blur-sm border border-slate-200 shadow-md rounded-lg px-2.5 py-2 pointer-events-auto min-w-[155px] font-sans">
       <div className="flex items-center justify-between mb-2">
         <h4 className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wider">
           Risk Priority

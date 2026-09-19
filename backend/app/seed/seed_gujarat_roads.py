@@ -56,6 +56,9 @@ _BACKEND_DIR = _APP_DIR.parent
 DEFAULT_DATA_FILE = _BACKEND_DIR / "data" / "Gujarat_Roads.geojson"
 DATA_FILE = Path(os.getenv("GUJARAT_ROADS_GEOJSONL", str(DEFAULT_DATA_FILE))).resolve()
 
+DEFAULT_NH48_FILE = _BACKEND_DIR / "data" / "NH48_Gujarat_Districts.geojson"
+NH48_DATA_FILE = Path(os.getenv("NH48_GUJARAT_DISTRICTS_GEOJSON", str(DEFAULT_NH48_FILE))).resolve()
+
 SOURCE_SRID = int(os.getenv("GUJARAT_ROADS_SOURCE_SRID", str(POSTGIS_SRID)))
 CHUNK_SIZE = int(os.getenv("SEED_BATCH_SIZE", str(DEFAULT_SEED_BATCH_SIZE)))
 
@@ -76,23 +79,23 @@ def _remove_keys(d: dict, keys: set[str]) -> dict:
     return {k: v for k, v in d.items() if k not in keys}
 
 
-def _normalize_geometry_to_postgis_4326(geom, *, source_srid: int) -> object:
-    """Normalize to EPSG:4326 if input is in a different CRS.
+def _drop_z_dimension(geom):
+    """Ensure geometry is strictly 2D (drops Z coordinate if present)."""
+    if geom.is_empty or not getattr(geom, "has_z", False):
+        return geom
+    return shapely_transform(lambda x, y, *args: (x, y), geom)
 
-    If SOURCE_SRID==POSTGIS_SRID, the geometry is returned unchanged.
-    """
+
+def _normalize_geometry_to_postgis_4326(geom, *, source_srid: int) -> object:
+    """Normalize to EPSG:4326 if input is in a different CRS, and ensure 2D coordinates."""
     if geom.is_empty:
         return geom
 
-    if int(source_srid) == int(POSTGIS_SRID):
-        return geom
+    if int(source_srid) != int(POSTGIS_SRID):
+        transformer = Transformer.from_crs(f"EPSG:{source_srid}", f"EPSG:{POSTGIS_SRID}", always_xy=True)
+        geom = shapely_transform(lambda x, y, *args: transformer.transform(x, y)[:2], geom)
 
-    transformer = Transformer.from_crs(f"EPSG:{source_srid}", f"EPSG:{POSTGIS_SRID}", always_xy=True)
-    # shapely_transform expects a function (x,y,...) -> (x,y)
-    def _tf(x, y, z=None):
-        return transformer.transform(x, y)
-
-    return shapely_transform(_tf, geom)
+    return _drop_z_dimension(geom)
 
 
 def _iter_lines_from_feature_geometry(geom) -> list[LineString]:
@@ -294,6 +297,9 @@ def seed_gujarat_roads(force: bool = False) -> None:
 
         logger.info("✓ Roads seed complete — inserted=%d, skipped=%d", inserted, skipped)
 
+        # Seed NH-48 centerline data into gujarat_roads
+        seed_nh48_centerline_roads(db=db, force=force)
+
     except Exception:
         db.rollback()
         logger.exception("Road seed failed — transaction rolled back.")
@@ -302,9 +308,113 @@ def seed_gujarat_roads(force: bool = False) -> None:
         db.close()
 
 
+def seed_nh48_centerline_roads(db: SessionLocal = None, force: bool = False) -> int:
+    """
+    Seeds the NH-48 centerline road network from NH48_Gujarat_Districts.geojson
+    into the gujarat_roads table.
+    """
+    own_session = False
+    if db is None:
+        Base.metadata.create_all(bind=engine)
+        db = SessionLocal()
+        own_session = True
+
+    try:
+        # Resolve path across containers or local environment
+        target_path = None
+        for p in [
+            NH48_DATA_FILE,
+            _BACKEND_DIR / "data" / "NH48_Gujarat_Districts.geojson",
+            Path("/app/data/NH48_Gujarat_Districts.geojson"),
+            Path("backend/data/NH48_Gujarat_Districts.geojson"),
+        ]:
+            if p.exists():
+                target_path = p
+                break
+
+        if not target_path:
+            logger.warning("NH-48 GeoJSON file not found at: %s", NH48_DATA_FILE)
+            return 0
+
+        existing_nh48 = db.query(GujaratRoad).filter(GujaratRoad.road_source_id.like("nh48-centerline-%")).count()
+        if existing_nh48 > 0 and not force:
+            logger.info("gujarat_roads already has %d NH-48 centerline record(s). Skipping. Use --force to re-seed.", existing_nh48)
+            return existing_nh48
+
+        if existing_nh48 > 0 and force:
+            logger.info("force=True — deleting %d existing NH-48 centerline records from gujarat_roads...", existing_nh48)
+            db.query(GujaratRoad).filter(GujaratRoad.road_source_id.like("nh48-centerline-%")).delete(synchronize_session=False)
+            db.commit()
+
+        logger.info("Reading NH-48 centerline dataset from: %s", target_path)
+        with target_path.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+
+        features = data.get("features", [])
+        inserted = 0
+
+        for feat_idx, feature in enumerate(features):
+            props = feature.get("properties", {}) or {}
+            geom_dict = feature.get("geometry")
+            if not geom_dict:
+                continue
+
+            try:
+                raw_geom = shapely_shape(geom_dict)
+            except Exception:
+                continue
+
+            if raw_geom.is_empty:
+                continue
+
+            geom = _normalize_geometry_to_postgis_4326(raw_geom, source_srid=SOURCE_SRID)
+            lines = _iter_lines_from_feature_geometry(geom)
+
+            district = props.get("DISTRICT", f"District_{feat_idx}")
+            dist_slug = str(district).strip().lower().replace(" ", "_")
+
+            for line_idx, ls in enumerate(lines):
+                if ls.is_empty:
+                    continue
+
+                source_id = f"nh48-centerline-{dist_slug}-{line_idx}"
+                postgis_geom = from_shape(ls, srid=POSTGIS_SRID)
+
+                clean_props = dict(props)
+                clean_props["district"] = district
+                clean_props["is_nh48_centerline"] = True
+                clean_props["source_file"] = "NH48_Gujarat_Districts.geojson"
+
+                road = GujaratRoad(
+                    road_source_id=source_id,
+                    road_name="NH 48",
+                    road_classification="National Highway",
+                    road_type="Centerline",
+                    properties=clean_props,
+                    geometry=postgis_geom,
+                )
+                db.add(road)
+                inserted += 1
+
+        db.commit()
+        logger.info("✓ Successfully seeded %d NH-48 centerline road segments into gujarat_roads", inserted)
+        return inserted
+    except Exception:
+        db.rollback()
+        logger.exception("NH-48 seed failed — transaction rolled back.")
+        raise
+    finally:
+        if own_session:
+            db.close()
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Seed Gujarat roads GeoJSONL into PostGIS.")
+    parser = argparse.ArgumentParser(description="Seed Gujarat roads and NH-48 centerline into PostGIS.")
     parser.add_argument("--force", action="store_true", help="Delete existing rows and re-seed.")
+    parser.add_argument("--nh48-only", action="store_true", help="Only seed the NH-48 centerline road network into gujarat_roads.")
     args = parser.parse_args()
-    seed_gujarat_roads(force=args.force)
+    if args.nh48_only:
+        seed_nh48_centerline_roads(force=args.force)
+    else:
+        seed_gujarat_roads(force=args.force)
 

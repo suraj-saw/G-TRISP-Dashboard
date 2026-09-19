@@ -110,8 +110,15 @@ def generate_risk_corridors(
 
 def rank_corridors(corridors: List[Dict[str, Any]], road_lengths_map: Optional[Dict[int, float]] = None) -> List[Dict[str, Any]]:
     """
-    Ranks corridors by calculating priority scores, densities, and assigning priority levels.
-    road_lengths_map provides total road length for context (road_id -> length).
+    Ranks corridors by calculating priority scores, crash densities, and assigning 3-class priority levels:
+    - "Critical Blackspot" (Brown)
+    - "High-Priority" (Orange)
+    - "Moderate-Priority" (Yellow)
+
+    Classification formula based on crash density with average Fatal + Grievous (FG) crashes in 500m as base:
+    - 10 FG crashes in 1 km (5 FG in 500m, density = 10 FG/km) -> Moderate-Priority
+    - 40 FG crashes in 2 km (10 FG in 500m, density = 20 FG/km) -> High-Priority
+    - >= 30 FG crashes in 1 km (>= 15 FG in 500m, density >= 30 FG/km) -> Critical Blackspot
     """
     if road_lengths_map is None:
         road_lengths_map = {}
@@ -126,51 +133,37 @@ def rank_corridors(corridors: List[Dict[str, Any]], road_lengths_map: Optional[D
         )
         c["weighted_score"] = weighted_score
         
-        # 2. Accident density (accidents per km)
-        length_km = c["corridor_length_m"] / 1000.0
-        c["accident_density"] = c["accident_count"] / length_km if length_km > 0 else 0.0
+        # 2. Crash density based on 500m base segment
+        effective_length_km = max(c["corridor_length_m"], 500.0) / 1000.0
+        fg_count = c.get("fatal_count", 0) + c.get("grievous_count", 0)
+        fg_density = fg_count / effective_length_km if effective_length_km > 0 else 0.0
         
-        # 3. Priority score calculation
-        c["priority_score"] = weighted_score
+        c["fg_count"] = fg_count
+        c["fg_density"] = round(fg_density, 2)
+        c["fg_per_500m"] = round(fg_density * 0.5, 2)
+        c["accident_density"] = round(c["accident_count"] / effective_length_km, 2) if effective_length_km > 0 else 0.0
         
-        # 4. Add road total length for context
-        c["road_length"] = road_lengths_map.get(c["road_id"], 0.0)
+        # Priority score reflects the FG crash density
+        c["priority_score"] = round(fg_density, 2)
+        
+        # 3. Add road total length for context
+        c["road_length"] = road_lengths_map.get(c.get("road_id"), 0.0) if road_lengths_map else 0.0
 
-    # 5. Calculate Dynamic Priority Levels (Equal Interval Binning)
-    if corridors:
-        min_score = min(c["priority_score"] for c in corridors)
-        max_score = max(c["priority_score"] for c in corridors)
-        
-        if max_score == min_score:
-            # Fallback if all corridors have identical scores
-            for c in corridors:
-                c["priority_level"] = "Medium"
+        # 4. 3-class priority classification:
+        # Base: 500m segment
+        # < 20 FG/km (< 10 FG in 500m) -> Moderate-Priority (e.g. 10 FG in 1 km -> 10 FG/km)
+        # 20 to < 25 FG/km (10 to < 12.5 FG in 500m) -> High-Priority (e.g. 40 FG in 2 km -> 20 FG/km)
+        # >= 25 FG/km (>= 12.5 FG in 500m) -> Critical Blackspot
+        if fg_density >= 25.0:
+            c["priority_level"] = "Critical Blackspot"
+        elif fg_density >= 20.0:
+            c["priority_level"] = "High-Priority"
         else:
-            interval = (max_score - min_score) / 5.0
-            thresholds = {
-                "Low": min_score + interval,
-                "Medium": min_score + 2 * interval,
-                "High": min_score + 3 * interval,
-                "Very High": min_score + 4 * interval
-                # Anything above Very High is Critical
-            }
-            
-            for c in corridors:
-                score = c["priority_score"]
-                if score < thresholds["Low"]:
-                    c["priority_level"] = "Low"
-                elif score < thresholds["Medium"]:
-                    c["priority_level"] = "Medium"
-                elif score < thresholds["High"]:
-                    c["priority_level"] = "High"
-                elif score < thresholds["Very High"]:
-                    c["priority_level"] = "Very High"
-                else:
-                    c["priority_level"] = "Critical"
+            c["priority_level"] = "Moderate-Priority"
 
-    # Sort deterministically: highest priority score, then highest density, then ID
+    # Sort deterministically: highest priority score (FG density), then total FG crashes, then ID
     corridors.sort(
-        key=lambda x: (x["priority_score"], x["accident_density"], x["corridor_id"]), 
+        key=lambda x: (x["priority_score"], x.get("fg_count", 0), x["corridor_id"]), 
         reverse=True
     )
     

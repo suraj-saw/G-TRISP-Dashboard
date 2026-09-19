@@ -504,9 +504,9 @@ export const fetchGujaratRiskCorridors = async (
   district: string
 ): Promise<any> => {
   const params = getParams(filters, district);
-  // Override default thresholds to ensure long, continuous corridors rather than disjointed blackspots
-  params.append("window_size_m", "1000");
-  params.append("merge_threshold_m", "2000");
+  // Base segment window is strictly 500m as specified
+  params.append("window_size_m", "500");
+  params.append("merge_threshold_m", "0");
   
   const cacheKey = `gujarat_risk_corridors_${params.toString()}`;
   return withCache(cacheKey, async () => {
@@ -529,9 +529,9 @@ export const fetchGujaratPedestrianRiskCorridors = async (
 ): Promise<any> => {
   const params = getParams(filters, district);
   params.set("is_pedestrian", "true");
-  // Override default thresholds to ensure long, continuous corridors rather than disjointed blackspots
-  params.append("window_size_m", "1000");
-  params.append("merge_threshold_m", "2000");
+  // Base segment window is strictly 500m as specified
+  params.append("window_size_m", "500");
+  params.append("merge_threshold_m", "0");
 
   const cacheKey = `gujarat_pedestrian_risk_corridors_${params.toString()}`;
   return withCache(cacheKey, async () => {

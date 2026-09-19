@@ -269,4 +269,68 @@ export const adminAccidentsApi = {
     );
     return res.data;
   },
+
+  /**
+   * Export accident records to Excel (.xlsx) file
+   * @param ids - Optional array of specific accident record IDs to export
+   * @param search - Optional search query string
+   * @param filters - Optional filter options
+   * @param filename - Optional custom filename for the downloaded Excel spreadsheet
+   */
+  exportAccidents: async (
+    ids?: number[],
+    search?: string,
+    filters?: AccidentFilters,
+    filename?: string
+  ): Promise<string> => {
+    const payload: Record<string, any> = {};
+    if (ids && ids.length > 0) {
+      payload.ids = ids;
+    }
+    if (search) {
+      payload.search = search;
+    }
+    if (filters) {
+      for (const [key, value] of Object.entries(filters)) {
+        if (value !== undefined && value !== "") {
+          payload[key] = value;
+        }
+      }
+    }
+
+    const res = await API.post(
+      "/admin/surat/accidents/export",
+      payload,
+      { responseType: "blob" }
+    );
+
+    // Extract filename from Content-Disposition header if available
+    let downloadName = filename;
+    if (!downloadName) {
+      const disposition = res.headers?.["content-disposition"];
+      if (disposition) {
+        const match = disposition.match(/filename=["']?([^"']+)["']?/i);
+        if (match && match[1]) {
+          downloadName = match[1];
+        }
+      }
+    }
+    if (!downloadName) {
+      const countLabel = ids && ids.length > 0 ? `${ids.length}_records` : "filtered";
+      downloadName = `ASTRA_Accidents_${countLabel}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    }
+
+    const blob = new Blob([res.data], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", downloadName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    return downloadName;
+  },
 };

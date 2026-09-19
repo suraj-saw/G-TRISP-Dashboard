@@ -16,6 +16,7 @@ import type { DashboardFilters } from "../../types/dashboard";
 import DistrictStatisticalAnalysis from "../../components/dashboard/DistrictStatisticalAnalysis";
 import TemporalAnalysis from "../../components/temporal/TemporalAnalysis";
 import { fetchGujaratTemporalAnalysis } from "../../api/gujaratDashboardApi";
+import { APP_CONFIG } from "../../config/constants";
 
 /**
  * Props for PdfReportGenerator component
@@ -392,7 +393,7 @@ export const PdfReportGenerator: React.FC<PdfReportGeneratorProps> = ({
         {/* Professional Header */}
         <div style={{ margin: '16px 12px 24px', paddingBottom: '16px', borderBottom: '3px solid #1e3a5f', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ textAlign: 'left' }}>
-            <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#1e3a5f', margin: 0, textTransform: 'uppercase', letterSpacing: '0.02em' }}>G-TRISP Analytics</h1>
+            <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#1e3a5f', margin: 0, textTransform: 'uppercase', letterSpacing: '0.02em' }}>{APP_CONFIG.reportTitle}</h1>
             <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#64748b', margin: '4px 0 0 0' }}>Road Accident Statistical & Temporal Report</h2>
           </div>
           <div style={{ textAlign: 'right' }}>

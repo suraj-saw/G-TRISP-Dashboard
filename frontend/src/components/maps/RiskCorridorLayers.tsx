@@ -76,6 +76,9 @@ interface HoveredSegment {
   grievous_count?: number;
   minor_hospitalized_count?: number;
   minor_non_hospitalized_count?: number;
+  fg_count?: number;
+  fg_density?: number;
+  fg_per_500m?: number;
   corridor_rank?: number;
   corridor_length?: number;
 }
@@ -184,6 +187,9 @@ export default function RiskCorridorLayers({
             grievous_count: f.properties?.grievous_count,
             minor_hospitalized_count: f.properties?.minor_hospitalized_count,
             minor_non_hospitalized_count: f.properties?.minor_non_hospitalized_count,
+            fg_count: f.properties?.fg_count,
+            fg_density: f.properties?.fg_density,
+            fg_per_500m: f.properties?.fg_per_500m,
             corridor_rank: f.properties?.corridor_rank,
             corridor_length: f.properties?.corridor_length,
           });
@@ -243,6 +249,9 @@ export default function RiskCorridorLayers({
             grievous_count: f.properties?.grievous_count,
             minor_hospitalized_count: f.properties?.minor_hospitalized_count,
             minor_non_hospitalized_count: f.properties?.minor_non_hospitalized_count,
+            fg_count: f.properties?.fg_count,
+            fg_density: f.properties?.fg_density,
+            fg_per_500m: f.properties?.fg_per_500m,
             corridor_rank: f.properties?.corridor_rank,
             corridor_length: f.properties?.corridor_length,
           });
@@ -320,6 +329,10 @@ export default function RiskCorridorLayers({
         <Layer
           id="risk-corridor-line-bg"
           type="line"
+          layout={{
+            "line-cap": "round",
+            "line-join": "round",
+          }}
           paint={{
             "line-color": "#FFFFFF",
             "line-width": getCorridorWidthExpr(activeCorridorId, true) as any,
@@ -331,6 +344,10 @@ export default function RiskCorridorLayers({
         <Layer
           id="risk-corridor-line"
           type="line"
+          layout={{
+            "line-cap": "round",
+            "line-join": "round",
+          }}
           paint={{
             "line-color": CORRIDOR_COLOR_EXPR as any,
             "line-width": getCorridorWidthExpr(activeCorridorId, false) as any,
@@ -361,7 +378,7 @@ export default function RiskCorridorLayers({
               "--popup-bg":
                 CORRIDOR_COLORS[
                   hovered.priority_level as keyof typeof CORRIDOR_COLORS
-                ] ?? CORRIDOR_COLORS["Very High"],
+                ] ?? CORRIDOR_COLORS["Moderate-Priority"],
             } as React.CSSProperties
           }
         >
@@ -373,7 +390,7 @@ export default function RiskCorridorLayers({
                 backgroundColor:
                   CORRIDOR_COLORS[
                     hovered.priority_level as keyof typeof CORRIDOR_COLORS
-                  ] ?? CORRIDOR_COLORS["Very High"],
+                  ] ?? CORRIDOR_COLORS["Moderate-Priority"],
               }}
             >
               <span className="truncate max-w-[145px]">
@@ -439,10 +456,10 @@ export default function RiskCorridorLayers({
                 </div>
                 <div>
                   <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block leading-none">
-                    Density
+                    FG Density
                   </span>
                   <span className="font-extrabold text-slate-700 leading-tight">
-                    {(hovered.accident_density ?? 0).toFixed(1)}/km
+                    {(hovered.fg_density ?? hovered.accident_density ?? 0).toFixed(1)}/km
                   </span>
                 </div>
                 <div>

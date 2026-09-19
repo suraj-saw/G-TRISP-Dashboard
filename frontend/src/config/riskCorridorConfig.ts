@@ -1,41 +1,33 @@
 /**
  * @file riskCorridorConfig.ts
- * @description Configuration for Risk Corridor visualization symbology, styling, and priority levels.
+ * @description Configuration for Risk Corridor visualization symbology, styling, and 3-tier priority levels.
  */
 
 export const CORRIDOR_PRIORITY_LEVELS = [
-  "Critical",
-  "Very High",
-  "High",
-  "Medium",
-  "Low",
+  "Critical Blackspot",
+  "High-Priority",
+  "Moderate-Priority",
 ] as const;
 
 export type CorridorPriorityLevel = (typeof CORRIDOR_PRIORITY_LEVELS)[number];
 
 export const CORRIDOR_COLORS: Record<CorridorPriorityLevel, string> = {
-  Critical: "#FF0033",  // Electric Vivid Red / Crimson
-  "Very High": "#FF6A00", // Vivid Safety Orange
-  High: "#A855F7",      // Vivid Electric Purple
-  Medium: "#0099FF",    // Vivid Dodger Blue
-  Low: "#00E676",       // Vivid Emerald Green
+  "Critical Blackspot": "#78350F", // Deep Brown
+  "High-Priority": "#EA580C",      // Vivid Orange
+  "Moderate-Priority": "#EAB308",  // Golden Yellow
 };
 
 export const CORRIDOR_OPACITIES: Record<CorridorPriorityLevel, number> = {
-  Critical: 1.0,
-  "Very High": 0.95,
-  High: 0.9,
-  Medium: 0.85,
-  Low: 0.8,
+  "Critical Blackspot": 1.0,
+  "High-Priority": 0.95,
+  "Moderate-Priority": 0.9,
 };
 
 // Controls the zoom level at which each priority tier begins to appear (kept at 0 for all since zoom reveal is disabled).
 export const CORRIDOR_ZOOM_THRESHOLDS: Record<CorridorPriorityLevel, number> = {
-  Critical: 0,
-  "Very High": 0,
-  High: 0,
-  Medium: 0,
-  Low: 0,
+  "Critical Blackspot": 0,
+  "High-Priority": 0,
+  "Moderate-Priority": 0,
 };
 
 /**
@@ -44,17 +36,17 @@ export const CORRIDOR_ZOOM_THRESHOLDS: Record<CorridorPriorityLevel, number> = {
 export const CORRIDOR_COLOR_EXPR = [
   "match",
   ["get", "priority_level"],
-  "Critical", CORRIDOR_COLORS.Critical,
-  "Very High", CORRIDOR_COLORS["Very High"],
-  "High", CORRIDOR_COLORS.High,
-  "Medium", CORRIDOR_COLORS.Medium,
-  "Low", CORRIDOR_COLORS.Low,
-  "#000000", // Fallback
+  "Critical Blackspot", CORRIDOR_COLORS["Critical Blackspot"],
+  "High-Priority", CORRIDOR_COLORS["High-Priority"],
+  "High Priority", CORRIDOR_COLORS["High-Priority"],
+  "Moderate-Priority", CORRIDOR_COLORS["Moderate-Priority"],
+  "Moderate Priority", CORRIDOR_COLORS["Moderate-Priority"],
+  "#EAB308", // Fallback (Yellow)
 ];
 
 /**
  * Generates a MapLibre expression for base line opacity.
- * All corridors are now shown at all zoom levels without zoom-step revealing.
+ * All corridors are shown at all zoom levels without zoom-step revealing.
  */
 export const getCorridorOpacityExpr = (activeCorridorId: string | null) => {
   if (activeCorridorId) {
@@ -69,12 +61,12 @@ export const getCorridorOpacityExpr = (activeCorridorId: string | null) => {
   return [
     "match",
     ["get", "priority_level"],
-    "Critical", CORRIDOR_OPACITIES.Critical,
-    "Very High", CORRIDOR_OPACITIES["Very High"],
-    "High", CORRIDOR_OPACITIES.High,
-    "Medium", CORRIDOR_OPACITIES.Medium,
-    "Low", CORRIDOR_OPACITIES.Low,
-    0.8, // Fallback
+    "Critical Blackspot", CORRIDOR_OPACITIES["Critical Blackspot"],
+    "High-Priority", CORRIDOR_OPACITIES["High-Priority"],
+    "High Priority", CORRIDOR_OPACITIES["High-Priority"],
+    "Moderate-Priority", CORRIDOR_OPACITIES["Moderate-Priority"],
+    "Moderate Priority", CORRIDOR_OPACITIES["Moderate-Priority"],
+    0.9, // Fallback
   ];
 };
 
@@ -98,7 +90,7 @@ export const getCorridorBgOpacityExpr = (activeCorridorId: string | null) => {
 export const getCorridorWidthExpr = (activeCorridorId: string | null, isBg: boolean = false) => {
   const getWidth = (baseWidth: number) => {
     let width = baseWidth;
-    if (isBg) width += 3; // Crisp 1.5px white halo on each side
+    if (isBg) width += 3; // Crisp 1.5px halo on each side
     if (!activeCorridorId) return width;
     
     return [
@@ -118,24 +110,24 @@ export const getCorridorWidthExpr = (activeCorridorId: string | null, isBg: bool
     [
       "match",
       ["get", "priority_level"],
-      "Critical", getWidth(6),
-      "Very High", getWidth(5),
-      "High", getWidth(4),
-      "Medium", getWidth(3.5),
-      "Low", getWidth(3),
-      getWidth(2),
+      "Critical Blackspot", getWidth(6),
+      "High-Priority", getWidth(4.5),
+      "High Priority", getWidth(4.5),
+      "Moderate-Priority", getWidth(3),
+      "Moderate Priority", getWidth(3),
+      getWidth(3),
     ],
     // At zoom 15 (zoomed in)
     15,
     [
       "match",
       ["get", "priority_level"],
-      "Critical", getWidth(12),
-      "Very High", getWidth(10),
-      "High", getWidth(8),
-      "Medium", getWidth(6.5),
-      "Low", getWidth(5),
-      getWidth(3),
+      "Critical Blackspot", getWidth(12),
+      "High-Priority", getWidth(8.5),
+      "High Priority", getWidth(8.5),
+      "Moderate-Priority", getWidth(5.5),
+      "Moderate Priority", getWidth(5.5),
+      getWidth(5),
     ]
   ];
 };

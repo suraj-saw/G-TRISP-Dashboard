@@ -27,6 +27,7 @@ from shapely.geometry import shape, LineString
 import shapely
 
 from app.core.dependencies import get_db
+from app.core.config import PROJECT_NAME
 from app.models.accident import Accident
 from app.models.snapped_accident import SnappedAccident
 from app.models.gujarat_road import GujaratRoad
@@ -955,7 +956,7 @@ def export_blackspots(
         ("Total Crashes Analyzed", len(points)),
         ("Radius (m)", radius_m),
         ("Min Crashes Threshold", min_crashes),
-        ("Source", "G-TRISP Dashboard"),
+        ("Source", f"{PROJECT_NAME} Dashboard"),
     ]
     buf = build_accident_excel(accidents_with_bs, meta_rows)
     return StreamingResponse(

@@ -380,7 +380,6 @@ function AdminPanel() {
       />
 
       <TopBar
-        appName="G-TRISP"
         user={user!}
         notificationCount={unreadCount}
         onLogout={logout}

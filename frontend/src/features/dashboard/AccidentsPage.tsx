@@ -170,7 +170,6 @@ export default function AccidentsPage() {
       </AnimatePresence>
 
       <TopBar
-        appName="G-TRISP"
         user={user!}
         notificationCount={unreadCount}
         onLogout={logout}

@@ -160,7 +160,6 @@ export default function GujaratOverview({
         }}
       >
         <TopBar
-          appName="G-TRISP"
           user={user}
           showNotificationBell={showAdminControls}
           notificationCount={unreadCount}

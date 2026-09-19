@@ -4,7 +4,7 @@ import { Map, LayoutDashboard, ChevronRight } from "lucide-react";
 import API from "../../api/axios";
 import type { User } from "../../types/user";
 import TopBar from "../../components/layout/TopBar";
-import { ROUTES } from "../../config/constants";
+import { ROUTES, APP_CONFIG } from "../../config/constants";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -51,7 +51,6 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col bg-[#F1F4FB]">
       <TopBar
-        appName="G-TRISP"
         user={user}
         showNotificationBell={isAdmin}
         adminPanelPath={isAdmin ? ROUTES.ADMIN_PANEL : undefined}
@@ -66,11 +65,11 @@ export default function HomePage() {
         <div className="w-full max-w-7xl mx-auto px-4 md:px-8 py-8 relative z-10 flex flex-col items-center">
           
           <h1 className="text-3xl md:text-5xl font-extrabold text-center text-slate-800 mb-6 tracking-tight">
-            Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">G-TRISP</span>
+            Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">{APP_CONFIG.displayName}</span>
           </h1>
           
           <p className="text-lg md:text-xl text-center text-slate-600 mb-8 max-w-3xl mx-auto leading-relaxed">
-            The Gujarat Traffic crash Reporting, Information and Statistical database Program provides a comprehensive suite of analytical tools to monitor, evaluate, and prevent road accidents across Gujarat.
+            <span className="font-semibold text-slate-700">{APP_CONFIG.fullName}</span> provides a comprehensive suite of analytical tools to monitor, evaluate, and prevent road accidents across Gujarat.
           </p>
           
           <div className="bg-white p-6 rounded-2xl mb-10 border border-slate-200 shadow-sm w-full max-w-4xl">

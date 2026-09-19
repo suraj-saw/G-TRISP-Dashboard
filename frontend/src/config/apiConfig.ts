@@ -1,6 +1,6 @@
 // frontend/src/config/apiConfig.ts
 /**
- * Centralized API endpoints and request configuration for G-TRISP frontend.
+ * Centralized API endpoints and request configuration for ASTRA frontend.
  */
 
 // ---------------------------------------------------------------------------

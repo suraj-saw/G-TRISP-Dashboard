@@ -8,6 +8,7 @@ import { Camera } from "lucide-react";
 import ExportButton from "../layout/ExportButton";
 import BlackspotExportButton from "../layout/BlackspotExportButton";
 import type { DashboardFilters } from "../../types/dashboard";
+import { APP_CONFIG } from "../../config/constants";
 
 export type AnalysisView = "spatial" | "statistical" | "temporal";
 
@@ -139,7 +140,7 @@ const DistrictAnalysisTabs: React.FC<DistrictAnalysisTabsProps> = ({
           };
 
           // Top Left: Title & Subtitle
-          drawHaloText('G-TRISP DASHBOARD', padding, padding, `900 ${26 * scale}px sans-serif`, '#1e3a8a', 'left', 'top');
+          drawHaloText(APP_CONFIG.canvasTitle, padding, padding, `900 ${26 * scale}px sans-serif`, '#1e3a8a', 'left', 'top');
           if (districtName) {
             drawHaloText(`${districtName.toUpperCase()} DISTRICT`, padding, padding + 34 * scale, `700 ${16 * scale}px sans-serif`, '#334155', 'left', 'top');
           }

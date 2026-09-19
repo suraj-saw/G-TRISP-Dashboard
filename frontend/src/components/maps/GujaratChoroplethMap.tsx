@@ -22,41 +22,41 @@ import { buildDistrictDashboardPath } from "../../config/constants";
 import { useDistrictInsights } from "../../context/DistrictInsightsContext";
 
 // 33 distinct, softly graded shades for Gujarat's 33 districts (Rank 1 = most accidents to Rank 33 = least).
-// Crafted with harmonious, controlled saturation and smooth lightness progression to avoid jarring contrast.
+// Calibrated with compressed lightness range (44% - 73%) to significantly soften contrast between districts while preserving clear data hierarchy.
 const RANK_COLORS_33: string[] = [
-  "#29447a", // Rank 1 (Most Accidents)
-  "#2c4881", // Rank 2
-  "#2e4c87", // Rank 3
-  "#31508d", // Rank 4
-  "#345493", // Rank 5
-  "#375899", // Rank 6
-  "#3a5c9f", // Rank 7
-  "#3d60a5", // Rank 8
-  "#4064ab", // Rank 9
-  "#4368b0", // Rank 10
-  "#466cb6", // Rank 11
-  "#4c71b9", // Rank 12
-  "#5376bb", // Rank 13
-  "#5a7bbd", // Rank 14
-  "#6180bf", // Rank 15
-  "#6886c1", // Rank 16
-  "#6f8bc3", // Rank 17 (Median)
-  "#7690c5", // Rank 18
-  "#7d96c7", // Rank 19
-  "#849bc9", // Rank 20
-  "#8aa0cb", // Rank 21
-  "#91a5ce", // Rank 22
-  "#97aad0", // Rank 23
-  "#9eafd2", // Rank 24
-  "#a5b5d5", // Rank 25
-  "#abbad7", // Rank 26
-  "#b1bfda", // Rank 27
-  "#b8c4dd", // Rank 28
-  "#bec9df", // Rank 29
-  "#c4cee2", // Rank 30
-  "#cad3e5", // Rank 31
-  "#d1d8e7", // Rank 32
-  "#d7ddea", // Rank 33 (Least Accidents)
+  "#3e63a3", // Rank 1 (Most Accidents)
+  "#3f65a6", // Rank 2
+  "#4167a9", // Rank 3
+  "#4369ac", // Rank 4
+  "#446bae", // Rank 5
+  "#466db1", // Rank 6
+  "#4870b4", // Rank 7
+  "#4a72b6", // Rank 8
+  "#4e75b7", // Rank 9
+  "#5277b8", // Rank 10
+  "#567ab9", // Rank 11
+  "#597dba", // Rank 12
+  "#5d7fbb", // Rank 13
+  "#6182bc", // Rank 14
+  "#6485bd", // Rank 15
+  "#6887be", // Rank 16
+  "#6b8abf", // Rank 17 (Median)
+  "#6f8dc0", // Rank 18
+  "#738fc1", // Rank 19
+  "#7692c2", // Rank 20
+  "#7a95c3", // Rank 21
+  "#7d97c4", // Rank 22
+  "#819ac5", // Rank 23
+  "#849cc7", // Rank 24
+  "#889fc8", // Rank 25
+  "#8ba2c9", // Rank 26
+  "#8ea4ca", // Rank 27
+  "#92a7cb", // Rank 28
+  "#95aacd", // Rank 29
+  "#99acce", // Rank 30
+  "#9cafcf", // Rank 31
+  "#9fb1d0", // Rank 32
+  "#a3b4d2", // Rank 33 (Least Accidents)
 ];
 
 // Internal dimensions for the SVG viewBox

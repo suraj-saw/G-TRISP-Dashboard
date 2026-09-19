@@ -18,13 +18,15 @@ import logging
 # Initialize module-level logger
 logger = logging.getLogger(__name__)
 
+from app.core.config import PROJECT_NAME, TEAM_NAME
+
 # Load SMTP configuration from environment variables.
 # These dictate how the application connects to the outbound mail server.
 SMTP_HOST = os.getenv("SMTP_HOST")
 SMTP_PORT = os.getenv("SMTP_PORT")
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "noreply@g-trisp.local")
+SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "noreply@astra.local")
 
 
 def send_reset_password_email(to_email: str, reset_link: str) -> None:
@@ -47,11 +49,11 @@ def send_reset_password_email(to_email: str, reset_link: str) -> None:
     None
     """
     # Construct the email metadata and plain-text body
-    subject = "G-TRISP Dashboard - Password Reset Request"
+    subject = f"{PROJECT_NAME} Dashboard - Password Reset Request"
     body = f"""
     Hello,
 
-    We received a request to reset your password for the G-TRISP Dashboard.
+    We received a request to reset your password for the {PROJECT_NAME} Dashboard.
     Please click the link below to set a new password. This link will expire in 15 minutes.
 
     {reset_link}
@@ -59,7 +61,7 @@ def send_reset_password_email(to_email: str, reset_link: str) -> None:
     If you did not request this, you can safely ignore this email.
 
     Regards,
-    G-TRISP Team
+    {TEAM_NAME}
     """
 
     # Check if essential SMTP configuration is provided.
