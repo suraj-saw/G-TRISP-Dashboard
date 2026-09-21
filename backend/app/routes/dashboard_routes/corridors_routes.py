@@ -1,7 +1,7 @@
 # backend/app/routes/dashboard_routes/corridors_routes.py
 
 """
-Risk Corridors Endpoints using NH-48 Centerline Road Dataset.
+Risk Corridors Endpoints using NH-48 and NE-1 Centerline Road Datasets.
 """
 
 from typing import List, Optional
@@ -41,7 +41,7 @@ def get_risk_corridors(
     merge_threshold_m: float = Query(100.0, description="Merge threshold in meters")
 ):
     """
-    Computes continuous risk corridors based on the NH48 centerline road dataset.
+    Computes continuous risk corridors based on NH-48 and NE-1 centerline road datasets.
     """
     validation_error = validate_observation_period(None, selected_years=year)
     if validation_error and year:

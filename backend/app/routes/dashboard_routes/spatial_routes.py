@@ -305,8 +305,8 @@ def get_snapped_accidents(
         Accident.severity,
         Accident.district,
         Accident.police_station,
-        Accident.road_name,
-        Accident.road_classification,
+        func.coalesce(GujaratRoad.road_name, Accident.road_name).label("road_name"),
+        func.coalesce(GujaratRoad.road_classification, Accident.road_classification).label("road_classification"),
         Accident.weather_condition,
         Accident.light_condition,
         Accident.type_of_collision.label("collision_type"),
@@ -322,6 +322,8 @@ def get_snapped_accidents(
         SnappedAccident.distance_meters
     ).join(
         SnappedAccident, Accident.id == SnappedAccident.accident_id
+    ).join(
+        GujaratRoad, SnappedAccident.road_id == GujaratRoad.id
     )
 
     if is_pedestrian:
@@ -353,24 +355,24 @@ def get_snapped_accidents(
     points = [
         {
             "accident_id": r.accident_id,
-            "severity": r.severity or "Unknown",
-            "district": r.district or "Unknown",
-            "police_station": r.police_station,
-            "road_name": r.road_name,
-            "road_classification": r.road_classification,
-            "weather_condition": r.weather_condition,
-            "light_condition": r.light_condition,
-            "collision_type": r.collision_type,
-            "collision_nature": r.collision_nature,
+            "severity": safe_text(r.severity),
+            "district": safe_text(r.district),
+            "police_station": safe_text(r.police_station),
+            "road_name": safe_text(r.road_name),
+            "road_classification": safe_text(r.road_classification),
+            "weather_condition": safe_text(r.weather_condition),
+            "light_condition": safe_text(r.light_condition),
+            "collision_type": safe_text(r.collision_type),
+            "collision_nature": safe_text(r.collision_nature),
             "accident_date_time": r.accident_date_time,
-            "pedestrian_killed": r.pedestrian_killed,
-            "pedestrian_grievous_injury": r.pedestrian_grievous_injury,
-            "pedestrian_minor_injury": r.pedestrian_minor_injury,
+            "pedestrian_killed": r.pedestrian_killed or 0,
+            "pedestrian_grievous_injury": r.pedestrian_grievous_injury or 0,
+            "pedestrian_minor_injury": r.pedestrian_minor_injury or 0,
             "latitude": r.snapped_lat,
             "longitude": r.snapped_lon,
             "original_latitude": r.orig_lat,
             "original_longitude": r.orig_lon,
-            "distance_meters": r.distance_meters,
+            "distance_meters": r.distance_meters or 0.0,
         }
         for r in rows
     ]
@@ -387,21 +389,30 @@ def get_road_network(
     Returns the road network linestrings for the specified district(s) as a GeoJSON FeatureCollection.
     """
     if not district:
-        return {"type": "FeatureCollection", "features": []}
-    
-    query = db.query(
-        GujaratRoad.id,
-        GujaratRoad.road_name,
-        GujaratRoad.road_classification,
-        GujaratRoad.road_type,
-        GujaratRoad.properties,
-        func.ST_AsGeoJSON(func.ST_Simplify(GujaratRoad.geometry, 0.0005)).label("geom_json")
-    ).join(
-        GujaratDistrict,
-        func.ST_Intersects(GujaratRoad.geometry, GujaratDistrict.geometry)
-    ).filter(
-        GujaratDistrict.shape_name.in_(district)
-    )
+        query = db.query(
+            GujaratRoad.id,
+            GujaratRoad.road_name,
+            GujaratRoad.road_classification,
+            GujaratRoad.road_type,
+            GujaratRoad.properties,
+            func.ST_AsGeoJSON(func.ST_Simplify(GujaratRoad.geometry, 0.0005)).label("geom_json")
+        ).filter(
+            GujaratRoad.road_type == "Centerline"
+        )
+    else:
+        query = db.query(
+            GujaratRoad.id,
+            GujaratRoad.road_name,
+            GujaratRoad.road_classification,
+            GujaratRoad.road_type,
+            GujaratRoad.properties,
+            func.ST_AsGeoJSON(func.ST_Simplify(GujaratRoad.geometry, 0.0005)).label("geom_json")
+        ).join(
+            GujaratDistrict,
+            func.ST_Intersects(GujaratRoad.geometry, GujaratDistrict.geometry)
+        ).filter(
+            func.upper(GujaratDistrict.shape_name).in_([d.strip().upper() for d in district])
+        )
     
     rows = query.distinct().all()
     

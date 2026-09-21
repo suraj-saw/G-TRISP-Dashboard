@@ -30,8 +30,8 @@ export default function SeverityLegend({
   let isVisible = !!showMarkers;
 
   if (
-    type === "clusters" // ||
-    // type === "snapped_accidents"
+    type === "clusters" ||
+    type === "snapped_accidents"
   ) {
     isVisible = true;
   }

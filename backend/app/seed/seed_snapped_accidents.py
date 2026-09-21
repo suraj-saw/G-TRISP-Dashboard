@@ -26,30 +26,28 @@ def run_snapping():
         logger.info("Truncating existing snapped_accidents data...")
         conn.execute(text("TRUNCATE TABLE snapped_accidents CASCADE;"))
         
-        logger.info("Executing spatial snapping query (this may take a minute)...")
-        # Query uses CROSS JOIN LATERAL with <-> operator for KNN (K-Nearest Neighbors) spatial index lookup
+        logger.info("Executing spatial snapping query to centerline road network...")
         query = text("""
             INSERT INTO snapped_accidents (accident_id, road_id, original_location, snapped_location, distance_meters)
             SELECT 
+                DISTINCT ON (a.id)
                 a.id AS accident_id,
-                nearest_road.id AS road_id,
+                r.id AS road_id,
                 a.location AS original_location,
-                ST_ClosestPoint(nearest_road.geometry, a.location) AS snapped_location,
-                ST_Distance(a.location::geography, nearest_road.geometry::geography) AS distance_meters
-            FROM accidents a
-            CROSS JOIN LATERAL (
-                SELECT r.id, r.geometry
-                FROM gujarat_roads r
-                WHERE r.geometry && ST_Expand(a.location, 0.01)
-                ORDER BY r.geometry <-> a.location
-                LIMIT 1
-            ) AS nearest_road
-            WHERE a.location IS NOT NULL;
+                ST_ClosestPoint(r.geometry, a.location) AS snapped_location,
+                ROUND(ST_Distance(a.location::geography, r.geometry::geography)::numeric, 2) AS distance_meters
+            FROM gujarat_roads r
+            JOIN accidents a 
+              ON a.location && ST_Expand(r.geometry, 0.0025) 
+              AND ST_DWithin(a.location::geography, r.geometry::geography, 200)
+            WHERE (r.road_type = 'Centerline' OR r.road_source_id LIKE '%centerline%')
+              AND a.location IS NOT NULL
+            ORDER BY a.id, ST_Distance(a.location::geography, r.geometry::geography);
         """)
         
         result = conn.execute(query)
         conn.commit()
-        logger.info(f"Successfully snapped and inserted {result.rowcount} accident records.")
+        logger.info(f"Successfully snapped and inserted {result.rowcount} accident records to centerline network.")
 
 if __name__ == "__main__":
     try:

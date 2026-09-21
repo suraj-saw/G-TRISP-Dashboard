@@ -7,7 +7,7 @@ These schemas define the structured JSON payloads returned to the frontend for
 rendering analytics, charts, tables, and geospatial maps based on road accident data.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Union
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
@@ -145,10 +145,10 @@ class HeatmapPoint(ResponseModel):
     police_station: Optional[str] = None
     road_name: Optional[str] = None
     road_classification: Optional[str] = None
-    weather_condition: Optional[str] = None
-    light_condition: Optional[str] = None
-    collision_type: Optional[str] = None
-    collision_nature: Optional[str] = None
+    weather_condition: Optional[Union[str, List[str]]] = None
+    light_condition: Optional[Union[str, List[str]]] = None
+    collision_type: Optional[Union[str, List[str]]] = None
+    collision_nature: Optional[Union[str, List[str]]] = None
     accident_date_time: Optional[datetime] = None
     
     # Specific casualty metrics for point-level analysis

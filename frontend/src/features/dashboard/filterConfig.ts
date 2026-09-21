@@ -78,6 +78,7 @@ export const HOTSPOT_OPTIONS = [
 
 /** Test visualization options */
 export const TEST_VISUALIZATION_OPTIONS = [
+  { value: "snapped_accidents", label: "Snapped Accident Points" },
   { value: "road_network", label: "Road Network" },
   { value: "merged_road_network", label: "Merged Road Network" },
   { value: "network_blackspot", label: "Network Blackspots (Segments)" },
@@ -99,7 +100,7 @@ export const VISUALIZATION_VARIANT_LABELS: Record<string, string> = {
   blackspot: "Crash Type",
   irc_greedy_blackspot: "Crash Type",
   irc_grid_blackspot: "Crash Type",
-  // snapped_accidents: "Crash Type",
+  snapped_accidents: "Crash Type",
   network_blackspot: "Crash Type",
   network_blackspot_merged: "Crash Type",
   risk_corridors: "Crash Type",

@@ -19,7 +19,7 @@ import LocationSearchBar from "../../components/maps/LocationSearchBar";
 import { VisualizationLayers } from "../../components/maps/VisualizationLayers";
 import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLayers";
 import IrcBlackspotDetectionLayers from "../../components/maps/IrcBlackspotDetectionLayers";
-// import SnappedAccidentLayers from "../../components/maps/SnappedAccidentLayers";
+import SnappedAccidentLayers from "../../components/maps/SnappedAccidentLayers";
 import NetworkBlackspotLayers from "../../components/maps/NetworkBlackspotLayers";
 import RiskCorridorLayers from "../../components/maps/RiskCorridorLayers";
 import RoadNetworkLayers from "../../components/maps/RoadNetworkLayers";
@@ -357,8 +357,8 @@ export default function StateDashboard() {
 
   useEffect(() => {
     let active = true;
-    if (allVisualizationTypes.includes("road_network") && districtName) {
-      fetchGujaratRoadNetwork(districtName).then(res => {
+    if (allVisualizationTypes.includes("road_network")) {
+      fetchGujaratRoadNetwork(districtName || "").then(res => {
         if (active) setRoadNetworkData(res);
       }).catch(console.error);
     } else {
@@ -462,7 +462,7 @@ export default function StateDashboard() {
   }, [districtName, filterKey]);
 
   useEffect(() => {
-    const isNetwork = allVisualizationTypes.some(t => ["network_blackspot", "network_blackspot_merged", "risk_corridors"].includes(t));
+    const isNetwork = allVisualizationTypes.some(t => ["network_blackspot", "network_blackspot_merged", "risk_corridors", "snapped_accidents"].includes(t));
     if (isNetwork) {
       let active = true;
       fetchGujaratSnappedAccidents(filters, "")
@@ -673,8 +673,9 @@ export default function StateDashboard() {
   const isRiskCorridors = allVisualizationTypes.includes("risk_corridors") ?? false;
   const isRoadNetwork = allVisualizationTypes.includes("road_network") ?? false;
   const isMergedRoadNetwork = allVisualizationTypes.includes("merged_road_network") ?? false;
+  const isSnappedAccidents = allVisualizationTypes.includes("snapped_accidents") ?? false;
   
-  const isNetwork = allVisualizationTypes.some(t => ["network_blackspot", "network_blackspot_merged", "risk_corridors"].includes(t));
+  const isNetwork = allVisualizationTypes.some(t => ["network_blackspot", "network_blackspot_merged", "risk_corridors", "snapped_accidents"].includes(t));
   const baseHeatmapData = isNetwork && snappedData ? snappedData : data.heatmap;
   const displayHeatmapData = isPedestrianVariant
     ? baseHeatmapData.filter(isPedestrianAccident)
@@ -1222,6 +1223,13 @@ export default function StateDashboard() {
                           geojsonData={mergedRoadNetworkData}
                         />
                       )}
+                      {isSnappedAccidents && (
+                        <SnappedAccidentLayers
+                          key="snapped-accidents"
+                          filters={filters}
+                          fetchFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
+                        />
+                      )}
                       {isDensityHeatmap && (
                         <VisualizationLayers
                           key={`density_heatmap-${filters.visualization_variant || "accident"}`}
@@ -1246,8 +1254,8 @@ export default function StateDashboard() {
                       )}
                       {!isRoadNetwork && !isMergedRoadNetwork && !isRiskCorridors && (
                         <SeverityLegend
-                          visualizationLayerType={isDensityHeatmap ? "density_heatmap" : ""}
-                          showMarkers={showMarkerOverlay}
+                          visualizationLayerType={isDensityHeatmap ? "density_heatmap" : isSnappedAccidents ? "snapped_accidents" : ""}
+                          showMarkers={showMarkerOverlay || isSnappedAccidents}
                         />
                       )}
                       <RoadNetworkLegend isVisible={isRoadNetwork || isMergedRoadNetwork} />

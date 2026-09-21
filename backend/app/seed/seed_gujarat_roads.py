@@ -59,6 +59,9 @@ DATA_FILE = Path(os.getenv("GUJARAT_ROADS_GEOJSONL", str(DEFAULT_DATA_FILE))).re
 DEFAULT_NH48_FILE = _BACKEND_DIR / "data" / "NH48_Gujarat_Districts.geojson"
 NH48_DATA_FILE = Path(os.getenv("NH48_GUJARAT_DISTRICTS_GEOJSON", str(DEFAULT_NH48_FILE))).resolve()
 
+DEFAULT_NE1_FILE = _BACKEND_DIR / "data" / "NE1_Gujarat_Districts.geojson"
+NE1_DATA_FILE = Path(os.getenv("NE1_GUJARAT_DISTRICTS_GEOJSON", str(DEFAULT_NE1_FILE))).resolve()
+
 SOURCE_SRID = int(os.getenv("GUJARAT_ROADS_SOURCE_SRID", str(POSTGIS_SRID)))
 CHUNK_SIZE = int(os.getenv("SEED_BATCH_SIZE", str(DEFAULT_SEED_BATCH_SIZE)))
 
@@ -297,8 +300,9 @@ def seed_gujarat_roads(force: bool = False) -> None:
 
         logger.info("✓ Roads seed complete — inserted=%d, skipped=%d", inserted, skipped)
 
-        # Seed NH-48 centerline data into gujarat_roads
+        # Seed NH-48 and NE-1 centerline data into gujarat_roads
         seed_nh48_centerline_roads(db=db, force=force)
+        seed_ne1_centerline_roads(db=db, force=force)
 
     except Exception:
         db.rollback()
@@ -408,13 +412,120 @@ def seed_nh48_centerline_roads(db: SessionLocal = None, force: bool = False) -> 
             db.close()
 
 
+def seed_ne1_centerline_roads(db: SessionLocal = None, force: bool = False) -> int:
+    """
+    Seeds the NE-1 (National Expressway 1) centerline road network from NE1_Gujarat_Districts.geojson
+    into the gujarat_roads table.
+    """
+    own_session = False
+    if db is None:
+        Base.metadata.create_all(bind=engine)
+        db = SessionLocal()
+        own_session = True
+
+    try:
+        # Resolve path across containers or local environment
+        target_path = None
+        for p in [
+            NE1_DATA_FILE,
+            _BACKEND_DIR / "data" / "NE1_Gujarat_Districts.geojson",
+            Path("/app/data/NE1_Gujarat_Districts.geojson"),
+            Path("backend/data/NE1_Gujarat_Districts.geojson"),
+        ]:
+            if p.exists():
+                target_path = p
+                break
+
+        if not target_path:
+            logger.warning("NE-1 GeoJSON file not found at: %s", NE1_DATA_FILE)
+            return 0
+
+        existing_ne1 = db.query(GujaratRoad).filter(GujaratRoad.road_source_id.like("ne1-centerline-%")).count()
+        if existing_ne1 > 0 and not force:
+            logger.info("gujarat_roads already has %d NE-1 centerline record(s). Skipping. Use --force to re-seed.", existing_ne1)
+            return existing_ne1
+
+        if existing_ne1 > 0 and force:
+            logger.info("force=True — deleting %d existing NE-1 centerline records from gujarat_roads...", existing_ne1)
+            db.query(GujaratRoad).filter(GujaratRoad.road_source_id.like("ne1-centerline-%")).delete(synchronize_session=False)
+            db.commit()
+
+        logger.info("Reading NE-1 centerline dataset from: %s", target_path)
+        with target_path.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+
+        features = data.get("features", [])
+        inserted = 0
+
+        for feat_idx, feature in enumerate(features):
+            props = feature.get("properties", {}) or {}
+            geom_dict = feature.get("geometry")
+            if not geom_dict:
+                continue
+
+            try:
+                raw_geom = shapely_shape(geom_dict)
+            except Exception:
+                continue
+
+            if raw_geom.is_empty:
+                continue
+
+            geom = _normalize_geometry_to_postgis_4326(raw_geom, source_srid=SOURCE_SRID)
+            lines = _iter_lines_from_feature_geometry(geom)
+
+            district = props.get("DISTRICT", f"District_{feat_idx}")
+            dist_slug = str(district).strip().lower().replace(" ", "_")
+
+            for line_idx, ls in enumerate(lines):
+                if ls.is_empty:
+                    continue
+
+                source_id = f"ne1-centerline-{dist_slug}-{line_idx}"
+                postgis_geom = from_shape(ls, srid=POSTGIS_SRID)
+
+                clean_props = dict(props)
+                clean_props["district"] = district
+                clean_props["is_ne1_centerline"] = True
+                clean_props["source_file"] = "NE1_Gujarat_Districts.geojson"
+
+                road = GujaratRoad(
+                    road_source_id=source_id,
+                    road_name="NE 1",
+                    road_classification="Expressway",
+                    road_type="Centerline",
+                    properties=clean_props,
+                    geometry=postgis_geom,
+                )
+                db.add(road)
+                inserted += 1
+
+        db.commit()
+        logger.info("✓ Successfully seeded %d NE-1 centerline road segments into gujarat_roads", inserted)
+        return inserted
+    except Exception:
+        db.rollback()
+        logger.exception("NE-1 seed failed — transaction rolled back.")
+        raise
+    finally:
+        if own_session:
+            db.close()
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Seed Gujarat roads and NH-48 centerline into PostGIS.")
+    parser = argparse.ArgumentParser(description="Seed Gujarat roads, NH-48 and NE-1 centerline into PostGIS.")
     parser.add_argument("--force", action="store_true", help="Delete existing rows and re-seed.")
     parser.add_argument("--nh48-only", action="store_true", help="Only seed the NH-48 centerline road network into gujarat_roads.")
+    parser.add_argument("--ne1-only", action="store_true", help="Only seed the NE-1 centerline road network into gujarat_roads.")
+    parser.add_argument("--centerlines-only", action="store_true", help="Seed both NH-48 and NE-1 centerline road networks into gujarat_roads.")
     args = parser.parse_args()
     if args.nh48_only:
         seed_nh48_centerline_roads(force=args.force)
+    elif args.ne1_only:
+        seed_ne1_centerline_roads(force=args.force)
+    elif args.centerlines_only:
+        seed_nh48_centerline_roads(force=args.force)
+        seed_ne1_centerline_roads(force=args.force)
     else:
         seed_gujarat_roads(force=args.force)
 

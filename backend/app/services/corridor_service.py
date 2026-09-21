@@ -25,9 +25,11 @@ from app.utils.district_utils import get_canonical_district, normalize_district_
 
 logger = logging.getLogger(__name__)
 
-# Cache for NH48 GeoJSON datasets
+# Cache for Centerline (NH48, NE1) GeoJSON datasets
 _NH48_DISTRICTS_GEOJSON: Optional[Dict[str, Any]] = None
 _NH48_STATE_GEOJSON: Optional[Dict[str, Any]] = None
+_NE1_DISTRICTS_GEOJSON: Optional[Dict[str, Any]] = None
+_NE1_STATE_GEOJSON: Optional[Dict[str, Any]] = None
 
 
 def _get_data_path(filename: str) -> str:
@@ -66,25 +68,56 @@ def load_nh48_state_geojson() -> Optional[Dict[str, Any]]:
     return _NH48_STATE_GEOJSON
 
 
-def get_nh48_features_for_districts(
+def load_ne1_districts_geojson() -> Dict[str, Any]:
+    global _NE1_DISTRICTS_GEOJSON
+    if _NE1_DISTRICTS_GEOJSON is None:
+        path = _get_data_path("NE1_Gujarat_Districts.geojson")
+        with open(path, "r", encoding="utf-8") as f:
+            _NE1_DISTRICTS_GEOJSON = json.load(f)
+    return _NE1_DISTRICTS_GEOJSON
+
+
+def load_ne1_state_geojson() -> Optional[Dict[str, Any]]:
+    global _NE1_STATE_GEOJSON
+    if _NE1_STATE_GEOJSON is None:
+        for fname in ["NE 1.geojson", "NE1_Gujarat.geojson"]:
+            path = _get_data_path(fname)
+            if os.path.exists(path) and os.path.getsize(path) > 1000:
+                with open(path, "r", encoding="utf-8") as f:
+                    _NE1_STATE_GEOJSON = json.load(f)
+                    break
+    return _NE1_STATE_GEOJSON
+
+
+def get_centerline_features_for_districts(
     district_names: Optional[List[str]] = None,
     db: Optional[Session] = None
 ) -> List[Dict[str, Any]]:
     """
-    Returns the NH48 GeoJSON features matching the requested district(s).
-    First attempts to load from the PostGIS gujarat_roads table where road_source_id like 'nh48-centerline-%'.
+    Returns centerline GeoJSON features (NH-48, NE-1) matching the requested district(s).
+    First attempts to load from the PostGIS gujarat_roads table where road_source_id matches centerline patterns.
     Falls back to the GeoJSON file on disk if db is unavailable or no records found in table.
     """
     all_features = []
     if db is not None:
         try:
             from app.models.gujarat_road import GujaratRoad
+            # pyrefly: ignore [missing-import]
+            from sqlalchemy import or_
             roads = db.query(
                 GujaratRoad.id,
                 GujaratRoad.road_source_id,
+                GujaratRoad.road_name,
+                GujaratRoad.road_classification,
                 GujaratRoad.properties,
                 func.ST_AsGeoJSON(GujaratRoad.geometry).label("geom_json")
-            ).filter(GujaratRoad.road_source_id.like("nh48-centerline-%")).all()
+            ).filter(
+                or_(
+                    GujaratRoad.road_source_id.like("nh48-centerline-%"),
+                    GujaratRoad.road_source_id.like("ne1-centerline-%"),
+                    GujaratRoad.road_type == "Centerline"
+                )
+            ).all()
 
             for r in roads:
                 props = dict(r.properties or {})
@@ -92,6 +125,8 @@ def get_nh48_features_for_districts(
                 props["DISTRICT"] = dist
                 props["road_db_id"] = r.id
                 props["road_source_id"] = r.road_source_id
+                props["road_name"] = r.road_name or ("NE 1" if "ne1" in (r.road_source_id or "").lower() else "NH 48")
+                props["road_classification"] = r.road_classification or ("Expressway" if "ne1" in (r.road_source_id or "").lower() else "National Highway")
 
                 geom = json.loads(r.geom_json)
                 all_features.append({
@@ -100,12 +135,34 @@ def get_nh48_features_for_districts(
                     "geometry": geom
                 })
         except Exception as e:
-            logger.warning(f"Failed to query NH-48 centerline from gujarat_roads table: {e}")
+            logger.warning(f"Failed to query centerline roads from gujarat_roads table: {e}")
             all_features = []
 
     if not all_features:
-        data = load_nh48_districts_geojson()
-        all_features = data.get("features", [])
+        data_nh48 = load_nh48_districts_geojson()
+        features_nh48 = []
+        for feat in (data_nh48.get("features", []) if data_nh48 else []):
+            feat_copy = dict(feat)
+            p = dict(feat.get("properties", {}) or {})
+            p.setdefault("road_name", "NH 48")
+            p.setdefault("road_classification", "National Highway")
+            feat_copy["properties"] = p
+            features_nh48.append(feat_copy)
+
+        features_ne1 = []
+        try:
+            data_ne1 = load_ne1_districts_geojson()
+            for feat in (data_ne1.get("features", []) if data_ne1 else []):
+                feat_copy = dict(feat)
+                p = dict(feat.get("properties", {}) or {})
+                p.setdefault("road_name", "NE 1")
+                p.setdefault("road_classification", "Expressway")
+                feat_copy["properties"] = p
+                features_ne1.append(feat_copy)
+        except Exception as ex:
+            logger.warning(f"Could not load fallback NE1 GeoJSON: {ex}")
+
+        all_features = features_nh48 + features_ne1
 
     if not district_names:
         return all_features
@@ -278,7 +335,7 @@ def compute_risk_corridors(
     if district:
         dist_list = district if isinstance(district, list) else [district]
 
-    raw_features = get_nh48_features_for_districts(dist_list if dist_list else None, db=db)
+    raw_features = get_centerline_features_for_districts(dist_list if dist_list else None, db=db)
     target_features = decompose_to_linestrings(raw_features)
     if not target_features:
         logger.info(f"No corridor segments found for districts: {dist_list}")
@@ -289,8 +346,19 @@ def compute_risk_corridors(
     feature_geoms_map = {}
 
     for idx, road_feat in enumerate(target_features):
-        road_id = 48000 + idx
-        district_name = road_feat.get("properties", {}).get("DISTRICT", "Gujarat")
+        props = road_feat.get("properties", {}) or {}
+        road_id = props.get("road_db_id") or (48000 + idx)
+        district_name = props.get("DISTRICT", "Gujarat")
+
+        r_name = props.get("road_name")
+        r_source = str(props.get("road_source_id", "")).lower()
+        if not r_name or r_name == "Unknown":
+            r_name = "NE 1" if ("ne1" in r_source or "ne 1" in r_source) else "NH 48"
+
+        r_class = props.get("road_classification")
+        if not r_class or r_class == "Unknown":
+            r_class = "Expressway" if ("ne1" in r_source or "ne 1" in r_source) else "National Highway"
+
         geom_json_str = json.dumps(road_feat.get("geometry", {}))
 
         # 1. Compute segment length in meters
@@ -305,7 +373,9 @@ def compute_risk_corridors(
         road_lengths_map[road_id] = road_length_m
         feature_geoms_map[road_id] = {
             "geom_json_str": geom_json_str,
-            "district": district_name
+            "district": district_name,
+            "road_name": r_name,
+            "road_classification": r_class,
         }
 
         # 2. Query accidents within buffer_distance_m of this segment
@@ -413,6 +483,8 @@ def compute_risk_corridors(
 
         geom_str = meta["geom_json_str"]
         district_name = meta["district"]
+        r_name = meta.get("road_name", "NH 48")
+        r_class = meta.get("road_classification", "National Highway")
 
         # PostGIS query to get the sliced corridor LineString geometry and start/end coordinates
         geom_res = db.execute(
@@ -441,8 +513,8 @@ def compute_risk_corridors(
                 "properties": {
                     "corridor_id": c["corridor_id"],
                     "road_id": c["road_id"],
-                    "road_name": f"NH 48 ({district_name.title()})",
-                    "road_classification": "National Highway",
+                    "road_name": f"{r_name} ({district_name.title()})",
+                    "road_classification": r_class,
                     "district": district_name,
                     "road_length": round(c.get("road_length", 0.0), 2),
                     "corridor_length": round(c["corridor_length_m"], 2),
@@ -473,5 +545,6 @@ def compute_risk_corridors(
     }
 
 
-# Backwards compatibility alias
+# Backwards compatibility aliases
+get_nh48_features_for_districts = get_centerline_features_for_districts
 compute_nh48_risk_corridors = compute_risk_corridors

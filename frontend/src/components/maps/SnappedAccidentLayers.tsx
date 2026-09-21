@@ -336,12 +336,19 @@ export default function SnappedAccidentLayers({ filters, fetchFn }: Props) {
     const layers = ["snapped-hover-targets", "snapped-points-layer", "snapped-original-points-layer"];
 
     const onMove = (e: import("react-map-gl/maplibre").MapLayerMouseEvent) => {
-      const features = map.queryRenderedFeatures(e.point, { layers });
+      const activeLayers = layers.filter((l) => map.getLayer(l));
+      if (!activeLayers.length) {
+        map.getCanvas().style.cursor = "";
+        return;
+      }
+      const features = map.queryRenderedFeatures(e.point, { layers: activeLayers });
       map.getCanvas().style.cursor = features.length > 0 ? "pointer" : "";
     };
 
     const onClick = (e: import("react-map-gl/maplibre").MapLayerMouseEvent) => {
-      const features = map.queryRenderedFeatures(e.point, { layers });
+      const activeLayers = layers.filter((l) => map.getLayer(l));
+      if (!activeLayers.length) return;
+      const features = map.queryRenderedFeatures(e.point, { layers: activeLayers });
       if (features.length > 0) {
         const feature = features[0];
         setSelectedPoint({
