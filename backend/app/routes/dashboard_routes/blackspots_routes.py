@@ -70,9 +70,18 @@ from app.core.constants import (
     UNKNOWN_LABEL,
 )
 
-def _resolve_road_network_km(district: Optional[List[str]], explicit_km: Optional[float]) -> float:
+def _resolve_road_network_km(district: Optional[List[str]], explicit_km: Optional[float], road_classification: Optional[List[str]] = None) -> float:
     if explicit_km is not None:
         return explicit_km
+    from app.utils.irc_blackspot_utils import GUJARAT_ROAD_NETWORK_KM, DISTRICT_ROAD_NETWORK_KM, DEFAULT_DISTRICT_ROAD_NETWORK_KM, DEFAULT_STATE_ROAD_NETWORK_KM
+
+    if not district:
+        if road_classification:
+            total_km = sum(GUJARAT_ROAD_NETWORK_KM.get(rc, 0) for rc in road_classification)
+            if total_km > 0:
+                return total_km
+        return DEFAULT_STATE_ROAD_NETWORK_KM
+
     if district and len(district) == 1:
         return DISTRICT_ROAD_NETWORK_KM.get(district[0], DEFAULT_DISTRICT_ROAD_NETWORK_KM)
     if district and len(district) > 1:
@@ -268,7 +277,7 @@ def get_irc_greedy_blackspots(
     db: Session = Depends(get_db),
     visibility: Optional[List[str]] = Query(None),
 ):
-    road_network_km = _resolve_road_network_km(district, road_network_km)
+    road_network_km = _resolve_road_network_km(district, road_network_km, road_classification)
     
     base_query = apply_filters(
         db.query(Accident),
@@ -357,7 +366,7 @@ def get_irc_grid_blackspots(
     db: Session = Depends(get_db),
     visibility: Optional[List[str]] = Query(None),
 ):
-    road_network_km = _resolve_road_network_km(district, road_network_km)
+    road_network_km = _resolve_road_network_km(district, road_network_km, road_classification)
     
     base_query = apply_filters(
         db.query(Accident),
@@ -445,7 +454,7 @@ def get_pedestrian_irc_greedy_blackspots(
     db: Session = Depends(get_db),
     visibility: Optional[List[str]] = Query(None),
 ):
-    road_network_km = _resolve_road_network_km(district, road_network_km)
+    road_network_km = _resolve_road_network_km(district, road_network_km, road_classification)
     
     base_query = apply_filters(
         db.query(Accident),
@@ -542,7 +551,7 @@ def get_pedestrian_irc_grid_blackspots(
     db: Session = Depends(get_db),
     visibility: Optional[List[str]] = Query(None),
 ):
-    road_network_km = _resolve_road_network_km(district, road_network_km)
+    road_network_km = _resolve_road_network_km(district, road_network_km, road_classification)
     
     base_query = apply_filters(
         db.query(Accident),

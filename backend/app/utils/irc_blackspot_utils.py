@@ -23,8 +23,17 @@ DISTRICT_ROAD_NETWORK_KM = {
 
 # Fallback road network lengths
 DEFAULT_DISTRICT_ROAD_NETWORK_KM = 1900.0
-DEFAULT_STATE_ROAD_NETWORK_KM = 75000.0
 DEFAULT_ROAD_NETWORK_KM = 1900.0
+
+# Official Road Network Lengths for Gujarat State (in kilometers)
+GUJARAT_ROAD_NETWORK_KM = {
+    "National Highway": 6722.0,
+    "State Highway": 15738.0,
+    "Major District Road": 20153.0,
+    "Other District Road": 10052.0,
+    "Village Road": 28041.0,
+}
+DEFAULT_STATE_ROAD_NETWORK_KM = 80706.0
 
 
 @dataclass
