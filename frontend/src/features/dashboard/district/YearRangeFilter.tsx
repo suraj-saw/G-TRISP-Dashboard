@@ -20,6 +20,8 @@ interface YearRangeFilterProps {
   selectedYears: string[];
   /** Callback when the year range changes */
   onChange: (years: string[]) => void;
+  /** Optional callback to open the rich selection modal */
+  onOpenModal?: () => void;
 }
 
 // ── Portaled year dropdown ──────────────────────────────────────────────────
@@ -184,9 +186,10 @@ export default function YearRangeFilter({
   availableYears,
   selectedYears,
   onChange,
+  onOpenModal,
 }: YearRangeFilterProps) {
   const sortedYears = useMemo(
-    () => [...availableYears].sort((a, b) => a - b),
+    () => [...availableYears].filter(y => !isNaN(y) && y > 1900).sort((a, b) => a - b),
     [availableYears]
   );
 
@@ -203,7 +206,19 @@ export default function YearRangeFilter({
 
   // Valid start years: any year where start + EXACT_YEAR_SPAN - 1 <= max available year
   const rangeOptions = useMemo(() => {
-    if (sortedYears.length < EXACT_YEAR_SPAN) return [];
+    if (sortedYears.length < EXACT_YEAR_SPAN) {
+      const fallbackMax = sortedYears.length > 0 ? sortedYears[sortedYears.length - 1] : 2026;
+      const start = fallbackMax - EXACT_YEAR_SPAN + 1;
+      const end = fallbackMax;
+      return [
+        {
+          value: `${start}-${end}`,
+          label: `${start}–${end}`,
+          start,
+          end,
+        },
+      ];
+    }
     const maxYear = sortedYears[sortedYears.length - 1];
     const starts = sortedYears.filter((y) => y + EXACT_YEAR_SPAN - 1 <= maxYear);
     return starts.map(start => {
@@ -234,12 +249,23 @@ export default function YearRangeFilter({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Header with icon */}
-      <div className="flex items-center gap-1.5">
-        <CalendarRange size={12} className="text-[#6B7299]" />
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7299]">
-          Year Range ({EXACT_YEAR_SPAN} years)
-        </span>
+      {/* Header with icon and optional modal trigger */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <CalendarRange size={12} className="text-[#6B7299]" />
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7299]">
+            Year Range ({EXACT_YEAR_SPAN} years)
+          </span>
+        </div>
+        {onOpenModal && (
+          <button
+            type="button"
+            onClick={onOpenModal}
+            className="text-[10px] font-bold text-[#1e3a8a] hover:underline cursor-pointer"
+          >
+            Change
+          </button>
+        )}
       </div>
 
       <RangeDropdown

@@ -111,6 +111,8 @@ import { MAP_STYLES } from "../../components/maps/mapStyles";
 import { DateFilterInput } from "./district/DateFilterInput";
 import YearRangeFilter from "./district/YearRangeFilter";
 import { SpatialExportRegistrar } from "./district/SpatialExportRegistrar";
+import BlackspotYearRangeInlineCard from "../../components/dashboard/BlackspotYearRangeInlineCard";
+import VisualizationCategoryPanel from "../../components/dashboard/VisualizationCategoryPanel";
 
 
 
@@ -319,6 +321,7 @@ export default function DistrictDashboard() {
   const [filters, setFilters] = useState<DashboardFilters>(
     defaultDistrictFilters
   );
+
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(
     null
   );
@@ -514,11 +517,15 @@ export default function DistrictDashboard() {
   });
 
   const years = useMemo(
-    () =>
-      Array.from(new Set(allData.timeSeries.map((t) => t.year))).sort(
-        (a, b) => b - a
-      ),
-    [allData]
+    () => {
+      const fromTimeSeries = Array.from(new Set(allData.timeSeries.map((t) => t.year)));
+      const fromFilterOptions = filterOptions?.years || [];
+      const combined = Array.from(new Set([...fromTimeSeries, ...fromFilterOptions]))
+        .filter((y) => !isNaN(y) && y > 1900)
+        .sort((a, b) => b - a);
+      return combined.length > 0 ? combined : [2026, 2025, 2024];
+    },
+    [allData, filterOptions]
   );
   const severities = useMemo(
     () => allData.severity.map((s) => s.severity),
@@ -708,6 +715,78 @@ export default function DistrictDashboard() {
   //   return parts.join(" · ");
   // }, [districtName, filters.year, filters.severity]);
 
+  const commitFilterChange = (
+    targetFilterId: FilterId,
+    targetNextValue: string | string[],
+    targetYears?: string[]
+  ) => {
+    setFilters((current) => {
+      const newFilters = { ...current, [targetFilterId]: targetNextValue };
+
+      // Handle redundancy between Year and Date Range
+      if (targetFilterId === "year" && Array.isArray(targetNextValue) && targetNextValue.length > 0) {
+        newFilters.date_from = "";
+        newFilters.date_to = "";
+      } else if ((targetFilterId === "date_from" || targetFilterId === "date_to") && targetNextValue) {
+        newFilters.year = [];
+      }
+
+      if (
+        targetFilterId === "visualization_type" ||
+        targetFilterId === "test_visualization" ||
+        targetFilterId === "blackspots" ||
+        targetFilterId === "hotspots"
+      ) {
+        const currentBlackspots =
+          targetFilterId === "blackspots"
+            ? (targetNextValue as string[])
+            : current.blackspots || [];
+        const currentHotspots =
+          targetFilterId === "hotspots"
+            ? (targetNextValue as string[])
+            : current.hotspots || [];
+        const currentTest =
+          targetFilterId === "test_visualization"
+            ? (targetNextValue as string[])
+            : current.test_visualization || [];
+        const currentLegacy =
+          targetFilterId === "visualization_type"
+            ? (targetNextValue as string[])
+            : current.visualization_type || [];
+        const newTypes = [
+          ...currentBlackspots,
+          ...currentHotspots,
+          ...currentTest,
+          ...currentLegacy,
+        ];
+        newFilters.visualization_variant = hasVisualizationVariants(newTypes)
+          ? current.visualization_variant || "accident"
+          : "accident";
+        newFilters.month = [];
+        newFilters.day = [];
+        newFilters.time_period = [];
+
+        if (newTypes.some(isBlackspotVisualization)) {
+          if (targetYears && targetYears.length === 3) {
+            newFilters.year = targetYears;
+          } else if (!current.year || current.year.length !== 3) {
+            const defaultYears = years
+              .slice(0, 3)
+              .map(String)
+              .sort((a, b) => Number(a) - Number(b));
+            if (defaultYears.length === 3) {
+              newFilters.year = defaultYears;
+            }
+          }
+          newFilters.date_from = "";
+          newFilters.date_to = "";
+        }
+      }
+
+      return newFilters;
+    });
+  };
+
   const renderFilter = (filter: FilterConfigItem) => {
     const variantLabel = "Crash Type";
 
@@ -730,12 +809,11 @@ export default function DistrictDashboard() {
                 date_to: "",
               }));
             }}
+            onOpenModal={() => { /* year range inline card handles this */ }}
           />
         </div>
       );
     }
-
-
 
     const value = filters[filter.id] ?? [];
     const isMultiSelect =
@@ -743,56 +821,22 @@ export default function DistrictDashboard() {
       filter.id !== "visualization_variant";
     const isDateFilter = filter.id === "date_from" || filter.id === "date_to";
 
-    const handleChange = (nextValue: string | string[]) => {
-      setFilters((current) => {
-        const newFilters = { ...current, [filter.id]: nextValue };
-        
-        // Handle redundancy between Year and Date Range
-        if (filter.id === "year" && Array.isArray(nextValue) && nextValue.length > 0) {
-          newFilters.date_from = "";
-          newFilters.date_to = "";
-        } else if ((filter.id === "date_from" || filter.id === "date_to") && nextValue) {
-          newFilters.year = [];
-        }
-        
-        if (
-          filter.id === "visualization_type" ||
-          filter.id === "test_visualization" ||
-          filter.id === "blackspots" ||
-          filter.id === "hotspots"
-        ) {
-          const currentBlackspots = filter.id === "blackspots" ? (nextValue as string[]) : (current.blackspots || []);
-          const currentHotspots = filter.id === "hotspots" ? (nextValue as string[]) : (current.hotspots || []);
-          const currentTest = filter.id === "test_visualization" ? (nextValue as string[]) : (current.test_visualization || []);
-          const currentLegacy = filter.id === "visualization_type" ? (nextValue as string[]) : (current.visualization_type || []);
-          const newTypes = [
-            ...currentBlackspots,
-            ...currentHotspots,
-            ...currentTest,
-            ...currentLegacy,
-          ];
-          newFilters.visualization_variant = hasVisualizationVariants(newTypes)
-            ? current.visualization_variant || "accident"
-            : "accident";
-          newFilters.month = [];
-          newFilters.day = [];
-          newFilters.time_period = [];
-          if (newTypes.some(isBlackspotVisualization)) {
-            // Enforce exactly 3 years if not already set or invalid length
-            if (!current.year || current.year.length !== 3) {
-              const defaultYears = years
-                .slice(0, 3)
-                .map(String)
-                .sort((a, b) => Number(a) - Number(b));
-              if (defaultYears.length === 3) {
-                newFilters.year = defaultYears;
-              }
-            }
-          }
-        }
+    // Determine if this filter has any active blackspot visualization (committed state)
+    const isBlackspotFilterId =
+      filter.id === "blackspots" ||
+      filter.id === "test_visualization" ||
+      filter.id === "visualization_type";
+    const currentValues: string[] = Array.isArray(value)
+      ? (value as string[])
+      : typeof value === "string" && value
+      ? [value]
+      : [];
+    const hasActiveBlackspot =
+      isBlackspotFilterId && currentValues.some(isBlackspotVisualization);
 
-        return newFilters;
-      });
+    const handleChange = (nextValue: string | string[]) => {
+      // Commit immediately — year range card is shown based on committed state
+      commitFilterChange(filter.id, nextValue);
     };
 
     const minDate =
@@ -822,10 +866,26 @@ export default function DistrictDashboard() {
           />
         ) : (
           <FilterSelect
+            key={hasActiveBlackspot ? `${filter.id}-blackspot-active` : filter.id}
             value={value as string | string[]}
             options={filterOptionsById[filter.id]}
             onChange={handleChange}
             multiSelect={isMultiSelect}
+          />
+        )}
+        {hasActiveBlackspot && (
+          <BlackspotYearRangeInlineCard
+            onConfirm={(selectedYears) => {
+              // Only update the year filter — blackspot is already committed
+              setFilters((curr) => ({
+                ...curr,
+                year: selectedYears,
+                date_from: "",
+                date_to: "",
+              }));
+            }}
+            availableYears={years}
+            selectedYears={filters.year || []}
           />
         )}
       </div>
@@ -894,7 +954,7 @@ export default function DistrictDashboard() {
 
             {(() => {
               const MAP_FILTER_IDS = ["baseMap"];
-              const ANALYSIS_FILTER_IDS = ["blackspots", "hotspots", "test_visualization", "visualization_variant"];
+              const ANALYSIS_FILTER_IDS = ["visualization_variant"];
               const TIME_FILTER_IDS = ["date_from", "date_to", "year", "year_range", "month", "day", "time_period"];
               const LOCATION_FILTER_IDS = ["taluka", "police_station"];
               const INCIDENT_FILTER_IDS = ["severity", "collision_type", "number_of_vehicles"];
@@ -970,7 +1030,49 @@ export default function DistrictDashboard() {
               return (
                 <div className="flex flex-col gap-3">
                   {analysisView === "spatial" && renderAccordion("map", "Map Settings", mapFilters, Layers)}
-                  {analysisView === "spatial" && renderAccordion("analysis", "Analysis", analysisFilters, Activity)}
+                  {analysisView === "spatial" && (
+                    <section className="rounded-xl border border-[#E4E8F4] bg-white shadow-sm overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => togglePanel("analysis")}
+                        aria-expanded={openPanels.analysis}
+                        className="flex w-full items-center gap-2 bg-[#1e3a8a] px-3.5 py-2.5 transition hover:bg-[#1c346f]"
+                      >
+                        <Activity size={13} className="text-white/75" />
+                        <h2 className="flex-1 text-left text-[11px] font-bold uppercase tracking-wider text-white">
+                          Analysis
+                        </h2>
+                        <ChevronDown
+                          size={15}
+                          className={`text-white/75 transition-transform duration-200 ${openPanels.analysis ? "rotate-180" : ""}`}
+                        />
+                      </button>
+                      {openPanels.analysis && (
+                        <div className="flex flex-col gap-3 p-3">
+                          <VisualizationCategoryPanel
+                            blackspots={filters.blackspots || []}
+                            hotspots={filters.hotspots || []}
+                            testVisualization={filters.test_visualization || []}
+                            selectedYears={filters.year || []}
+                            availableYears={years}
+                            onBlackspotsChange={(v) => commitFilterChange("blackspots", v)}
+                            onHotspotsChange={(v) => commitFilterChange("hotspots", v)}
+                            onTestVisualizationChange={(v) => commitFilterChange("test_visualization", v)}
+                            onYearsChange={(y) =>
+                              setFilters((curr) => ({
+                                ...curr,
+                                year: y,
+                                date_from: "",
+                                date_to: "",
+                              }))
+                            }
+                          />
+                          {/* visualization_variant renders normally */}
+                          {analysisFilters.map(renderFilter)}
+                        </div>
+                      )}
+                    </section>
+                  )}
                   {renderAccordion("time", "Time Period", timeFilters, Calendar)}
                   {renderAccordion("location", "Location & Admin", locationFilters, MapPin)}
                   {renderAccordion("incident", "Incident Details", incidentFilters, AlertCircle)}
