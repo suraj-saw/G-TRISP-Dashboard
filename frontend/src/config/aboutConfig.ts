@@ -5,6 +5,15 @@ export interface AboutMetadataItem {
   value: string;
 }
 
+export interface AboutPatron {
+  name: string;
+  designation?: string;
+  role: string;
+  photo?: string;
+  email?: string;
+  website?: string;
+}
+
 export interface AboutOrganization {
   name: string;
   type?: string;
@@ -12,6 +21,7 @@ export interface AboutOrganization {
   group?: string;
   description?: string;
   website?: string;
+  patron?: AboutPatron;
 }
 
 export interface AboutTeamMember {
@@ -51,29 +61,30 @@ export const ABOUT_CONFIG = {
       type: "Project Sponsoring Authority",
       department: "Western Railway Police Division · Gujarat Police",
       description:
-        "Sponsoring authority driving evidence-based road and transport safety analytics across Gujarat. Provides incident reporting jurisdiction data, field operational support, and strategic oversight for the systematic identification and remediation of high-risk accident corridors and railway level-crossing blackspots.",
+      "",
+        // "Sponsoring authority driving evidence-based road and transport safety analytics across Gujarat. Provides incident reporting jurisdiction data, field operational support, and strategic oversight for the systematic identification and remediation of high-risk accident corridors and railway level-crossing blackspots.",
       website: "https://police.gujarat.gov.in/",
     },
     {
       name: "Sardar Vallabhbhai National Institute of Technology, Surat",
       type: "Academic & Research Institution",
-      department: "Department of Civil Engineering · Transportation Engineering Section",
+      department: "Department of Civil Engineering · Transportation Engineering and Planning Section",
       description:
-        "An Institute of National Importance under the Ministry of Education, Government of India. Leads academic research, advanced GIS spatiotemporal modeling, Kernel Density Estimation (KDE), MoRTH & IRC:131 blackspot detection algorithms, and the end-to-end software architecture for ASTRA.",
+        "An Institute of National Importance under the Ministry of Education, Government of India.",
       website: "https://www.svnit.ac.in/",
+      patron: {
+        name: "Dr. Anupam Shukla",
+        designation: "Director, SVNIT Surat",
+        role: "Institutional Patron & Leadership",
+        photo: "/team/dr_anupam_shukla.png",
+        email: "director@svnit.ac.in",
+      },
     },
   ] as AboutOrganization[],
   teamGroups: [
     {
       title: "Project Supervision",
       members: [
-        {
-          name: "Dr. Anupam Shukla",
-          designation: "Director, SVNIT Surat",
-          role: "Institutional Patron & Leadership",
-          photo: "/team/dr_anupam_shukla.png",
-          email: "director@svnit.ac.in",
-        },
         {
           name: "Dr. Shrinivas S. Arkatkar",
           designation: "Professor, Department of Civil Engineering",
@@ -159,11 +170,11 @@ export const ABOUT_CONFIG = {
       icon: "map",
       technologies: [
         "MapLibre GL",
-        "Turf.js",
+        // "Turf.js",
         "GeoJSON",
         "KDE Heatmaps",
         "MoRTH / IRC:131 Blackspots",
-        "DBSCAN Clustering",
+        // "DBSCAN Clustering",
       ],
     },
     {

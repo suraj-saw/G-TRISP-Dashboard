@@ -47,16 +47,21 @@ function AdminCard({
   title,
   icon: Icon,
   children,
+  action,
 }: {
   title: string;
   icon?: React.ElementType;
   children: React.ReactNode;
+  action?: React.ReactNode;
 }) {
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col">
-      <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-        {Icon && <Icon size={20} className="text-indigo-600" />}
-        <h2 className="text-base font-bold text-slate-800">{title}</h2>
+      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {Icon && <Icon size={20} className="text-indigo-600" />}
+          <h2 className="text-base font-bold text-slate-800">{title}</h2>
+        </div>
+        {action}
       </div>
       <div className="p-6 flex-1">{children}</div>
     </div>
@@ -129,7 +134,7 @@ export default function AboutPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1536px] px-6 lg:px-8 pt-8 space-y-6">
+      <div className="mx-auto w-[80%] max-w-[1536px] pt-8 space-y-6">
         {/* Hero Section (Light & Clean) */}
         <section
           id="overview"
@@ -250,160 +255,242 @@ export default function AboutPage() {
         {academicOrg && (
           <div id="institutional-support" className="scroll-mt-20">
             <AdminCard title="Institutional Support" icon={Building2}>
-              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-8">
-                {/* Left Side: SVNIT Logo */}
-                <div className="flex shrink-0 flex-col items-center justify-center">
-                  <div className="h-28 w-28 sm:h-36 sm:w-36 md:h-40 md:w-40 flex items-center justify-center rounded-2xl bg-slate-50/80 border border-slate-200/80 p-3 shadow-xs">
-                    <img
-                      src="/logos/svnit_logo.svg"
-                      alt={academicOrg.name}
-                      className="h-full w-full object-contain select-none"
-                    />
+              <div className="flex flex-col lg:flex-row items-center lg:items-start gap-6 lg:gap-8">
+                {/* Left Side: SVNIT Logo & Director Photo side by side */}
+                <div className="flex shrink-0 items-start justify-center gap-4 sm:gap-6">
+                  {/* SVNIT Logo */}
+                  <div className="flex flex-col items-center">
+                    <div className="h-28 w-28 sm:h-32 sm:w-32 md:h-36 md:w-36 flex items-center justify-center rounded-2xl bg-white border border-slate-200/80 p-3 shadow-xs">
+                      <img
+                        src="/logos/svnit_logo.svg"
+                        alt={academicOrg.name}
+                        className="h-full w-full object-contain select-none"
+                      />
+                    </div>
+                    <span className="mt-2 text-xs font-bold text-slate-800 text-center leading-tight">
+                      SVNIT Surat
+                    </span>
                   </div>
-                  <span className="mt-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-center">
-                    SVNIT Surat
-                  </span>
+
+                  {/* Dr. Anupam Shukla Photo (just right of SVNIT logo) */}
+                  {academicOrg.patron && (
+                    <div className="flex flex-col items-center">
+                      <div className="h-28 w-28 sm:h-32 sm:w-32 md:h-36 md:w-36 overflow-hidden rounded-2xl bg-slate-100 border border-slate-200/80 shadow-xs">
+                        {academicOrg.patron.photo ? (
+                          <img
+                            src={academicOrg.patron.photo}
+                            alt={academicOrg.patron.name}
+                            className="h-full w-full object-cover object-top select-none"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center text-slate-600 font-bold text-2xl">
+                            {academicOrg.patron.name.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                      <span className="mt-2 text-xs font-bold text-slate-800 text-center leading-tight">
+                        {academicOrg.patron.name}
+                      </span>
+                      <span className="text-[11px] font-medium text-slate-500 text-center mt-0.5">
+                        Director & Patron
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Right Side: Information */}
-                <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
+                <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch pt-0.5">
                   <div>
                     {academicOrg.type && (
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 block">
-                          {academicOrg.type}
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="text-[11px] font-medium text-slate-500">
-                          Institute of National Importance
-                        </span>
-                      </div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 block mb-1">
+                        {academicOrg.type}
+                      </span>
                     )}
-                    <h3 className="text-lg sm:text-xl font-bold text-slate-900">
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">
                       {academicOrg.name}
                     </h3>
                     {academicOrg.department && (
-                      <p className="text-sm font-semibold text-slate-700 mt-0.5">
+                      <p className="text-sm font-semibold text-slate-700 mt-1">
                         {academicOrg.department}
                       </p>
                     )}
                     {academicOrg.description && (
-                      <p className="text-sm sm:text-[15px] text-slate-600 mt-3 leading-relaxed">
+                      <p className="text-sm sm:text-[15px] text-slate-600 mt-2.5 leading-relaxed">
                         {academicOrg.description}
                       </p>
                     )}
                   </div>
 
-                  {academicOrg.website && (
-                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                  {/* Clean Bottom Metadata & Actions Bar */}
+                  <div className="mt-5 pt-3.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-y-2 gap-x-4 text-xs">
+                    {academicOrg.patron?.email && (
+                      <a
+                        href={`mailto:${academicOrg.patron.email}`}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                      >
+                        <Mail size={13} className="text-slate-400" /> {academicOrg.patron.email}
+                      </a>
+                    )}
+
+                    {academicOrg.website && (
                       <a
                         href={academicOrg.website}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                        className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors group sm:ml-auto"
                       >
-                        Visit official portal <ExternalLink size={14} />
+                        Visit official portal <ExternalLink size={13} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                       </a>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </AdminCard>
           </div>
         )}
 
-        {/* Team Sections */}
-        <div id="team" className="space-y-6 scroll-mt-20">
-          {ABOUT_CONFIG.teamGroups.map(
-            (group) =>
-              group.members.length > 0 && (
-                <AdminCard
-                  key={group.title}
-                  title={group.title}
-                  icon={group.title.includes("Supervision") ? Briefcase : Users}
-                >
-                  <div
-                    className={
-                      group.members.length === 2
-                        ? "grid grid-cols-1 md:grid-cols-2 gap-8 divide-y md:divide-y-0 md:divide-x divide-slate-100"
-                        : "grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10"
-                    }
-                  >
-                    {group.members.map((member, index) => {
-                      const isSupervision = group.members.length === 2;
-                      return (
-                        <div
-                          key={`${group.title}-${member.name}`}
-                          className={`flex items-start gap-4 sm:gap-6 ${
-                            isSupervision && index > 0 ? "pt-6 md:pt-0 md:pl-8" : ""
-                          }`}
-                        >
-                          <div
-                            className={`flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 font-bold text-slate-600 ring-1 ring-slate-200/80 shadow-xs ${
-                              isSupervision
-                                ? "h-24 w-24 sm:h-28 sm:w-28 md:h-32 md:w-32 text-2xl"
-                                : "h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 text-xl"
-                            }`}
-                          >
-                            {member.photo ? (
-                              <img
-                                src={member.photo}
-                                alt={member.name}
-                                className="h-full w-full object-cover object-top"
-                              />
-                            ) : (
-                              member.name.charAt(0)
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0 flex flex-col justify-center">
-                            <h3
-                              className={`font-bold text-slate-900 ${
-                                isSupervision ? "text-base sm:text-lg" : "text-sm sm:text-base"
-                              }`}
-                            >
-                              {member.name}
-                            </h3>
-                            {member.designation && (
-                              <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-                                {member.designation}
-                              </p>
-                            )}
-                            <div className="mt-2">
-                              <span className="inline-block rounded-md bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700">
-                                {member.role}
-                              </span>
-                            </div>
-                            {(member.email || member.website) && (
-                              <div className="mt-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
-                                {member.email && (
-                                  <a
-                                    href={`mailto:${member.email}`}
-                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
-                                  >
-                                    <Mail size={13} /> {member.email}
-                                  </a>
-                                )}
-                                {member.website && (
-                                  <a
-                                    href={member.website}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
-                                  >
-                                    <Globe2 size={13} /> Website <ExternalLink size={11} />
-                                  </a>
-                                )}
-                              </div>
-                            )}
-                          </div>
+        {/* Project Team Section (Following Reference Layout) */}
+        {(() => {
+          const supervisionGroup = ABOUT_CONFIG.teamGroups.find((g) =>
+            g.title.toLowerCase().includes("supervision")
+          );
+          const devGroup =
+            ABOUT_CONFIG.teamGroups.find((g) =>
+              g.title.toLowerCase().includes("development")
+            ) ||
+            ABOUT_CONFIG.teamGroups.find(
+              (g) => !g.title.toLowerCase().includes("supervision")
+            );
+
+          return (
+            <div id="team" className="scroll-mt-20">
+              <AdminCard
+                title="Project Team"
+                icon={Users}
+                action={
+                  <span className="hidden sm:inline-block text-xs sm:text-sm text-slate-500 font-normal">
+                    Supervision and the development team behind ASTRA.
+                  </span>
+                }
+              >
+                {/* Supervision (Top Row) */}
+                {supervisionGroup && supervisionGroup.members.length > 0 && (
+                  <div className="space-y-6">
+                    {supervisionGroup.members.map((member) => (
+                      <div
+                        key={member.name}
+                        className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-7"
+                      >
+                        <div className="flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 font-bold text-slate-600 border border-slate-200/80 shadow-xs h-28 w-28 sm:h-32 sm:w-32 md:h-36 md:w-36 text-2xl">
+                          {member.photo ? (
+                            <img
+                              src={member.photo}
+                              alt={member.name}
+                              className="h-full w-full object-cover object-top select-none"
+                            />
+                          ) : (
+                            member.name.charAt(0)
+                          )}
                         </div>
-                      );
-                    })}
+                        <div className="flex-1 min-w-0 flex flex-col justify-center text-center sm:text-left pt-1">
+                          {member.role && (
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 mb-1 block">
+                              {member.role}
+                            </span>
+                          )}
+                          <h3 className="font-bold text-slate-900 text-xl sm:text-2xl leading-snug">
+                            {member.name}
+                          </h3>
+                          {member.designation && (
+                            <p className="text-sm font-semibold text-slate-600 mt-1">
+                              {member.designation.includes("SVNIT")
+                                ? member.designation
+                                : `${member.designation}, SVNIT Surat`}
+                            </p>
+                          )}
+                          {(member.email || member.website) && (
+                            <div className="mt-3.5 flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2 text-xs">
+                              {member.email && (
+                                <a
+                                  href={`mailto:${member.email}`}
+                                  className="inline-flex items-center gap-1.5 font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                                >
+                                  <Mail size={13} className="text-slate-400" /> {member.email}
+                                </a>
+                              )}
+                              {member.website && (
+                                <a
+                                  href={member.website}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                                >
+                                  Website <ExternalLink size={12} />
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </AdminCard>
-              )
-          )}
-        </div>
+                )}
+
+                {/* Divider between Supervision and Development Team */}
+                {supervisionGroup && devGroup && (
+                  <div className="my-8 border-t border-slate-100" />
+                )}
+
+                {/* Development Team Grid (4 Columns as in Reference) */}
+                {devGroup && devGroup.members.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+                    {devGroup.members.map((member) => (
+                      <div key={member.name} className="flex flex-col items-center text-center">
+                        <div className="h-32 w-32 sm:h-36 sm:w-36 md:h-40 md:w-40 overflow-hidden rounded-2xl bg-slate-100 border border-slate-200/80 shadow-xs">
+                          {member.photo ? (
+                            <img
+                              src={member.photo}
+                              alt={member.name}
+                              className="h-full w-full object-cover object-top select-none"
+                            />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center text-slate-400 font-bold text-3xl">
+                              {member.name.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-3.5 flex flex-col items-center flex-1 w-full">
+                          <h4 className="font-bold text-slate-900 text-sm sm:text-base leading-snug">
+                            {member.name}
+                          </h4>
+                          {member.designation && (
+                            <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                              {member.designation}
+                            </p>
+                          )}
+                          {member.role && (
+                            <p className="text-xs font-semibold text-indigo-600 mt-1.5 leading-snug">
+                              {member.role}
+                            </p>
+                          )}
+                          {member.email && (
+                            <a
+                              href={`mailto:${member.email}`}
+                              className="mt-2.5 inline-flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-indigo-600 transition-colors"
+                            >
+                              <Mail size={12} className="shrink-0" />
+                              <span>{member.email}</span>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </AdminCard>
+            </div>
+          );
+        })()}
 
         {/* Technology Stack */}
         {ABOUT_CONFIG.technologyStack.length > 0 && (
