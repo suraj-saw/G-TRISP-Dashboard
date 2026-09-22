@@ -13,15 +13,14 @@ import {
   Database,
   ExternalLink,
   Globe2,
-  Info,
   Mail,
   Map,
   MapPinned,
   Server,
-  ShieldCheck,
   Users,
   Briefcase,
   Layers,
+  ShieldCheck,
 } from "lucide-react";
 import { ABOUT_CONFIG } from "../../config/aboutConfig";
 import { ROUTES } from "../../config/constants";
@@ -74,24 +73,56 @@ function AdminCard({
  */
 export default function AboutPage() {
   const navigate = useNavigate();
-  const { project } = ABOUT_CONFIG;
+  const { project, organizations } = ABOUT_CONFIG;
+
+  const sponsorOrg =
+    organizations.find(
+      (org) =>
+        org.name.toLowerCase().includes("police") ||
+        org.type?.toLowerCase().includes("sponsor")
+    ) || organizations[0];
+
+  const academicOrg =
+    organizations.find(
+      (org) =>
+        org.name.toLowerCase().includes("technology") ||
+        org.type?.toLowerCase().includes("academic")
+    ) || organizations[1];
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 pb-16 font-sans">
-      {/* Top Navigation Bar perfectly aligned with content */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto flex h-16 max-w-[1536px] items-center justify-between px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded bg-indigo-50 text-indigo-600">
-              <Info size={18} />
-            </div>
-            <span className="text-base font-bold tracking-wide text-slate-900">
-              About {project.name}
-            </span>
+      {/* Top Navigation Bar with Official Brand Logo */}
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur-md shadow-xs">
+        <div className="mx-auto flex h-[52px] max-w-[1536px] items-center justify-between px-6 lg:px-8">
+          <div className="flex items-center gap-3.5">
+            <button
+              type="button"
+              onClick={() => navigate(ROUTES.HOME_PAGE)}
+              className="flex items-center rounded-lg text-left transition-all hover:opacity-85 active:scale-98 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer group"
+              title="Go to Landing Page"
+              aria-label="Go to Landing Page"
+            >
+              <h1 className="sr-only">ASTRA (अस्त्र)</h1>
+              <img
+                src="/logos/astra_topbar_brand.png?v=3"
+                alt="ASTRA (अस्त्र)"
+                className="h-[18px] md:h-[20px] w-auto object-contain select-none transition-transform duration-200 group-hover:scale-[1.02]"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = "/api/images/astra_topbar_brand?v=3";
+                }}
+              />
+            </button>
           </div>
+
           <button
-            onClick={() => navigate(ROUTES.DASHBOARD)}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-indigo-600"
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate(ROUTES.DASHBOARD);
+              }
+            }}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-slate-700 transition-all hover:bg-slate-50 hover:text-indigo-600 shadow-2xs active:scale-98 cursor-pointer"
           >
             <ArrowLeft size={16} /> Back to Dashboard
           </button>
@@ -99,132 +130,392 @@ export default function AboutPage() {
       </header>
 
       <div className="mx-auto max-w-[1536px] px-6 lg:px-8 pt-8 space-y-6">
-        {/* Top Banner (Admin Style Hero) */}
-        <section className="overflow-hidden rounded-xl bg-gradient-to-r from-indigo-900 to-indigo-700 text-white shadow-sm">
-          <div className="p-8 sm:p-10 md:flex md:items-center md:justify-between gap-10">
-            <div className="max-w-4xl">
-              <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-indigo-950/40 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-100 border border-indigo-400/20">
-                <ShieldCheck size={14} /> Road safety intelligence
-              </div>
-              <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-                {project.name}
+        {/* Hero Section (Light & Clean) */}
+        <section
+          id="overview"
+          className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 lg:p-10 shadow-xs"
+        >
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+            <div className="max-w-2xl">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900">
+                ASTRA <span className="text-indigo-600 font-bold">(अस्त्र)</span>
               </h1>
-              <p className="mt-2 text-lg font-medium text-indigo-200">
+
+              <p className="mt-1 text-base sm:text-lg font-medium text-slate-600">
                 {project.fullName}
               </p>
-              <p className="mt-4 text-sm leading-relaxed text-indigo-100/90 sm:text-base">
+
+              <p className="mt-3 text-sm sm:text-base leading-relaxed text-slate-500 max-w-2xl">
                 {project.description}
               </p>
             </div>
-            {project.mark && (
-              <div className="mt-8 md:mt-0 flex h-28 w-28 shrink-0 items-center justify-center rounded-xl bg-white/10 text-5xl font-black text-white backdrop-blur-sm border border-white/20 shadow-inner">
-                {project.mark}
-              </div>
-            )}
+
+            {/* Logos: Platform Emblem, Sponsor Police Logo & Academic Institution SVNIT Logo */}
+            <div className="flex shrink-0 items-center gap-3.5 sm:gap-5 self-start md:self-center">
+              <img
+                src="/logos/astra_logo_emblem.png"
+                alt="ASTRA Emblem"
+                className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 object-contain select-none"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = "/api/images/astra_logo_emblem";
+                }}
+              />
+
+              <div className="h-12 sm:h-14 w-px bg-slate-200" />
+
+              <img
+                src="/logos/gujarat_police_logo.png"
+                alt="Gujarat Police - Western Railway"
+                className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 object-contain select-none"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = "/api/images/gujarat_police_logo";
+                }}
+              />
+
+              <div className="h-12 sm:h-14 w-px bg-slate-200" />
+
+              <img
+                src="/logos/svnit_logo.svg"
+                alt="SVNIT Surat"
+                className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 object-contain select-none"
+              />
+            </div>
           </div>
         </section>
 
-        {/* Project Overview */}
-        {project.metadata.length > 0 && (
-          <AdminCard title="Project Overview" icon={Info}>
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-6">
-              {project.metadata.map((item) => (
-                <div key={item.label} className="flex flex-col">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-                    {item.label}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-900">
-                    {item.value}
+        {/* Research Support Section */}
+        {sponsorOrg && (
+          <div id="research-support" className="scroll-mt-20">
+            <AdminCard title="Research Support Agency" icon={ShieldCheck}>
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-8">
+                {/* Left Side: Police Logo */}
+                <div className="flex shrink-0 flex-col items-center justify-center">
+                  <div className="h-28 w-28 sm:h-36 sm:w-36 md:h-40 md:w-40 flex items-center justify-center rounded-2xl bg-slate-50/80 border border-slate-200/80 p-3 shadow-xs">
+                    <img
+                      src="/logos/gujarat_police_logo.png"
+                      alt={sponsorOrg.name}
+                      className="h-full w-full object-contain select-none"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = "/api/images/gujarat_police_logo";
+                      }}
+                    />
+                  </div>
+                  <span className="mt-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-center">
+                    Gujarat Police
                   </span>
                 </div>
-              ))}
-            </div>
-          </AdminCard>
-        )}
 
-        {/* 2-Column Grid for Orgs & Contact */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {ABOUT_CONFIG.organizations.length > 0 && (
-            <AdminCard title="Institutional Support" icon={Building2}>
-              <div className="space-y-6">
-                {ABOUT_CONFIG.organizations.map((org) => (
-                  <div key={org.name}>
-                    {org.type && (
-                      <span className="text-[11px] font-bold uppercase tracking-wide text-indigo-600 mb-1 block">
-                        {org.type}
+                {/* Right Side: Information */}
+                <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
+                  <div>
+                    {sponsorOrg.type && (
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 mb-1 block">
+                        {sponsorOrg.type}
                       </span>
                     )}
-                    <h3 className="text-base font-bold text-slate-900">
-                      {org.name}
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900">
+                      {sponsorOrg.name}
                     </h3>
-                    {org.department && (
-                      <p className="text-sm font-medium text-slate-700 mt-0.5">
-                        {org.department}
+                    {sponsorOrg.department && (
+                      <p className="text-sm font-semibold text-slate-700 mt-0.5">
+                        {sponsorOrg.department}
                       </p>
                     )}
-                    {org.description && (
-                      <p className="text-sm text-slate-500 mt-2 leading-relaxed">
-                        {org.description}
+                    {sponsorOrg.description && (
+                      <p className="text-sm sm:text-[15px] text-slate-600 mt-3 leading-relaxed">
+                        {sponsorOrg.description}
                       </p>
-                    )}
-                    {org.website && (
-                      <a
-                        href={org.website}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-800"
-                      >
-                        Visit website <ExternalLink size={14} />
-                      </a>
                     )}
                   </div>
-                ))}
+
+                  {sponsorOrg.website && (
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                      <a
+                        href={sponsorOrg.website}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                      >
+                        Visit official portal <ExternalLink size={14} />
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
             </AdminCard>
-          )}
+          </div>
+        )}
 
-          <AdminCard title="Contact Information" icon={Mail}>
-            <div className="space-y-5">
-              {ABOUT_CONFIG.contact.institution && (
-                <div className="flex gap-4">
-                  <Building2 size={20} className="text-slate-400 shrink-0" />
+        {/* Institutional Support Section */}
+        {academicOrg && (
+          <div id="institutional-support" className="scroll-mt-20">
+            <AdminCard title="Institutional Support" icon={Building2}>
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-8">
+                {/* Left Side: SVNIT Logo */}
+                <div className="flex shrink-0 flex-col items-center justify-center">
+                  <div className="h-28 w-28 sm:h-36 sm:w-36 md:h-40 md:w-40 flex items-center justify-center rounded-2xl bg-slate-50/80 border border-slate-200/80 p-3 shadow-xs">
+                    <img
+                      src="/logos/svnit_logo.svg"
+                      alt={academicOrg.name}
+                      className="h-full w-full object-contain select-none"
+                    />
+                  </div>
+                  <span className="mt-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-center">
+                    SVNIT Surat
+                  </span>
+                </div>
+
+                {/* Right Side: Information */}
+                <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    {academicOrg.type && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 block">
+                          {academicOrg.type}
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-[11px] font-medium text-slate-500">
+                          Institute of National Importance
+                        </span>
+                      </div>
+                    )}
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900">
+                      {academicOrg.name}
+                    </h3>
+                    {academicOrg.department && (
+                      <p className="text-sm font-semibold text-slate-700 mt-0.5">
+                        {academicOrg.department}
+                      </p>
+                    )}
+                    {academicOrg.description && (
+                      <p className="text-sm sm:text-[15px] text-slate-600 mt-3 leading-relaxed">
+                        {academicOrg.description}
+                      </p>
+                    )}
+                  </div>
+
+                  {academicOrg.website && (
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                      <a
+                        href={academicOrg.website}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                      >
+                        Visit official portal <ExternalLink size={14} />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </AdminCard>
+          </div>
+        )}
+
+        {/* Team Sections */}
+        <div id="team" className="space-y-6 scroll-mt-20">
+          {ABOUT_CONFIG.teamGroups.map(
+            (group) =>
+              group.members.length > 0 && (
+                <AdminCard
+                  key={group.title}
+                  title={group.title}
+                  icon={group.title.includes("Supervision") ? Briefcase : Users}
+                >
+                  <div
+                    className={
+                      group.members.length === 2
+                        ? "grid grid-cols-1 md:grid-cols-2 gap-8 divide-y md:divide-y-0 md:divide-x divide-slate-100"
+                        : "grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10"
+                    }
+                  >
+                    {group.members.map((member, index) => {
+                      const isSupervision = group.members.length === 2;
+                      return (
+                        <div
+                          key={`${group.title}-${member.name}`}
+                          className={`flex items-start gap-4 sm:gap-6 ${
+                            isSupervision && index > 0 ? "pt-6 md:pt-0 md:pl-8" : ""
+                          }`}
+                        >
+                          <div
+                            className={`flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 font-bold text-slate-600 ring-1 ring-slate-200/80 shadow-xs ${
+                              isSupervision
+                                ? "h-24 w-24 sm:h-28 sm:w-28 md:h-32 md:w-32 text-2xl"
+                                : "h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 text-xl"
+                            }`}
+                          >
+                            {member.photo ? (
+                              <img
+                                src={member.photo}
+                                alt={member.name}
+                                className="h-full w-full object-cover object-top"
+                              />
+                            ) : (
+                              member.name.charAt(0)
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0 flex flex-col justify-center">
+                            <h3
+                              className={`font-bold text-slate-900 ${
+                                isSupervision ? "text-base sm:text-lg" : "text-sm sm:text-base"
+                              }`}
+                            >
+                              {member.name}
+                            </h3>
+                            {member.designation && (
+                              <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+                                {member.designation}
+                              </p>
+                            )}
+                            <div className="mt-2">
+                              <span className="inline-block rounded-md bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700">
+                                {member.role}
+                              </span>
+                            </div>
+                            {(member.email || member.website) && (
+                              <div className="mt-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
+                                {member.email && (
+                                  <a
+                                    href={`mailto:${member.email}`}
+                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                                  >
+                                    <Mail size={13} /> {member.email}
+                                  </a>
+                                )}
+                                {member.website && (
+                                  <a
+                                    href={member.website}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+                                  >
+                                    <Globe2 size={13} /> Website <ExternalLink size={11} />
+                                  </a>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </AdminCard>
+              )
+          )}
+        </div>
+
+        {/* Technology Stack */}
+        {ABOUT_CONFIG.technologyStack.length > 0 && (
+          <div id="tech-stack" className="scroll-mt-20">
+            <AdminCard title="Technology Stack" icon={Layers}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-8">
+                {ABOUT_CONFIG.technologyStack.map((group) => {
+                  const Icon = technologyIcons[group.icon];
+                  return (
+                    <div key={group.category} className="flex flex-col">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-1 rounded-md bg-indigo-50 text-indigo-600">
+                          <Icon size={15} />
+                        </div>
+                        <h3 className="font-bold text-sm text-slate-900">
+                          {group.category}
+                        </h3>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {group.technologies.map((tech) => (
+                          <span
+                            key={tech}
+                            className="rounded-md bg-slate-50 border border-slate-200/70 px-2.5 py-1 text-[11px] font-medium text-slate-700 shadow-2xs hover:border-indigo-200 hover:text-indigo-700 transition-colors"
+                          >
+                            {tech}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </AdminCard>
+          </div>
+        )}
+
+        {/* Contact Information Section (Full Width at End of Page) */}
+        <div id="contact" className="scroll-mt-20">
+          <AdminCard title="Contact Information" icon={Mail}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {ABOUT_CONFIG.contact.institution && (
+                <div className="flex gap-3.5">
+                  <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 shrink-0 self-start">
+                    <Building2 size={18} />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                       Institution
                     </p>
-                    <p className="text-sm font-medium text-slate-900 mt-0.5">
+                    <p className="text-sm font-semibold text-slate-900 mt-0.5">
                       {ABOUT_CONFIG.contact.institution}
                     </p>
+                    {ABOUT_CONFIG.contact.department && (
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {ABOUT_CONFIG.contact.department}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
+
               {ABOUT_CONFIG.contact.address && (
-                <div className="flex gap-4">
-                  <MapPinned size={20} className="text-slate-400 shrink-0" />
+                <div className="flex gap-3.5">
+                  <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 shrink-0 self-start">
+                    <MapPinned size={18} />
+                  </div>
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                      Office address
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Office Address
                     </p>
-                    <p className="text-sm text-slate-700 mt-0.5">
+                    <p className="text-sm text-slate-700 mt-0.5 leading-relaxed">
                       {ABOUT_CONFIG.contact.address}
                     </p>
                   </div>
                 </div>
               )}
-              {ABOUT_CONFIG.contact.website && (
-                <div className="flex gap-4">
-                  <Globe2 size={20} className="text-slate-400 shrink-0" />
+
+              {ABOUT_CONFIG.contact.email && (
+                <div className="flex gap-3.5">
+                  <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 shrink-0 self-start">
+                    <Mail size={18} />
+                  </div>
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                      Website
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Project Inquiries
+                    </p>
+                    <a
+                      href={`mailto:${ABOUT_CONFIG.contact.email}`}
+                      className="text-sm font-medium text-indigo-600 hover:underline mt-0.5 block"
+                    >
+                      {ABOUT_CONFIG.contact.email}
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {ABOUT_CONFIG.contact.website && (
+                <div className="flex gap-3.5">
+                  <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 shrink-0 self-start">
+                    <Globe2 size={18} />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Official Portal
                     </p>
                     <a
                       href={ABOUT_CONFIG.contact.website}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-sm font-medium text-indigo-600 hover:underline mt-0.5 block"
+                      className="text-sm font-medium text-indigo-600 hover:underline mt-0.5 inline-flex items-center gap-1"
                     >
-                      {ABOUT_CONFIG.contact.website}
+                      svnit.ac.in <ExternalLink size={13} />
                     </a>
                   </div>
                 </div>
@@ -232,100 +523,6 @@ export default function AboutPage() {
             </div>
           </AdminCard>
         </div>
-
-        {/* Team Sections - Flat layout inside cards */}
-        {ABOUT_CONFIG.teamGroups.map(
-          (group) =>
-            group.members.length > 0 && (
-              <AdminCard
-                key={group.title}
-                title={group.title}
-                icon={group.title.includes("Supervision") ? Briefcase : Users}
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                  {group.members.map((member) => (
-                    <div
-                      key={`${group.title}-${member.name}`}
-                      className="flex items-start gap-4"
-                    >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-lg font-bold text-slate-600 ring-1 ring-slate-200">
-                        {member.photo ? (
-                          <img
-                            src={member.photo}
-                            alt={member.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          member.name.charAt(0)
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-sm font-bold text-slate-900">
-                          {member.name}
-                        </h3>
-                        {member.designation && (
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {member.designation}
-                          </p>
-                        )}
-                        <span className="mt-2 inline-block rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
-                          {member.role}
-                        </span>
-                        {member.responsibilities?.length ? (
-                          <ul className="mt-3 space-y-1 text-xs text-slate-600">
-                            {member.responsibilities.map((item) => (
-                              <li key={item} className="flex gap-2">
-                                <span className="text-slate-300">•</span> {item}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : null}
-                        {member.email && (
-                          <a
-                            href={`mailto:${member.email}`}
-                            className="mt-3 flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600"
-                          >
-                            <Mail size={12} /> {member.email}
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </AdminCard>
-            )
-        )}
-
-        {/* Technology Stack */}
-        {ABOUT_CONFIG.technologyStack.length > 0 && (
-          <AdminCard title="Technology Stack" icon={Layers}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-8">
-              {ABOUT_CONFIG.technologyStack.map((group) => {
-                const Icon = technologyIcons[group.icon];
-                return (
-                  <div key={group.category}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Icon size={16} className="text-slate-400" />
-                      <h3 className="font-semibold text-sm text-slate-900">
-                        {group.category}
-                      </h3>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {group.technologies.map((tech) => (
-                        <span
-                          key={tech}
-                          className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700"
-                        >
-                          {tech}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </AdminCard>
-        )}
       </div>
     </main>
   );

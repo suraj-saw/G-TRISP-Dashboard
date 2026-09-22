@@ -9,6 +9,7 @@ import type { DashboardFilters } from "../types/dashboard";
  * Set of visualization types that represent blackspot visualizations.
  */
 export const BLACKSPOT_VISUALIZATION_TYPES = new Set([
+  "morth_blackspot",
   "blackspot",
   "irc_greedy_blackspot",
   "irc_grid_blackspot",

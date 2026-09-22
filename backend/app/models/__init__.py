@@ -28,3 +28,6 @@ from app.models.gujarat_merged_road import GujaratMergedRoad
 from app.models.accident          import Accident
 from app.models.snapped_accident  import SnappedAccident
 from app.models.blackspot_remark  import BlackspotRemark
+
+# ── Application Assets & Media Models ─────────────────────────────────────────
+from app.models.app_image         import AppImage

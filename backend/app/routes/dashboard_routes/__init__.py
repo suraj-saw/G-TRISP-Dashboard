@@ -16,7 +16,7 @@ from app.routes.dashboard_routes import (
     breakdowns_routes,
     spatial_routes,
     blackspots_routes,
-    corridors_routes,
+    segment_blackspots_routes,
     temporal_routes,
     export_routes,
     remarks_routes,
@@ -32,7 +32,7 @@ router.include_router(analytics_routes.router)
 router.include_router(breakdowns_routes.router)
 router.include_router(spatial_routes.router)
 router.include_router(blackspots_routes.router)
-router.include_router(corridors_routes.router)
+router.include_router(segment_blackspots_routes.router)
 router.include_router(temporal_routes.router)
 router.include_router(export_routes.router)
 router.include_router(remarks_routes.router)

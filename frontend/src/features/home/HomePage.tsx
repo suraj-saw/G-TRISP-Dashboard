@@ -57,64 +57,78 @@ export default function HomePage() {
         onLogout={logout}
       />
       
-      <main className="flex-1 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      <main className="flex-1 flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden">
         {/* Decorative background shapes */}
         <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-blue-400/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-[-10%] right-[-5%] w-[30%] h-[40%] bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
         
-        <div className="w-full max-w-7xl mx-auto px-4 md:px-8 py-8 relative z-10 flex flex-col items-center">
+        <div className="w-full max-w-5xl mx-auto relative z-10 flex flex-col items-center my-auto">
           
-          <h1 className="text-3xl md:text-5xl font-extrabold text-center text-slate-800 mb-6 tracking-tight">
-            Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">{APP_CONFIG.displayName}</span>
+          {/* Brand Logo Banner */}
+          <div className="mb-3 md:mb-4 flex items-center justify-center">
+            <img
+              src="/api/images/astra_logo_transparent"
+              alt="ASTRA Transparent Logo - Advanced Spatiotemporal Traffic Risk Analytics"
+              className="h-32 md:h-44 lg:h-48 xl:h-52 w-auto max-w-xl md:max-w-2xl object-contain select-none transition-transform duration-300 hover:scale-[1.01]"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = "/logos/astra_logo_transparent.png";
+              }}
+            />
+          </div>
+
+          <h1 className="sr-only">
+            {APP_CONFIG.name} - {APP_CONFIG.fullName} ({APP_CONFIG.hindiName})
           </h1>
-          
-          <p className="text-lg md:text-xl text-center text-slate-600 mb-8 max-w-3xl mx-auto leading-relaxed">
-            <span className="font-semibold text-slate-700">{APP_CONFIG.fullName}</span> provides a comprehensive suite of analytical tools to monitor, evaluate, and prevent road accidents across Gujarat.
+
+          <p className="text-base md:text-lg lg:text-xl text-center text-slate-700 mb-4 md:mb-5 max-w-2xl font-medium tracking-wide">
+            Traffic Safety & Incident Intelligence Platform for Gujarat
           </p>
           
-          <div className="bg-white p-6 rounded-2xl mb-10 border border-slate-200 shadow-sm w-full max-w-4xl">
-            <h3 className="text-lg font-bold text-slate-800 mb-2">Our Purpose</h3>
-            <p className="text-slate-600 leading-relaxed">
+          {/* Streamlined Purpose Pill */}
+          <div className="bg-white/90 backdrop-blur-xs px-6 py-3 rounded-2xl mb-5 md:mb-6 border border-slate-200/80 shadow-xs w-full max-w-3xl text-center">
+            <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
+              <span className="font-semibold text-slate-800">Our Purpose: </span>
               To empower stakeholders with actionable data, identifying blackspots, high-risk corridors, and temporal trends to foster data-driven road safety interventions and save lives.
             </p>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-6 w-full max-w-6xl">
+          {/* Dashboard Action Cards */}
+          <div className="grid md:grid-cols-2 gap-4 md:gap-6 w-full max-w-4xl">
             {/* State Level Card */}
             <div 
               onClick={() => navigate(ROUTES.STATE_DASHBOARD)}
-              className="group cursor-pointer bg-white border border-slate-200 rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:border-blue-300 hover:-translate-y-1 flex flex-col"
+              className="group cursor-pointer bg-white border border-slate-200 rounded-2xl p-5 transition-all duration-300 hover:shadow-md hover:border-blue-300 hover:-translate-y-0.5 flex flex-col"
             >
-              <div className="flex items-center gap-4 mb-4">
-                <div className="p-3 bg-blue-100 text-blue-600 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  <Map size={24} />
+              <div className="flex items-center gap-3.5 mb-2.5">
+                <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <Map size={22} />
                 </div>
                 <h3 className="text-xl font-bold text-slate-800">State Visualization</h3>
               </div>
-              <p className="text-slate-500 mb-6 flex-1">
+              <p className="text-xs md:text-sm text-slate-500 mb-3 flex-1 leading-relaxed">
                 Show the accident visualization of the overall state with the state boundary only.
               </p>
-              <div className="flex items-center text-blue-600 font-semibold group-hover:gap-2 transition-all">
-                View Dashboard <ChevronRight size={18} className="ml-1" />
+              <div className="flex items-center text-sm text-blue-600 font-semibold group-hover:gap-2 transition-all">
+                View Dashboard <ChevronRight size={16} className="ml-1" />
               </div>
             </div>
 
             {/* District Level Card */}
             <div 
               onClick={() => navigate(ROUTES.DASHBOARD)}
-              className="group cursor-pointer bg-white border border-slate-200 rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:border-indigo-300 hover:-translate-y-1 flex flex-col"
+              className="group cursor-pointer bg-white border border-slate-200 rounded-2xl p-5 transition-all duration-300 hover:shadow-md hover:border-indigo-300 hover:-translate-y-0.5 flex flex-col"
             >
-              <div className="flex items-center gap-4 mb-4">
-                <div className="p-3 bg-indigo-100 text-indigo-600 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                  <LayoutDashboard size={24} />
+              <div className="flex items-center gap-3.5 mb-2.5">
+                <div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  <LayoutDashboard size={22} />
                 </div>
                 <h3 className="text-xl font-bold text-slate-800">District Level Visualization</h3>
               </div>
-              <p className="text-slate-500 mb-6 flex-1">
+              <p className="text-xs md:text-sm text-slate-500 mb-3 flex-1 leading-relaxed">
                 Show what we are showing in the state visualization, but customized for a specific district.
               </p>
-              <div className="flex items-center text-indigo-600 font-semibold group-hover:gap-2 transition-all">
-                View Dashboard <ChevronRight size={18} className="ml-1" />
+              <div className="flex items-center text-sm text-indigo-600 font-semibold group-hover:gap-2 transition-all">
+                View Dashboard <ChevronRight size={16} className="ml-1" />
               </div>
             </div>
           </div>

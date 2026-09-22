@@ -21,6 +21,7 @@ export interface AboutTeamMember {
   responsibilities?: string[];
   photo?: string;
   email?: string;
+  website?: string;
 }
 
 export interface AboutTechnologyCategory {
@@ -34,23 +35,31 @@ export const ABOUT_CONFIG = {
     name: APP_CONFIG.displayName,
     fullName: APP_CONFIG.fullName,
     description:
-      "A district-level road safety intelligence platform that combines GIS visualization, statistical insights, and temporal analysis to support evidence-based planning and decision-making.",
+      "An integrated road safety intelligence platform designed to monitor, evaluate, and prevent traffic accidents across Gujarat through spatial modeling, blackspot detection, and temporal analytics.",
     mark: APP_CONFIG.name,
     metadata: [
-      { label: "Project name", value: APP_CONFIG.displayName },
-      { label: "Project type", value: "Government & research analytics" },
-      { label: "Platform", value: "Responsive web application" },
+      { label: "Project type", value: "Research project" },
+      { label: "Project sponsor", value: "Superintendent of Police (SP), Western Railway" },
       { label: "Current version", value: "1.0.0" },
       { label: "Development status", value: "Active development" },
-      { label: "Release year", value: "2026" },
+      { label: "Release year", value: "" },
     ] satisfies AboutMetadataItem[],
   },
   organizations: [
     {
-      name: "Sardar Vallabhbhai National Institute of Technology, Surat",
-      type: "Academic institution",
+      name: "Superintendent of Police (SP), Western Railway",
+      type: "Project Sponsoring Authority",
+      department: "Western Railway Police Division · Gujarat Police",
       description:
-        "Supporting research and technology development for safer, data-informed transport systems.",
+        "Sponsoring authority driving evidence-based road and transport safety analytics across Gujarat. Provides incident reporting jurisdiction data, field operational support, and strategic oversight for the systematic identification and remediation of high-risk accident corridors and railway level-crossing blackspots.",
+      website: "https://police.gujarat.gov.in/",
+    },
+    {
+      name: "Sardar Vallabhbhai National Institute of Technology, Surat",
+      type: "Academic & Research Institution",
+      department: "Department of Civil Engineering · Transportation Engineering Section",
+      description:
+        "An Institute of National Importance under the Ministry of Education, Government of India. Leads academic research, advanced GIS spatiotemporal modeling, Kernel Density Estimation (KDE), MoRTH & IRC:131 blackspot detection algorithms, and the end-to-end software architecture for ASTRA.",
       website: "https://www.svnit.ac.in/",
     },
   ] as AboutOrganization[],
@@ -59,14 +68,19 @@ export const ABOUT_CONFIG = {
       title: "Project Supervision",
       members: [
         {
-          name: "Dr. [Professor Name]",
-          designation: "Professor",
-          role: "Principal Investigator & Project Advisor",
-          responsibilities: [
-            "Project conceptualization and academic guidance",
-            "Research methodology and institutional oversight",
-          ],
-          email: "professor@svnit.ac.in",
+          name: "Dr. Anupam Shukla",
+          designation: "Director, SVNIT Surat",
+          role: "Institutional Patron & Leadership",
+          photo: "/team/dr_anupam_shukla.png",
+          email: "director@svnit.ac.in",
+        },
+        {
+          name: "Dr. Shrinivas S. Arkatkar",
+          designation: "Professor, Department of Civil Engineering",
+          role: "Principal Investigator & Project Supervisor",
+          photo: "/team/dr_shrinivas_arkatkar.png",
+          email: "sarkatkar@ced.svnit.ac.in",
+          website: "https://shriniwasprofile.wordpress.com/",
         },
       ],
     },
@@ -74,31 +88,32 @@ export const ABOUT_CONFIG = {
       title: "Development Team",
       members: [
         {
-          name: "Suraj Kumar Saw",
-          role: "Lead Full-Stack Developer",
-          responsibilities: [
-            "Platform architecture and system design",
-            "Dashboard engineering and data visualization",
-          ],
-          email: "suraj@example.com",
+          name: "Mr. Vishal Patel",
+          designation: "Research Scholar, SVNIT",
+          role: "Research & Safety Analytics",
+          photo: "/team/mr_vishal_patel.jpeg",
+          email: "abc@gmail.com",
         },
         {
-          name: "Harsh Kakkad",
-          role: "Backend & Systems Engineer",
-          responsibilities: [
-            "API development and database management",
-            "Authentication and security implementation",
-          ],
+          name: "Mr. Mihir Koladiya",
+          designation: "Project Engineer, SVNIT",
+          role: "Transportation Engineer | GIS & Spatial Data Analyst",
+          photo: "/team/mr_mihir_koladiya.jpeg",
+          email: "koladiyamihir5212@gmail.com",
+        },
+        {
+          name: "Mr. Harsh Kakkad",
+          designation: "Project Engineer, SVNIT",
+          role: "AI/ML Engineer | Backend Support",
+          photo: "/team/mr_harsh_kakkad.jpeg",
           email: "harshkakkad25@gmail.com",
         },
         {
-          name: "[Developer 3 Name]",
-          role: "GIS & Analytics Developer",
-          responsibilities: [
-            "Spatial data processing and mapping",
-            "GIS analytics and platform integration",
-          ],
-          email: "dev3@example.com",
+          name: "Mr. Suraj Kumar Saw",
+          designation: "B.Tech. Student, NIT Delhi",
+          role: "Lead Full-Stack Developer",
+          photo: "/team/mr_suraj_kumar_saw.jpg",
+          email: "suraj03saw@gmail.com",
         },
       ],
     },
@@ -107,37 +122,66 @@ export const ABOUT_CONFIG = {
     {
       category: "Frontend",
       icon: "layout",
-      technologies: ["React", "TypeScript", "Vite", "Tailwind CSS", "Recharts"],
+      technologies: [
+        "React 19",
+        "TypeScript",
+        "Vite",
+        "Tailwind CSS",
+        "Recharts",
+        "Framer Motion",
+        "Lucide Icons",
+      ],
     },
     {
       category: "Backend",
       icon: "server",
-      technologies: ["FastAPI", "Python", "SQLAlchemy"],
+      technologies: [
+        "FastAPI",
+        "Python",
+        "SQLAlchemy",
+        "Pydantic",
+        "Uvicorn",
+        "JWT Auth",
+      ],
     },
     {
       category: "Database",
       icon: "database",
-      technologies: ["PostgreSQL", "PostGIS"],
+      technologies: [
+        "PostgreSQL",
+        "PostGIS",
+        "Redis",
+        "GiST Spatial Indexing",
+      ],
     },
     {
       category: "GIS & Analytics",
       icon: "map",
       technologies: [
         "MapLibre GL",
+        "Turf.js",
         "GeoJSON",
-        "Spatial clustering",
-        "KDE analysis",
+        "KDE Heatmaps",
+        "MoRTH / IRC:131 Blackspots",
+        "DBSCAN Clustering",
       ],
     },
     {
       category: "Deployment",
       icon: "cloud",
-      technologies: ["Docker", "Nginx"],
+      technologies: [
+        "Docker",
+        "Nginx",
+        "Ubuntu Linux",
+        "Git",
+      ],
     },
   ] satisfies AboutTechnologyCategory[],
   contact: {
     institution: "Sardar Vallabhbhai National Institute of Technology, Surat",
-    website: "https://www.svnit.ac.in/",
+    department: "Department of Civil Engineering (Transportation Engineering Section)",
     address: "Ichchhanath, Surat, Gujarat 395007, India",
+    email: "sarkatkar@ced.svnit.ac.in",
+    website: "https://www.svnit.ac.in/",
   },
 } as const;

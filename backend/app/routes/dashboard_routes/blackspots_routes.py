@@ -105,6 +105,7 @@ def get_blackspots(
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
     visibility: Optional[List[str]] = Query(None),
+    algorithm: Optional[str] = Query("morth_standard"),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -144,7 +145,13 @@ def get_blackspots(
     ]
 
     blackspots = greedy_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
-    geojson = blackspots_to_geojson(blackspots, radius_m=radius_m)
+    is_modified = algorithm == "modified"
+    geojson = blackspots_to_geojson(
+        blackspots,
+        radius_m=radius_m,
+        rank_by="priority_score" if is_modified else "crash_count",
+        clip_polygons=is_modified,
+    )
 
     return {
         "total_crashes": len(points),
@@ -152,6 +159,7 @@ def get_blackspots(
         "isolated_crashes": len(points) - sum(b.crash_count for b in blackspots),
         "radius_m": radius_m,
         "min_crashes": min_crashes,
+        "algorithm": algorithm,
         "circles": geojson["circles"],
         "centroids": geojson["centroids"],
     }
@@ -175,6 +183,7 @@ def get_pedestrian_blackspots(
     db: Session = Depends(get_db),
     police_station: Optional[List[str]] = Query(None),
     visibility: Optional[List[str]] = Query(None),
+    algorithm: Optional[str] = Query("morth_standard"),
 ):
     query = apply_filters(
         db.query(Accident),
@@ -220,7 +229,13 @@ def get_pedestrian_blackspots(
     ]
 
     blackspots = greedy_blackspots(points, radius_m=radius_m, min_crashes=min_crashes)
-    geojson = blackspots_to_geojson(blackspots, radius_m=radius_m)
+    is_modified = algorithm == "modified"
+    geojson = blackspots_to_geojson(
+        blackspots,
+        radius_m=radius_m,
+        rank_by="priority_score" if is_modified else "crash_count",
+        clip_polygons=is_modified,
+    )
 
     return {
         "total_crashes": len(points),
@@ -228,6 +243,7 @@ def get_pedestrian_blackspots(
         "isolated_crashes": len(points) - sum(b.crash_count for b in blackspots),
         "radius_m": radius_m,
         "min_crashes": min_crashes,
+        "algorithm": algorithm,
         "circles": geojson["circles"],
         "centroids": geojson["centroids"],
     }

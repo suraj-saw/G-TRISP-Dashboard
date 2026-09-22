@@ -85,17 +85,23 @@ function TopBar({
       >
         {/* LEFT SIDE: Branding */}
         <div className="flex items-center gap-4">
-          {/* App Title / Logo */}
+          {/* App Title / Logo Image */}
           <button
             type="button"
             onClick={() => navigate(ROUTES.HOME_PAGE)}
-            className="flex items-center gap-2 rounded-lg text-left transition-all hover:opacity-80 active:scale-98 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer"
+            className="flex items-center rounded-lg text-left transition-all hover:opacity-85 active:scale-98 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer group"
             title="Go to Landing Page"
             aria-label="Go to Landing Page"
           >
-            <h1 className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 to-indigo-950 bg-clip-text text-transparent select-none">
-              {displayTitle}
-            </h1>
+            <h1 className="sr-only">{displayTitle}</h1>
+            <img
+              src="/logos/astra_topbar_brand.png?v=3"
+              alt={displayTitle}
+              className="h-[18px] md:h-[20px] w-auto object-contain select-none transition-transform duration-200 group-hover:scale-[1.02]"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = "/api/images/astra_topbar_brand?v=3";
+              }}
+            />
           </button>
         </div>
 

@@ -274,9 +274,13 @@ export const fetchGujaratTemporalAnalysis = async (
  */
 export const fetchGujaratBlackspots = async (
   filters: DashboardFilters,
-  district: string
+  district: string,
+  algorithm: string = "morth_standard"
 ): Promise<BlackspotData> => {
   const params = getParams(filters, district);
+  if (algorithm) {
+    params.set("algorithm", algorithm);
+  }
   const cacheKey = `gujarat_blackspots_${params.toString()}`;
   return withCache(cacheKey, async () => {
     const { data } = await API.get(`${GUJARAT_API_BASE}/blackspots`, { params });
@@ -350,9 +354,13 @@ export const fetchGujaratSnappedAccidents = async (
  */
 export const fetchGujaratPedestrianBlackspots = async (
   filters: DashboardFilters,
-  district: string
+  district: string,
+  algorithm: string = "morth_standard"
 ): Promise<BlackspotData> => {
   const params = getParams(filters, district);
+  if (algorithm) {
+    params.set("algorithm", algorithm);
+  }
   const cacheKey = `gujarat_pedestrian_blackspots_${params.toString()}`;
   return withCache(cacheKey, async () => {
     const { data } = await API.get(`${GUJARAT_API_BASE}/pedestrian-blackspots`, {
@@ -494,12 +502,12 @@ export const fetchGujaratPedestrianNetworkBlackspots = async (
 };
 
 /**
- * Fetch Risk Corridors data for Gujarat
+ * Fetch Segment Blackspots data for Gujarat
  * @param filters - Dashboard filter options
  * @param district - District to scope the data
- * @returns GeoJSON FeatureCollection of corridors
+ * @returns GeoJSON FeatureCollection of segment blackspots
  */
-export const fetchGujaratRiskCorridors = async (
+export const fetchGujaratSegmentBlackspots = async (
   filters: DashboardFilters,
   district: string
 ): Promise<any> => {
@@ -508,9 +516,9 @@ export const fetchGujaratRiskCorridors = async (
   params.append("window_size_m", "500");
   params.append("merge_threshold_m", "0");
   
-  const cacheKey = `gujarat_risk_corridors_${params.toString()}`;
+  const cacheKey = `gujarat_segment_blackspots_${params.toString()}`;
   return withCache(cacheKey, async () => {
-    const { data } = await API.get(`${GUJARAT_API_BASE}/risk-corridors`, {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/segment-blackspots`, {
       params,
     });
     return data;
@@ -518,12 +526,12 @@ export const fetchGujaratRiskCorridors = async (
 };
 
 /**
- * Fetch Pedestrian Risk Corridors data for Gujarat
+ * Fetch Pedestrian Segment Blackspots data for Gujarat
  * @param filters - Dashboard filter options
  * @param district - District to scope the data
- * @returns GeoJSON FeatureCollection of corridors
+ * @returns GeoJSON FeatureCollection of segment blackspots
  */
-export const fetchGujaratPedestrianRiskCorridors = async (
+export const fetchGujaratPedestrianSegmentBlackspots = async (
   filters: DashboardFilters,
   district: string
 ): Promise<any> => {
@@ -533,14 +541,18 @@ export const fetchGujaratPedestrianRiskCorridors = async (
   params.append("window_size_m", "500");
   params.append("merge_threshold_m", "0");
 
-  const cacheKey = `gujarat_pedestrian_risk_corridors_${params.toString()}`;
+  const cacheKey = `gujarat_pedestrian_segment_blackspots_${params.toString()}`;
   return withCache(cacheKey, async () => {
-    const { data } = await API.get(`${GUJARAT_API_BASE}/risk-corridors`, {
+    const { data } = await API.get(`${GUJARAT_API_BASE}/segment-blackspots`, {
       params,
     });
     return data;
   });
 };
+
+// Backward compatibility aliases
+export const fetchGujaratRiskCorridors = fetchGujaratSegmentBlackspots;
+export const fetchGujaratPedestrianRiskCorridors = fetchGujaratPedestrianSegmentBlackspots;
 
 /**
  * Fetch KDE heatmap data for Gujarat

@@ -21,7 +21,7 @@ import BlackspotDetectionLayers from "../../components/maps/BlackspotDetectionLa
 import IrcBlackspotDetectionLayers from "../../components/maps/IrcBlackspotDetectionLayers";
 import SnappedAccidentLayers from "../../components/maps/SnappedAccidentLayers";
 import NetworkBlackspotLayers from "../../components/maps/NetworkBlackspotLayers";
-import RiskCorridorLayers from "../../components/maps/RiskCorridorLayers";
+import SegmentBlackspotLayers from "../../components/maps/SegmentBlackspotLayers";
 import RoadNetworkLayers from "../../components/maps/RoadNetworkLayers";
 import MergedRoadNetworkLayers from "../../components/maps/MergedRoadNetworkLayers";
 import RoadNetworkLegend from "../../components/maps/RoadNetworkLegend";
@@ -31,7 +31,7 @@ import MarkerOverlayLayer from "../../components/maps/MarkerOverlayLayer";
 // import WeightedKdeHeatmapLayers from "../../components/maps/WeightedKdeHeatmapLayers";
 // import DensityMapOverlays from "../../components/maps/DensityMapOverlays";
 import SeverityLegend from "../../components/maps/SeverityLegend";
-import RiskCorridorLegend from "../../components/maps/RiskCorridorLegend";
+import SegmentBlackspotLegend from "../../components/maps/SegmentBlackspotLegend";
 import TopBar from "../../components/layout/TopBar";
 import FilterSelect from "../../components/layout/FilterSelect";
 import DistrictBaseMap from "../../components/maps/DistrictBaseMap";
@@ -77,8 +77,8 @@ import {
   fetchGujaratSnappedAccidents,
   fetchGujaratNetworkBlackspots,
   fetchGujaratPedestrianNetworkBlackspots,
-  fetchGujaratRiskCorridors,
-  fetchGujaratPedestrianRiskCorridors,
+  fetchGujaratSegmentBlackspots,
+  fetchGujaratPedestrianSegmentBlackspots,
   fetchGujaratRoadNetwork,
   fetchGujaratMergedRoadNetwork,
 } from "../../api/gujaratDashboardApi";
@@ -326,8 +326,8 @@ export default function DistrictDashboard() {
     { value: string; label: string }[]
   >([]);
   const [openPanels, setOpenPanels] = useState({ 
+    map: true,
     analysis: true,
-    map: true, 
     time: true, 
     location: true, 
     incident: false, 
@@ -469,7 +469,7 @@ export default function DistrictDashboard() {
 
   useEffect(() => {
     if (!districtName) return;
-    const isNetwork = allVisualizationTypes.some(t => ["network_blackspot", "network_blackspot_merged", "risk_corridors", "snapped_accidents"].includes(t));
+    const isNetwork = allVisualizationTypes.some(t => ["network_blackspot", "network_blackspot_merged", "segment_blackspots", "risk_corridors", "snapped_accidents"].includes(t));
     if (isNetwork) {
       let active = true;
       fetchGujaratSnappedAccidents(filters, districtName)
@@ -671,19 +671,24 @@ export default function DistrictDashboard() {
   }, [analysisView, allVisualizationTypes, BLACKSPOT_REPLACED_IDS]);
 
   const isDensityHeatmap = allVisualizationTypes.includes("density_heatmap");
-  const isBlackspotDetection = allVisualizationTypes.includes("blackspot") ?? false;
+  const isMorthBlackspot = allVisualizationTypes.includes("morth_blackspot") ?? false;
+  const isModifiedBlackspot = allVisualizationTypes.includes("blackspot") ?? false;
+  const isBlackspotDetection = isMorthBlackspot || isModifiedBlackspot;
   const isPedestrianVariant = filters.visualization_variant === "pedestrian";
+  const isPedestrianMorthBlackspot = isMorthBlackspot && isPedestrianVariant;
+  const isPedestrianModifiedBlackspot = isModifiedBlackspot && isPedestrianVariant;
   const isPedestrianBlackspot = isBlackspotDetection && isPedestrianVariant;
   const isIrcGreedyBlackspot = allVisualizationTypes.includes("irc_greedy_blackspot") ?? false;
   const isIrcGridBlackspot = allVisualizationTypes.includes("irc_grid_blackspot") ?? false;
   const isNetworkBlackspot = allVisualizationTypes.includes("network_blackspot") ?? false;
   const isNetworkBlackspotMerged = allVisualizationTypes.includes("network_blackspot_merged") ?? false;
-  const isRiskCorridors = allVisualizationTypes.includes("risk_corridors") ?? false;
+  const isSegmentBlackspots = allVisualizationTypes.some(t => ["segment_blackspots", "risk_corridors"].includes(t)) ?? false;
+  const isRiskCorridors = isSegmentBlackspots;
   const isRoadNetwork = allVisualizationTypes.includes("road_network") ?? false;
   const isMergedRoadNetwork = allVisualizationTypes.includes("merged_road_network") ?? false;
   const isSnappedAccidents = allVisualizationTypes.includes("snapped_accidents") ?? false;
   
-  const isNetwork = allVisualizationTypes.some(t => ["network_blackspot", "network_blackspot_merged", "risk_corridors", "snapped_accidents"].includes(t));
+  const isNetwork = allVisualizationTypes.some(t => ["network_blackspot", "network_blackspot_merged", "segment_blackspots", "risk_corridors", "snapped_accidents"].includes(t));
   const baseHeatmapData = isNetwork && snappedData ? snappedData : data.heatmap;
   const displayHeatmapData = isPedestrianVariant
     ? baseHeatmapData.filter(isPedestrianAccident)
@@ -964,8 +969,8 @@ export default function DistrictDashboard() {
 
               return (
                 <div className="flex flex-col gap-3">
-                  {analysisView === "spatial" && renderAccordion("analysis", "Analysis", analysisFilters, Activity)}
                   {analysisView === "spatial" && renderAccordion("map", "Map Settings", mapFilters, Layers)}
+                  {analysisView === "spatial" && renderAccordion("analysis", "Analysis", analysisFilters, Activity)}
                   {renderAccordion("time", "Time Period", timeFilters, Calendar)}
                   {renderAccordion("location", "Location & Admin", locationFilters, MapPin)}
                   {renderAccordion("incident", "Incident Details", incidentFilters, AlertCircle)}
@@ -1083,32 +1088,69 @@ export default function DistrictDashboard() {
                           </div>
                         </Marker>
                       )}
-                      {isPedestrianBlackspot && (
+                      {/* Standard MoRTH Blackspots (7-step slide protocol: raw crash count & uniform outlines) */}
+                      {isPedestrianMorthBlackspot && (
                         <BlackspotDetectionLayers
-                          key="pedestrian-blackspot"
+                          key="pedestrian-morth-blackspot"
                           filters={filters}
                           districtName={districtName}
                           fetchFn={(f) =>
-                            fetchGujaratPedestrianBlackspots(f, districtName)
+                            fetchGujaratPedestrianBlackspots(f, districtName, "morth_standard")
                           }
                           exportFn={exportGujaratBlackspotCrashes}
                           heatmapData={data.heatmap.filter(
                             isPedestrianAccident
                           )}
-                          analysisLabel="Pedestrian MoRTH Blackspot (Greedy)"
+                          analysisLabel="Pedestrian MoRTH Blackspot"
                           crashLabel="pedestrian crashes"
+                          isStandardMorth={true}
                         />
                       )}
-                      {isBlackspotDetection && !isPedestrianVariant && (
+                      {isMorthBlackspot && !isPedestrianVariant && (
                         <BlackspotDetectionLayers
-                          key="blackspot"
+                          key="morth-blackspot"
                           filters={filters}
                           districtName={districtName}
                           fetchFn={(f) =>
-                            fetchGujaratBlackspots(f, districtName)
+                            fetchGujaratBlackspots(f, districtName, "morth_standard")
                           }
                           exportFn={exportGujaratBlackspotCrashes}
                           heatmapData={data.heatmap}
+                          analysisLabel="MoRTH Blackspot"
+                          isStandardMorth={true}
+                        />
+                      )}
+
+                      {/* Modified MoRTH Blackspots (Test Visualization: Voronoi clipping & Severity Score) */}
+                      {isPedestrianModifiedBlackspot && (
+                        <BlackspotDetectionLayers
+                          key="pedestrian-modified-blackspot"
+                          filters={filters}
+                          districtName={districtName}
+                          fetchFn={(f) =>
+                            fetchGujaratPedestrianBlackspots(f, districtName, "modified")
+                          }
+                          exportFn={exportGujaratBlackspotCrashes}
+                          heatmapData={data.heatmap.filter(
+                            isPedestrianAccident
+                          )}
+                          analysisLabel="Pedestrian Modified MoRTH Blackspot (Greedy)"
+                          crashLabel="pedestrian crashes"
+                          isStandardMorth={false}
+                        />
+                      )}
+                      {isModifiedBlackspot && !isPedestrianVariant && (
+                        <BlackspotDetectionLayers
+                          key="modified-blackspot"
+                          filters={filters}
+                          districtName={districtName}
+                          fetchFn={(f) =>
+                            fetchGujaratBlackspots(f, districtName, "modified")
+                          }
+                          exportFn={exportGujaratBlackspotCrashes}
+                          heatmapData={data.heatmap}
+                          analysisLabel="Modified MoRTH Blackspot"
+                          isStandardMorth={false}
                         />
                       )}
                       {isIrcGreedyBlackspot && isPedestrianVariant && (
@@ -1201,22 +1243,22 @@ export default function DistrictDashboard() {
                           analysisLabel="Network Blackspots (Merged Lanes)"
                         />
                       )}
-                      {isRiskCorridors && isPedestrianVariant && (
-                        <RiskCorridorLayers
-                          key="pedestrian-risk-corridors"
+                      {isSegmentBlackspots && isPedestrianVariant && (
+                        <SegmentBlackspotLayers
+                          key="pedestrian-segment-blackspots"
                           filters={filters}
-                          fetchFn={(f) => fetchGujaratPedestrianRiskCorridors(f, districtName)}
+                          fetchFn={(f) => fetchGujaratPedestrianSegmentBlackspots(f, districtName)}
                           fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
-                          analysisLabel="Pedestrian Risk Corridors"
+                          analysisLabel="Pedestrian Segment Blackspots"
                         />
                       )}
-                      {isRiskCorridors && !isPedestrianVariant && (
-                        <RiskCorridorLayers
-                          key="risk-corridors"
+                      {isSegmentBlackspots && !isPedestrianVariant && (
+                        <SegmentBlackspotLayers
+                          key="segment-blackspots"
                           filters={filters}
-                          fetchFn={(f) => fetchGujaratRiskCorridors(f, districtName)}
+                          fetchFn={(f) => fetchGujaratSegmentBlackspots(f, districtName)}
                           fetchSnappedPointsFn={(f) => fetchGujaratSnappedAccidents(f, districtName)}
-                          analysisLabel="Risk Corridors"
+                          analysisLabel="Segment Blackspots"
                         />
                       )}
                       {isRoadNetwork && (
@@ -1255,12 +1297,12 @@ export default function DistrictDashboard() {
                         />
                       )}
 
-                      {isRiskCorridors && (
-                        <RiskCorridorLegend
-                          visualizationLayerType="risk_corridors"
+                      {isSegmentBlackspots && (
+                        <SegmentBlackspotLegend
+                          visualizationLayerType={allVisualizationTypes.find(t => ["segment_blackspots", "risk_corridors"].includes(t)) || "segment_blackspots"}
                         />
                       )}
-                      {!isRoadNetwork && !isMergedRoadNetwork && !isRiskCorridors && (
+                      {!isRoadNetwork && !isMergedRoadNetwork && !isSegmentBlackspots && (
                         <SeverityLegend
                           visualizationLayerType={isDensityHeatmap ? "density_heatmap" : isSnappedAccidents ? "snapped_accidents" : ""}
                           showMarkers={showMarkerOverlay || isSnappedAccidents}

@@ -225,7 +225,7 @@ export default function BlackspotExportButton({
     }
   };
 
-  const algorithmLabel = algorithm === "irc_greedy" ? "IRC (Greedy)" : algorithm === "irc_grid" ? "IRC (Grid)" : "MoRTH";
+  const algorithmLabel = algorithm === "irc_greedy" ? "IRC (Greedy)" : algorithm === "irc_grid" ? "IRC (Grid)" : "Modified MoRTH";
   const exportLabel = bsIdsInput.trim()
     ? `Blackspot(s) ${bsIdsInput.trim()} accidents`
     : "Please enter blackspot number(s)";
@@ -342,7 +342,7 @@ export default function BlackspotExportButton({
           crashIds={pdfExport.crashIds}
           bsId={pdfExport.bsIdsStr}
           priorityLabel={`Multiple Blackspots (${pdfExport.bsIdsStr})`}
-          detectionMethod={algorithm === "irc_greedy" ? "IRC Blackspot (Greedy)" : algorithm === "irc_grid" ? "IRC Blackspot (Grid)" : "MoRTH Blackspot"}
+          detectionMethod={algorithm === "irc_greedy" ? "IRC Blackspot (Greedy)" : algorithm === "irc_grid" ? "IRC Blackspot (Grid)" : "Modified MoRTH Blackspot"}
           districtName={districtName}
           filters={filters}
           onComplete={() => setPdfExport(null)}

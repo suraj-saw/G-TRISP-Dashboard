@@ -62,17 +62,19 @@ KDE_RADIUS_METERS: float = 500.0
 KDE_PIXEL_METERS: float = 25.0
 
 # ---------------------------------------------------------------------------
-# Risk Corridor Evaluation
+# Segment Blackspot Evaluation
 # ---------------------------------------------------------------------------
 
 # Default maximum gap distance (meters) to merge adjacent blackspot segments
-CORRIDOR_MERGE_THRESHOLD_M: float = 100.0
+SEGMENT_BLACKSPOT_MERGE_THRESHOLD_M: float = 100.0
+CORRIDOR_MERGE_THRESHOLD_M: float = SEGMENT_BLACKSPOT_MERGE_THRESHOLD_M
 
-# Score thresholds for categorizing corridor risk priority tiers
-CORRIDOR_PRIORITY_THRESHOLDS = {
+# Score thresholds for categorizing segment risk priority tiers
+SEGMENT_PRIORITY_THRESHOLDS = {
     "Critical": 250,
     "Very High": 150,
     "High": 100,
     "Medium": 50,
     "Low": 0,
 }
+CORRIDOR_PRIORITY_THRESHOLDS = SEGMENT_PRIORITY_THRESHOLDS

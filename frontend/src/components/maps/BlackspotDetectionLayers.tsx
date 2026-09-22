@@ -40,6 +40,7 @@ interface Props {
   analysisLabel?: string;
   crashLabel?: string;
   districtName?: string;
+  isStandardMorth?: boolean;
 }
 
 /**
@@ -101,10 +102,12 @@ export default function BlackspotDetectionLayers({
   fetchFn,
   exportFn,
   heatmapData,
-  analysisLabel = "MoRTH Blackspot (Greedy)",
+  analysisLabel = "Modified MoRTH Blackspot",
   crashLabel = "crashes",
   districtName,
+  isStandardMorth = false,
 }: Props) {
+  const idPrefix = isStandardMorth ? "morth-bs-" : "blackspot-";
   const { current: mapRef } = useMap();
   const [data, setData] = useState<BlackspotData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -258,8 +261,8 @@ export default function BlackspotDetectionLayers({
     if (!map) return;
 
     const clusterLayers = [
-      "blackspot-circles-fill",
-      "blackspot-centroids-point",
+      `${idPrefix}circles-fill`,
+      `${idPrefix}centroids-point`,
     ];
 
     const onMove = (e: any) => {
@@ -411,67 +414,77 @@ export default function BlackspotDetectionLayers({
 
 
       <Source
-        id="blackspot-circles-source"
+        id={`${idPrefix}circles-source`}
         type="geojson"
         data={data.circles as any}
       >
         <Layer
-          id="blackspot-circles-fill"
+          id={`${idPrefix}circles-fill`}
           type="fill"
           paint={{
-            "fill-color": PRIORITY_COLOR_EXPR as any,
-            "fill-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              10,
-              0.25,
-              13,
-              0.15,
-              15,
-              0.08,
-            ],
+            "fill-color": isStandardMorth
+              ? (["coalesce", ["get", "priority_color"], "#DC2626"] as any)
+              : (PRIORITY_COLOR_EXPR as any),
+            "fill-opacity": isStandardMorth
+              ? 0.12
+              : [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  10,
+                  0.25,
+                  13,
+                  0.15,
+                  15,
+                  0.08,
+                ],
           }}
         />
         <Layer
-          id="blackspot-circles-outline"
+          id={`${idPrefix}circles-outline`}
           type="line"
           paint={{
-            "line-color": PRIORITY_COLOR_EXPR as any,
-            "line-width": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              10,
-              2,
-              14,
-              1.5,
-              16,
-              1,
-            ],
-            "line-dasharray": [2, 1],
-            "line-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              10,
-              0.9,
-              15,
-              0.6,
-              17,
-              0.3,
-            ],
+            "line-color": isStandardMorth
+              ? (["coalesce", ["get", "priority_color"], "#DC2626"] as any)
+              : (PRIORITY_COLOR_EXPR as any),
+            "line-width": isStandardMorth
+              ? 2.2
+              : [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  10,
+                  2,
+                  14,
+                  1.5,
+                  16,
+                  1,
+                ],
+            ...(isStandardMorth ? {} : { "line-dasharray": [2, 1] }),
+            "line-opacity": isStandardMorth
+              ? 0.95
+              : [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  10,
+                  0.9,
+                  15,
+                  0.6,
+                  17,
+                  0.3,
+                ],
           }}
         />
       </Source>
 
       <Source
-        id="blackspot-centroids-source"
+        id={`${idPrefix}centroids-source`}
         type="geojson"
         data={data.centroids as any}
       >
         <Layer
-          id="blackspot-centroids-shadow"
+          id={`${idPrefix}centroids-shadow`}
           type="circle"
           paint={{
             "circle-radius": [
@@ -521,7 +534,7 @@ export default function BlackspotDetectionLayers({
           }}
         />
         <Layer
-          id="blackspot-centroids-point"
+          id={`${idPrefix}centroids-point`}
           type="circle"
           paint={{
             "circle-radius": [
@@ -553,7 +566,9 @@ export default function BlackspotDetectionLayers({
                 1,
               ],
             ],
-            "circle-color": PRIORITY_COLOR_EXPR as any,
+            "circle-color": isStandardMorth
+              ? (["coalesce", ["get", "priority_color"], "#DC2626"] as any)
+              : (PRIORITY_COLOR_EXPR as any),
             "circle-opacity": [
               "interpolate",
               ["linear"],

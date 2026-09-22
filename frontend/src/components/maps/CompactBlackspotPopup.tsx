@@ -12,6 +12,8 @@ import type { RemarkClusterSummary } from "../../api/remarksApi";
 
 export interface BlackspotPopupData {
   bs_id?: number | string;
+  priority_rank?: number;
+  ranking_metric?: string;
   priority_score?: number;
   priority_label?: string;
   fatal_count?: number;
@@ -57,7 +59,8 @@ export default function CompactBlackspotPopup({
   onOpenTimeline,
 }: CompactBlackspotPopupProps) {
   const priorityScore = data.priority_score ?? 0;
-  const priorityColor = getPriorityColor(priorityScore);
+  const isRankLabel = data.priority_label?.startsWith("Rank #");
+  const priorityColor = isRankLabel ? "#DC2626" : getPriorityColor(priorityScore);
   const priorityLabel =
     data.priority_label ?? getPriorityLabel(priorityScore);
 
@@ -144,7 +147,8 @@ export default function CompactBlackspotPopup({
         {/* Cluster Header */}
         <div className="flex items-center justify-between">
           <span className="text-xs font-extrabold text-slate-800 truncate">
-            {data.bs_id !== undefined ? `Cluster #${data.bs_id}` : "Blackspot"}
+            {data.priority_rank !== undefined ? `Rank #${data.priority_rank} ` : ""}
+            {data.bs_id !== undefined ? `(BS #${data.bs_id})` : "Blackspot"}
           </span>
           {data.aatc !== undefined && (
             <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">

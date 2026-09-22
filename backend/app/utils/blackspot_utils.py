@@ -627,39 +627,65 @@ def resolve_non_overlapping_polygons(
     return geoms
 
 
-def blackspots_to_geojson(blackspots: list[Blackspot], radius_m: float) -> dict:
+def blackspots_to_geojson(
+    blackspots: list[Blackspot],
+    radius_m: float,
+    rank_by: str = "crash_count",
+    clip_polygons: bool = False,
+) -> dict:
     """
     Convert Blackspot records to a GeoJSON dict with both circle polygons and
     centroid points.
 
-    Returns {"circles": FeatureCollection, "centroids": FeatureCollection}.
-
-    Each feature carries the full blackspot metadata as properties.
-
-    ── Backward-compatibility note ────────────────────────────────────────────
-    The frontend currently reads `asi`, `risk_label`, and `risk_color` from
-    these GeoJSON properties.  These are mapped from the new terminology
-    (priority_score, priority_label, priority_color) so the existing frontend
-    continues to work without modification.
-
-    Once the frontend has been updated to the new property names, remove the
-    three legacy lines marked with # COMPAT below.
-    ── ────────────────────────────────────────────────────────────────────────
+    Parameters
+    ----------
+    blackspots    : List of identified Blackspot dataclass instances.
+    radius_m      : Radius in meters for the circle buffer.
+    rank_by       : "crash_count" (standard MoRTH protocol) or "priority_score" (modified).
+    clip_polygons : If True, applies Voronoi half-plane clipping to eliminate overlap.
+                    If False, generates standard uniform QGIS circular buffers.
     """
     circle_features = []
     centroid_features = []
 
-    # Sort blackspots by priority_score (descending) to calculate rank
-    sorted_blackspots = sorted(blackspots, key=lambda bs: bs.priority_score, reverse=True)
-    total_blackspots = len(sorted_blackspots)
+    # Sort blackspots according to the specified ranking metric
+    if rank_by == "crash_count":
+        # Pure raw Crash Count ranking as per MoRTH 7-step slide protocol
+        sorted_blackspots = sorted(
+            blackspots,
+            key=lambda bs: (bs.crash_count, bs.fatal_count, bs.priority_score),
+            reverse=True,
+        )
+    else:
+        # Weighted severity priority score ranking
+        sorted_blackspots = sorted(
+            blackspots,
+            key=lambda bs: (bs.priority_score, bs.crash_count),
+            reverse=True,
+        )
 
+    total_blackspots = len(sorted_blackspots)
     anchors = [(bs.anchor_lat, bs.anchor_lon) for bs in sorted_blackspots]
-    geoms = resolve_non_overlapping_polygons(anchors, radius_m)
+
+    if clip_polygons:
+        geoms = resolve_non_overlapping_polygons(anchors, radius_m)
+    else:
+        # Standard unclipped QGIS circular buffer outlines
+        geoms = [circle_polygon_geojson(lat, lon, radius_m) for lat, lon in anchors]
 
     for rank, (bs, geom) in enumerate(zip(sorted_blackspots, geoms), start=1):
+        color = "#DC2626" if rank_by == "crash_count" else bs.priority_color
+        label_text = (
+            f"BS#{bs.bs_id} | Rank #{rank} | {bs.crash_count} crashes"
+            if rank_by == "crash_count"
+            else f"BS#{bs.bs_id} | Score {bs.priority_score} | {bs.crash_count} crashes"
+        )
+        tier_label = f"Rank #{rank} ({bs.crash_count} crashes)" if rank_by == "crash_count" else bs.priority_label
+
         props = {
-            # ── New terminology ────────────────────────────────────────────
             "priority_rank":              rank,
+            "ranking_metric":             rank_by,
+            "algorithm_type":             "modified" if clip_polygons else "morth_standard",
             "total_blackspots":           total_blackspots,
             "bs_id":                      bs.bs_id,
             "crash_count":                bs.crash_count,
@@ -670,17 +696,13 @@ def blackspots_to_geojson(blackspots: list[Blackspot], radius_m: float) -> dict:
             "no_injury_count":            bs.no_injury_count,
             "qualifying_count":           bs.qualifying_count,
             "priority_score":             bs.priority_score,
-            "priority_label":             bs.priority_label,
-            "priority_color":             bs.priority_color,
+            "priority_label":             tier_label,
+            "priority_color":             color,
             "qualifies_by":               " | ".join(bs.qualifies_by),
             "crash_ids":                  ", ".join(bs.crash_ids),
             "vehicle_count":              bs.vehicle_count,
-            "label": (
-                f"BS#{bs.bs_id} | Score {bs.priority_score} | "
-                f"{bs.crash_count} crashes"
-            ),
-            # point_count alias so existing MapLibre step expressions still work
-            "point_count":    bs.crash_count,
+            "label":                      label_text,
+            "point_count":                bs.crash_count,
         }
         circle_features.append({
             "type": "Feature",

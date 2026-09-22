@@ -27,6 +27,7 @@ from app.routes import admin
 from app.routes import dashboard              
 from app.routes import geo
 from app.routes import accident_admin_routes
+from app.routes import images
 from app.core.constants import (
     DB_RETRY_ATTEMPTS,
     DB_RETRY_DELAY_SECONDS,
@@ -107,6 +108,7 @@ app.include_router(admin.router)
 app.include_router(dashboard.router)         # ← /api/dashboard/*
 app.include_router(geo.router)               # ← /api/geo/* 
 app.include_router(accident_admin_routes.router) # ← /api/admin/surat/accidents/*
+app.include_router(images.router)            # ← /api/images/*
 
 
 

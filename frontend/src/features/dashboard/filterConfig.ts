@@ -8,6 +8,7 @@ import { DEFAULT_BASE_MAP, GEO_FILTER_LABEL } from "../../config/constants";
 import { isBlackspotVisualization } from "../../utils/dashboardFilters";
 
 /** Type representing all possible visualization types */
+/** Type representing all possible visualization types */
 export type VisualizationType =
   | "density_heatmap"
   | "kde_heatmap"
@@ -18,6 +19,7 @@ export type VisualizationType =
   | "temporal_analysis"
   | "network_blackspot"
   | "network_blackspot_merged"
+  | "segment_blackspots"
   | "risk_corridors"
   | "road_network";
 
@@ -55,17 +57,18 @@ export const VISUALIZATION_OPTIONS = [
   { value: "density_heatmap", label: "Density Heatmap" },
   // { value: "kde_heatmap", label: "Kernel Density Heatmap (KDE)" },
   // { value: "weighted_kde_heatmap", label: "Severity-Weighted KDE Heatmap" },
-  { value: "blackspot", label: "MoRTH Blackspot" },
+  { value: "morth_blackspot", label: "MoRTH Blackspot" },
+  { value: "blackspot", label: "Modified MoRTH Blackspot" },
   { value: "irc_greedy_blackspot", label: "IRC 131 Blackspot (Greedy)" },
   { value: "irc_grid_blackspot", label: "IRC 131 Blackspot (Grid)" },
   // { value: "snapped_accidents", label: "Network Snapped" },
-  { value: "risk_corridors", label: "Risk Corridors" },
+  { value: "segment_blackspots", label: "Segment Blackspots" },
   { value: "temporal_analysis", label: "Temporal Analysis" },
 ];
 
 /** Blackspot visualization options */
 export const BLACKSPOT_OPTIONS = [
-  { value: "blackspot", label: "MoRTH Blackspot" },
+  { value: "morth_blackspot", label: "MoRTH Blackspot" },
   { value: "irc_greedy_blackspot", label: "IRC 131 Blackspot (Greedy)" },
   { value: "irc_grid_blackspot", label: "IRC 131 Blackspot (Grid)" },
 ];
@@ -73,11 +76,12 @@ export const BLACKSPOT_OPTIONS = [
 /** Hotspot visualization options */
 export const HOTSPOT_OPTIONS = [
   { value: "density_heatmap", label: "Density Heatmap" },
-  { value: "risk_corridors", label: "Risk Corridors" },
+  { value: "segment_blackspots", label: "Segment Blackspots" },
 ];
 
 /** Test visualization options */
 export const TEST_VISUALIZATION_OPTIONS = [
+  { value: "blackspot", label: "Modified MoRTH Blackspot" },
   { value: "snapped_accidents", label: "Snapped Accident Points" },
   { value: "road_network", label: "Road Network" },
   { value: "merged_road_network", label: "Merged Road Network" },
@@ -97,12 +101,14 @@ export const VISUALIZATION_VARIANT_LABELS: Record<string, string> = {
   density_heatmap: "Crash Type",
   // kde_heatmap: "Crash Type",
   // weighted_kde_heatmap: "Crash Type",
+  morth_blackspot: "Crash Type",
   blackspot: "Crash Type",
   irc_greedy_blackspot: "Crash Type",
   irc_grid_blackspot: "Crash Type",
   snapped_accidents: "Crash Type",
   network_blackspot: "Crash Type",
   network_blackspot_merged: "Crash Type",
+  segment_blackspots: "Crash Type",
   risk_corridors: "Crash Type",
   road_network: "Crash Type",
   merged_road_network: "Crash Type",
